@@ -60,7 +60,6 @@
    if(e.shiftKey&&(document.activeElement===first||!overlay.contains(document.activeElement))){e.preventDefault();last.focus()}
    else if(!e.shiftKey&&(document.activeElement===last||!overlay.contains(document.activeElement))){e.preventDefault();first.focus()}
   }
-  // Prevent canvas shortcuts (V/H/N/Delete) from firing behind a dialog.
-  e.stopPropagation();
+  // Canvas shortcuts are gated in app.js while dialogs are open; preserve inner controls' key events.
  },true);
 })();
