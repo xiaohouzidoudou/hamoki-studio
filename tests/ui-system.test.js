@@ -7,6 +7,7 @@ const root=path.resolve(__dirname,'..');
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const css=fs.readFileSync(path.join(root,'assets/ui-system.css'),'utf8');
 const ui=fs.readFileSync(path.join(root,'assets/ui-system.js'),'utf8');
+const app=fs.readFileSync(path.join(root,'assets/app.js'),'utf8');
 
 test('new UI assets load after existing application styles and scripts',()=>{
  assert.match(html,/<link rel="stylesheet" href="assets\/style\.css">\s*<link rel="stylesheet" href="assets\/ui-system\.css">/);
@@ -23,6 +24,7 @@ test('modal keyboard trap preserves dismiss and canvas shortcuts',()=>{
  assert.match(ui,/MutationObserver/);
  assert.match(ui,/e\.key==='Tab'/);
  assert.match(ui,/e\.key==='Escape'/);
- assert.match(ui,/stopPropagation/);
+ assert.match(app,/document.querySelector\('\.modal-back:not\(\.hidden\)'\)\)return/);
+ assert.doesNotMatch(ui,/e\.stopPropagation\(\)/);
  assert.match(ui,/focusables\(remaining\)/);
 });
