@@ -1,11 +1,78 @@
-# Hamoki Studio
+# Hamoki Studio V0.6.3 — 邀请码账号 + 一键错误日志
 
-Hamoki Studio source repository.
+保持原有无限画布、生图队列、图片反推、模型对比等功能。V0.6.3 只增加极简账号体系和排错日志，**未改动上游 AI 接口适配器**。
 
-Current production baseline: v0.6.33-desktop-polish.
+## 账号系统
 
-Development workflow: edit locally, test, commit and push to GitHub; deploy to production only after verification.
+- 注册：**用户名 / 密码 / 由部署者在环境变量中设置的邀请码**，不需要邮件或手机，也没有管理后台。
+- 用户名：2–30 位英数字、点、下划线、短横线；密码：6–72 位。没有找回密码功能。
+- 登录状态：30 天持久 Cookie，会在使用期间续期；容器重启后仍保持登录。
+- 每个账号有自己独立的项目、图片、任务、历史和中转站。API Key 用 AES-256-GCM 在账号专属服务端目录加密保存，不会发回明文。
+- 每账号图片预算默认 **1 GB**；所有新账号的总存储预算默认 **5 GB**。注册人数没有人为上限。
+- 空间不足时，先清理当前用户的旧缩略图，再按时间顺序自动删除该用户最旧的已保存图片，并从画布/历史移除对应引用。**不会清理其他账号的任何作品**；当前用户已无可清理的旧图片则拒绝新上传。
+- 旧版匿名浏览器工作区、最早单用户数据**原样保留，不自动迁移给新注册用户**。
 
-Do not commit API keys, `.env`, private deployment configuration, user data or persistent volumes.
+## 小按钮：查看日志
 
-Source import is in progress. This repository is not yet a complete source backup.
+网页左侧「中转站管理」下方有一个「查看日志」按钮，点击弹出当前账号的诊断日志，提供：
+
+- 查看错误时间、阶段、请求方法、API 路径、HTTP 状态码、模型及简短报错
+- 刷新、复制日志（适合贴给 Codex）、清空本账号日志
+- 生图队列异步失败、上游 429、连接检查失败、付费模型能力实测失败（即使返回 HTTP 200）、普通 API 错误及浏览器脚本异常
+- 每个账号最多保存最近 **160** 条日志，超出自动丢弃旧日志，不会无限增长
+
+安全设计：不记录请求正文、API Key、密码、Token、提示词和图片，服务端在写盘前也做脱敏；日志文件仅位于当前账号私有目录。
+
+Codex 可使用同源、带登录 Cookie 的接口：
+
+```text
+GET    /api/logs     读取当前账号的诊断日志（最新在前）
+POST   /api/logs     写入经过服务端脱敏的浏览器错误（仅允许当前账号）
+DELETE /api/logs     清空当前账号的诊断日志
+```
+
+**注意：API 模型兼容问题尚未修复**。本次改的是日志与账号，不代表真实付费生图已经验证可用。需要用户在自己登录的独立 HTTPS 站点添加 Key，自主确认付费测试。
+
+## 安装（Docker Compose）
+
+1. 使用独立 HTTPS 域名，反向代理到 Docker 在 `127.0.0.1:8030` 的回环监听端口。不要把真实 API Key 用于共享的 dev 预览域名。
+2. 复制 `.env.example` 到服务器的私有 `.env`，设置 `APP_ENCRYPTION_KEY` 为至少 32 字符的随机值，并设置 `APP_ALLOWED_HOST` 为真实域名，`COOKIE_SECURE=1`。
+3. `docker compose up -d --build`。更新现有容器之前必须备份数据卷与 `.env`，不得在本地初始代码目录直接覆盖现有数据卷。
+4. 运行 `npm test`：覆盖旧生图适配器与新账号、独立密钥、图片清理、日志接口、上游模拟错误、会话持久化。
+
+关键变量在 `.env.example` 中：`INVITE_CODE` 必须自行设置私密随机值，其他包括 `USER_QUOTA_GB=1`、`TOTAL_QUOTA_GB=5`、`MAX_CONCURRENT=1`。
+
+## 项目结构
+
+```text
+gateway.js             账号、会话、隔离、日志权限与 5GB 总量校验
+workspace.js           每个账号的项目、媒体、1GB 清理与生图任务
+lib/diagnostics.js     日志脱敏、存储、回收
+lib/upstream.js        各个 AI 协议适配器（本次未修改）
+assets/app.js          创作前端 + 一键日志查看
+assets/style.css       前端界面
+index.html             登录、注册和日志弹窗
+```
+
+**数据恢复提醒**：旧的 v0.6.2 浏览器匿名 Cookie 工作区和更早的单人数据不能自动划给新账号。请保留完整备份后再考虑单独迁移。
+
+
+## v0.6.4 · 通用能力路由
+
+每个账号有独立服务商池，可以将文字对话 (`text`)、图片生成 (`image`) 和图片反推 (`vision`) 分别绑定到任意支持的中转站及模型。默认同一服务商使用原基础 API 地址/Key；每项能力可以解除继承，单独填写地址与 Key。独立 Key 继续在账号数据文件中加密保存，不会通过 GET 返回。
+
+`GET /api/bindings` 返回三项当前路由，`PUT /api/bindings` 保存 `{bindings:{text:{providerId,model},image:{...},vision:{...}}}`。`POST /api/chat` 是文字 API（提供 `prompt` 和可选 `projectId` / `model`），`POST /api/jobs` 用图片能力，`POST /api/reverse` 用反推能力。`GET /api/models?providerId=...&capability=text` 按对应 Key/URL 查询模型。
+
+旧版本 providers.enc.json 原样可读，缺失 capabilities/bindings 时在内存中映射原 imageModel/visionModel；只有用户明确保存时才写回加密文件。局部重绘和去背景仍使用当前图片生成能力，其他能力不调用未实现接口。
+
+## V0.6.5 · 连续 AI 对话与流式输出
+
+文字能力现在支持项目级多轮上下文：只读取当前账号、当前项目中标记为 `capability=text` 的最近 24 条已完成问答，每条最多 3,000 字，总历史最多 16,000 字，避免聊天费用和隐私失控。画布生图的提示词和图片**不自动发送到文字模型**；不同项目/账号互不共享聊天上下文。
+
+- `POST /api/chat/stream`：使用当前账号的文字能力绑定及独立 Key/URL，返回带有 `start`、`delta`、`done`、`error` 事件的 `text/event-stream`；优先使用上游原生流式输出，兼容部分忽略流式请求而返回 JSON 的服务商。
+- `POST /api/chat`：继续保留兼容端点，现在同样携带项目内多轮文字上下文。
+- 支持 OpenAI 兼容聊天流（`/chat/completions`）及 Gemini 原生 `streamGenerateContent`。
+- 回复完成时才保存完整本轮用户问句和助手回复；取消、断线、上游报错不会将半截回复作为完整历史保存。请求可能已计费，重新发送前请注意。
+- 界面显示真实逐字/分块输出、生成时间和「停止生成」按钮，避免长回复时看起来卡住。
+
+本版**未改动**局部重绘、放大和去背景的上游路由，它们仍采用 V0.6.4 现有图片能力；后续需要针对各服务商非标准接口先做协议映射，不能假设所有模型都接受同一放大/去背景请求格式。

@@ -1,0 +1,13 @@
+{
+  "name": "hamoki-studio",
+  "private": true,
+  "version": "0.6.27",
+  "description": "Invite-only multi-account AI workspace with isolated per-user encrypted provider credentials",
+  "scripts": {
+    "start": "node gateway.js",
+    "test": "node --check server.js && node --check workspace.js && node --check gateway.js && node --check lib/upstream.js && node --check assets/app.js && node --test tests/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
