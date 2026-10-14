@@ -589,7 +589,7 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
     if(route==='/api/logout'&&req.method==='POST'&&process.env.ANON_WORKSPACE==='1')return fail(res,405,'免登录工作区无需退出');
     if(route==='/api/logout'&&req.method==='POST'){sessions.delete(cookie(req));res.setHeader('Set-Cookie',`hs_session=; HttpOnly; SameSite=Strict; Path=${BASE||''}/; Max-Age=0`);return respond(res,200,{ok:true})}
     if(req.method==='GET'&&route==='/api/storage')return respond(res,200,{...storageUsage(),mode:'local',concurrency:CONCURRENCY,notice:'每个账号默认 1GB 空间，空间不足时会自动清理最旧的历史图片和浏览器预览；请定期导出重要作品。'});
-    const creativeMatch=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/creative(?:\/(document|settings|analyze|quality|split|page))?$/);
+    const creativeMatch=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/creative(?:\/(document|document-remove|settings|analyze|quality|split|page))?$/);
     if(creativeMatch){
       const p=assertProject(creativeMatch[1]),action=creativeMatch[2],f=creativeState(p);
       if(!action&&req.method==='GET')return respond(res,200,creativeView(p));
@@ -600,6 +600,7 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
         if(f.documents.length>=creativePages.MAX_DOCUMENTS)throw Error('当前项目最多保存 12 份 Word，请另建一个项目');
         if(typeof b.data!=='string'||b.data.length>MAX_DOCX*1.38||!/^([A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(b.data))throw Error('Word 文件格式错误或超过 12MB');
         const raw=Buffer.from(b.data,'base64'),hash=crypto.createHash('sha256').update(raw).digest('hex');
+        if(f.documents.some(x=>x.name===b.name))return fail(res,409,'已有同名 Word，请先删除旧文件或换一个文件名后重新上传');
         if(f.documents.some(x=>x.hash===hash))return fail(res,409,'这份 Word 已经上传过了，避免重复导入');
         if(p.nodes.length+20>1800)throw Error('画布素材数量不足，无法继续导入原型图');
         const extracted=await parseDocx(raw,img=>storeMedia(img));
@@ -618,6 +619,23 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
         f.stages.document='done';f.status='document-ready';f.error='';f.progress=null;
         touchProject(p);
         return respond(res,201,{...creativeView(p),importedImages:doc.images.length,createdPages:f.pages.length});
+      }
+      if(action==='document-remove'&&req.method==='POST'){
+        const b=await readJSON(req),doc=f.documents.find(x=>x.id===b.docId);
+        if(!doc)throw Error('指定 Word 文档不存在');
+        const deletedIds=new Set((doc.images||[]).map(x=>x.nodeId));
+        f.documents=f.documents.filter(x=>x.id!==doc.id);
+        f.document=f.documents.at(-1)||null;
+        f.pages=f.pages.filter(x=>x.docId!==doc.id);
+        p.nodes=p.nodes.filter(x=>!deletedIds.has(x.id));
+        cleanupMessages(p,null,deletedIds);
+        const refs=f.styleNodeIds.filter(x=>!deletedIds.has(x));
+        if(refs.length!==f.styleNodeIds.length){f.styleNodeIds=refs;f.styleDNA='';f.styleLocked=false}
+        if(!f.pages.some(x=>x.id===f.activePageId))f.activePageId=f.pages[0]?.id||null;
+        f.analysis=creativeCurrent(f)?.analysis||{};f.quality=creativeCurrent(f)?.quality||null;
+        f.status=f.analysis.prompt?'ready':f.documents.length?'document-ready':'empty';
+        f.stages.document=f.documents.length?'done':'pending';f.error='';
+        touchProject(p);return respond(res,200,creativeView(p));
       }
       if(action==='settings'&&req.method==='POST'){
         const oldRefs=JSON.stringify(f.styleNodeIds||[]);

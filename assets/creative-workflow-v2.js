@@ -57,7 +57,10 @@
   const list=$('creativeDocList');list.replaceChildren();
   docs.forEach((d,i)=>{
    const row=el('div','creative-document-row');
-   row.append(el('span','creative-doc-index',String(i+1).padStart(2,'0')),el('strong',null,d.name),el('span','creative-doc-stat',d.text.length+' 字 · '+d.images.length+' 图'));
+   const remove=el('button','creative-doc-remove','移除');remove.type='button';
+   remove.setAttribute('aria-label','移除文档 '+d.name);remove.title='只从当前工作流移除该 Word 和对应原型';
+   remove.addEventListener('click',()=>removeDocument(d));
+   row.append(el('span','creative-doc-index',String(i+1).padStart(2,'0')),el('strong',null,d.name),el('span','creative-doc-stat',d.text.length+' 字 · '+d.images.length+' 图'),remove);
    list.append(row);
   });
   const grid=$('creativeDocumentImages');grid.replaceChildren();
@@ -161,6 +164,18 @@
    const r=await api('projects/'+projectId+'/creative/page',{method:'POST',body:{pageId}});
    f=r.flow;render();
   }catch(e){say('切换页面失败：'+e.message)}
+ }
+ async function removeDocument(d){
+  if(busy)return;
+  if(!confirm('从当前项目移除「'+d.name+'」及它的页面任务和导入的原型节点？其他 Word 和游戏风格将保留。'))return;
+  setBusy(true);
+  try{
+   const out=await api('projects/'+projectId+'/creative/document-remove',{method:'POST',body:{docId:d.id}});
+   f=out.flow;
+   if(typeof refreshProjectData==='function')await refreshProjectData();
+   render();toast('已移除 Word，其他文档与页面不受影响');
+  }catch(e){say('移除文档失败：'+e.message)}
+  finally{setBusy(false)}
  }
  async function savePage(){
   if(!active())return;

@@ -67,10 +67,12 @@
 
 /* V2: stable multi-document explorer and page-task board */
 .creative-document-list{display:flex;flex-direction:column;gap:7px;margin:11px 0 4px;max-height:176px;overflow-y:auto}
-.creative-document-row{display:grid;grid-template-columns:25px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 13px;border:1px solid #334448;border-radius:9px;background:#1f2a2e;color:#d5e6e1}
+.creative-document-row{display:grid;grid-template-columns:25px minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:10px 13px;border:1px solid #334448;border-radius:9px;background:#1f2a2e;color:#d5e6e1}
 .creative-document-row strong{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .creative-doc-index{font-size:11px;color:#65cfa9}
 .creative-doc-stat{font-size:10px;color:#9baeb0;white-space:nowrap}
+.creative-doc-remove{border:1px solid #485454;border-radius:7px;color:#b6c4c1;background:transparent;padding:6px 9px;font-size:11px;cursor:pointer}
+.creative-doc-remove:hover{color:#ffa69b;border-color:#95584e;background:#402d2d}
 .creative-page-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:13px 0 17px}
 .creative-page-card{appearance:none;display:flex;align-items:center;text-align:left;min-height:67px;gap:10px;padding:11px 12px;border:1px solid #33474b;border-radius:11px;background:#222d32;color:#e6f3ef;cursor:pointer;transition:background .18s ease,border-color .18s ease}
 .creative-page-card:hover{background:#2a383c;border-color:#5d7974}
@@ -88,6 +90,6 @@
 .creative-page-editor>.soft-btn{margin-top:11px;min-height:35px}
 .creative-style-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0 10px}
 .creative-style-head button{flex:none;min-height:34px}
-@media(max-width:820px){.creative-page-list{grid-template-columns:1fr}.creative-document-row{grid-template-columns:18px 1fr}.creative-doc-stat{grid-column:2}.creative-style-head{align-items:stretch;flex-direction:column}}
+@media(max-width:820px){.creative-page-list{grid-template-columns:1fr}.creative-document-row{grid-template-columns:18px 1fr auto}.creative-doc-stat{grid-column:2}.creative-style-head{align-items:stretch;flex-direction:column}}
 
 @media(prefers-reduced-motion:reduce){#creativeModal *,#creativeModal *::before,#creativeModal *::after{animation:none!important;transition:none!important}}

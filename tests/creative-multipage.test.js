@@ -79,6 +79,8 @@ test('multi DOCX upload keeps earlier docs and per-page plans, then backup resto
  assert.equal(up2.code,201,JSON.stringify(up2.body));
  let f=up2.body.flow;
  assert.equal(f.documents.length,2);
+ const sameName=await req('/api/projects/'+project+'/creative/document','POST',{name:'周年庆总览.docx',data:second.toString('base64')});
+ assert.equal(sameName.code,409,'a revised document must not silently create a same-name duplicate');
  assert.ok(f.pages.some(x=>x.name==='登录奖励详情'));
  assert.ok(f.pages.some(x=>x.name==='4 倍钻石'));
  const diamond=f.pages.find(x=>x.name==='4 倍钻石');
@@ -134,4 +136,9 @@ test('multi DOCX upload keeps earlier docs and per-page plans, then backup resto
  assert.notEqual(imported.documents[0].images[0].nodeId,f.documents[0].images[0].nodeId);
  assert.equal(imported.pages.find(x=>x.name==='登录奖励详情').analysis.prompt,f.pages.find(x=>x.name==='登录奖励详情').analysis.prompt);
  assert.equal(imported.routing?.text?.providerId||'', '', 'provider routes should not be copied through backup');
+ const remove=await req('/api/projects/'+imp.body.project.id+'/creative/document-remove','POST',{docId:imported.documents[0].id});
+ assert.equal(remove.code,200,JSON.stringify(remove.body));
+ assert.equal(remove.body.flow.documents.length,1);
+ assert.ok(remove.body.flow.pages.every(x=>x.docId!==imported.documents[0].id));
+ assert.equal((await req('/api/projects/'+project+'/creative')).body.flow.documents.length,2,'deleting imported copy must not affect original');
 });
