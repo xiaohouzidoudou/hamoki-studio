@@ -36,6 +36,14 @@ test('Word outlines become page tasks and never infer prototype for unrelated pa
  const refined=pageTools.parsePageResponse(ai,[doc],pages);
  assert.equal(refined.length,2);
  assert.equal(refined.find(p=>p.name==='4 倍钻石').imageIndexes.length,0);
+ const alternate=pageTools.parsePageResponse(JSON.stringify({pages:[
+  {name:'登录奖励页面',docId:'unreliable-model-doc-id',imageIndexes:[0]},
+  {name:'4 倍钻石 UI',docId:'',imageIndexes:[]},
+  {name:'完全不存在的世界地图',docId:'',imageIndexes:[]}
+ ]}),[doc],pages);
+ assert.equal(alternate.length,2,'only grounded headings survive freeform suffix and wrong ID');
+ assert.ok(alternate.some(p=>p.name==='登录奖励'));
+ assert.equal(alternate.find(p=>p.name==='4 倍钻石').imageIndexes.length,0);
 });
 test('append preserves saved AI page structure, manual content, prototypes and plans',()=>{
  const doc={id:'a',name:'a.docx',blocks:[{kind:'text',level:1,text:'登录奖励'},{kind:'text',text:'原始需求'}],images:[]};
