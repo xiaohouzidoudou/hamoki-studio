@@ -201,7 +201,7 @@ function creativePictureFromNode(p,id){
 }
 function creativeCheckModels(f,stage,{pageId,batch=false}={}){
  const config=f.routing||{};
- if(stage==='analyze'||stage==='split'){
+ if(stage==='analyze'||stage==='split'||stage==='director-retry'){
   const c=config.text||{};
   const text=effectiveProvider(provider(c.providerId||state.activeId),'text');
   emptyProvider(text);creativeModel(text,'text',c.model);
@@ -243,6 +243,17 @@ async function creativeSplit(p){
  }catch(e){f.status='failed';f.stages.document='failed';f.error=String(e.message||e).slice(0,450);touchProject(p);throw e}
  finally{creativeBusy.delete(p.id)}
 }
+// A long-running text model can finish after the ordinary chat deadline.
+const DIRECTOR_TIMEOUT_MS=330000;
+async function creativeDirectorResult(f,page,layout,text,model){
+ const d=creativePageDoc(f,page);
+ if(!d)throw Error('此页面的 Word 来源已不存在');
+ const context='【页面】'+page.name+'\n【来源文件】'+d.name+'\n【本页需求】'+(page.requirements||d.text.slice(0,5000));
+ return options.limiter.run(()=>generateText(text,{
+  model,prompt:creativeUpstream.directorPrompt(context,f.styleDNA||'【未提供风格参考图】需等待用户提供游戏实际 UI 截图后确定最终画风。',layout,f.notes),
+  maxPromptChars:58000,maxOutputTokens:4600,timeoutMs:DIRECTOR_TIMEOUT_MS
+ }));
+}
 async function creativeAnalyze(p,{pageId,batch=false}={}){
  const f=creativeState(p);
  if(!f.documents.length||!f.pages.length)throw Error('请先上传 Word 文档并确认拆分页面');
@@ -265,7 +276,7 @@ async function creativeAnalyze(p,{pageId,batch=false}={}){
  }
  creativeBusy.add(p.id);f.error='';f.status='running';f.quality=null;
  for(const k of ['style','layout','director','generation','quality'])f.stages[k]='pending';
- f.analysis={};f.progress={done:0,total:selected.length,pageId:selected[0]?.id,pageName:selected[0]?.name};touchProject(p);
+ f.analysis={};f.progress={done:0,total:selected.length,pageId:selected[0]?.id,pageName:selected[0]?.name,stage:'style',startedAt:time()};touchProject(p);
  let stage='style',currentPage=null;
  try{
   if(refs.length&&!f.styleDNA){
@@ -281,13 +292,13 @@ async function creativeAnalyze(p,{pageId,batch=false}={}){
    currentPage=page;f.progress.pageId=page.id;f.progress.pageName=page.name;
    const d=creativePageDoc(f,page),prototype=creativePagePicture(f,page);
    const context='【页面】'+page.name+'\n【来源文件】'+d.name+'\n【本页需求】'+(page.requirements||d.text.slice(0,5000));
-   stage='layout';f.stages.layout=prototype?'running':'pending';page.status='analyzing';touchProject(p);
+   stage='layout';f.progress.stage='layout';f.progress.startedAt=time();f.stages.layout=prototype?'running':'pending';page.status='analyzing';touchProject(p);
    const layout=prototype
     ?await options.limiter.run(()=>analyzeCreativeImages(vision,[fetchMedia(prototype.file)],vm,creativeUpstream.layoutPrompt(context,f.notes)))
     :'【无布局原型】此页面没有可靠的原型图。只能依据文档文字给出设计建议；禁止声称已还原原型位置。';
    f.stages.layout=prototype?'done':'pending';page.analysis.layout=layout;touchProject(p);
-   stage='director';f.stages.director='running';touchProject(p);
-   const director=await options.limiter.run(()=>generateText(text,{model:tm,prompt:creativeUpstream.directorPrompt(context,f.styleDNA||'【未提供风格参考图】需等待用户提供游戏实际 UI 截图后确定最终画风。',layout,f.notes),maxPromptChars:58000,maxOutputTokens:4600}));
+   stage='director';f.progress.stage='director';f.progress.startedAt=time();f.stages.director='running';touchProject(p);
+   const director=await creativeDirectorResult(f,page,layout,text,tm);
    page.analysis={style:f.styleDNA||'',layout,director,prompt:creative.extractPrompt(director)};
    page.status='ready';page.updatedAt=time();f.progress.done++;f.stages.director='done';touchProject(p);
   }
@@ -299,6 +310,33 @@ async function creativeAnalyze(p,{pageId,batch=false}={}){
   f.stages[stage]='failed';f.status='failed';f.error=String(e.message||e).slice(0,450);
   if(currentPage)currentPage.status='failed';
   touchProject(p);throw e;
+ }finally{creativeBusy.delete(p.id)}
+}
+// Explicit, billable retry: reuse saved STYLE and Layout Blueprint, never rerun vision.
+async function creativeRetryDirector(p,{pageId}={}){
+ const f=creativeState(p);
+ if(creativeBusy.has(p.id))throw Error('已有正在执行的 AI 工作流');
+ if(DEMO_MODE)throw Error('演示模式不能调用付费 AI');
+ const page=f.pages.find(x=>x.id===(pageId||f.activePageId));
+ if(!page)throw Error('待重试页面不存在');
+ if(!page.analysis?.layout||page.analysis?.prompt||page.status!=='failed'||f.stages.director!=='failed')
+  throw Error('只有美术总监失败且布局结果已保存的页面才能单独重试');
+ const config=f.routing?.text||{},text=effectiveProvider(provider(config.providerId||state.activeId),'text');
+ emptyProvider(text);const model=creativeModel(text,'text',config.model);
+ creativeBusy.add(p.id);f.status='running';f.error='';
+ f.stages.director='running';page.status='analyzing';
+ f.progress={done:0,total:1,pageId:page.id,pageName:page.name,stage:'director',startedAt:time()};
+ touchProject(p);
+ try{
+  const director=await creativeDirectorResult(f,page,page.analysis.layout,text,model);
+  page.analysis={...page.analysis,style:f.styleDNA||'',director,prompt:creative.extractPrompt(director)};
+  page.status='ready';page.updatedAt=time();
+  f.stages.director='done';f.status='ready';f.progress.done=1;
+  f.analysis=creativeCurrent(f)?.analysis||{};f.updatedAt=time();touchProject(p);
+  return creativeView(p);
+ }catch(e){
+  f.stages.director='failed';f.status='failed';page.status='failed';
+  f.error=String(e.message||e).slice(0,450);touchProject(p);throw e;
  }finally{creativeBusy.delete(p.id)}
 }
 async function creativeQuality(p,historyId){
@@ -639,7 +677,7 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
     if(route==='/api/logout'&&req.method==='POST'&&process.env.ANON_WORKSPACE==='1')return fail(res,405,'免登录工作区无需退出');
     if(route==='/api/logout'&&req.method==='POST'){sessions.delete(cookie(req));res.setHeader('Set-Cookie',`hs_session=; HttpOnly; SameSite=Strict; Path=${BASE||''}/; Max-Age=0`);return respond(res,200,{ok:true})}
     if(req.method==='GET'&&route==='/api/storage')return respond(res,200,{...storageUsage(),mode:'local',concurrency:CONCURRENCY,notice:'每个账号默认 1GB 空间，空间不足时会自动清理最旧的历史图片和浏览器预览；请定期导出重要作品。'});
-    const creativeMatch=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/creative(?:\/(document|document-remove|settings|analyze|quality|split|page))?$/);
+    const creativeMatch=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/creative(?:\/(document|document-remove|settings|analyze|director-retry|quality|split|page))?$/);
     if(creativeMatch){
       const p=assertProject(creativeMatch[1]),action=creativeMatch[2],f=creativeState(p);
       if(!action&&req.method==='GET')return respond(res,200,creativeView(p));
@@ -733,6 +771,16 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
         if(b.pageId&&!f.pages.some(x=>x.id===b.pageId))throw Error('未找到该页面');
         creativeCheckModels(f,'analyze',{pageId:b.pageId,batch:b.batch===true});
         void creativeAnalyze(p,{pageId:b.pageId,batch:b.batch===true}).catch(e=>diag({source:'creative',level:'error',action:'analyze',message:String(e.message||e).slice(0,350)}));
+        return respond(res,202,{started:true,flowStatus:'running'});
+      }
+      if(action==='director-retry'&&req.method==='POST'){
+        const b=await readJSON(req);
+        if(!state.providers.length)throw Error('请先配置文字模型');
+        creativeCheckModels(f,'director-retry');
+        const page=f.pages.find(x=>x.id===(b.pageId||f.activePageId));
+        if(!page?.analysis?.layout||page.analysis?.prompt||page.status!=='failed'||f.stages.director!=='failed')
+          throw Error('没有可以单独重试的美术总监失败任务');
+        void creativeRetryDirector(p,{pageId:b.pageId}).catch(e=>diag({source:'creative',level:'error',action:'director-retry',message:String(e.message||e).slice(0,350)}));
         return respond(res,202,{started:true,flowStatus:'running'});
       }
       if(action==='quality'&&req.method==='POST'){
