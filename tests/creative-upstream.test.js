@@ -59,3 +59,40 @@ test('CHECK role uses original §5 and quality gate of upstream UI page skill',(
  assert.match(prompt,/REVIEW NOTES|CHECK/);
  assert.match(prompt,/game UI|游戏 UI|页面/);
 });
+
+test('two original game UI skills are included with their own licenses',()=>{
+ const ux=fs.readFileSync(path.join(base,'game-ui-ux/SKILL.md'),'utf8');
+ const three=fs.readFileSync(path.join(base,'threejs-game-ui-designer/SKILL.md'),'utf8');
+ assert.match(ux,/anchors \+ containers/);
+ assert.match(three,/premium Three\.js game UI/i);
+ assert.match(fs.readFileSync(path.join(base,'game-ui-ux/LICENSE'),'utf8'),/Apache License/);
+ assert.match(fs.readFileSync(path.join(base,'threejs-game-ui-designer/LICENSE'),'utf8'),/MIT License/);
+ assert.equal(a.version.game_ui_ux,'0a70cfc64672d512c5b5b6006b5dcb5cf90dbdbd');
+ assert.equal(a.version.threejs_game_ui_designer,'8286774b22a2566bf894dbc825825c16921866af');
+});
+test('layout respects safe areas, text fit, and original prototype boundaries',()=>{
+ const p=a.layoutPrompt('签到奖励格和领取按钮','保留原型控件');
+ assert.match(p,/Safe-area math/);
+ assert.match(p,/Localization-ready layout/);
+ assert.match(p,/Responsive constraints/);
+ assert.match(p,/原型图仅提供功能元件和布局，不提供美术风格/);
+ assert.ok(p.length<18000);
+});
+test('art direction follows premium game UI hierarchy without changing Style DNA',()=>{
+ const p=a.directorPrompt('周年庆签到 UI',styleOutput,'原型奖励格','保持游戏原有画风');
+ assert.match(p,/SYNTHESIZER/);
+ assert.match(p,/Hierarchy and states/);
+ assert.match(p,/Menus and overlays/);
+ assert.match(p,/Style and cohesion/);
+ assert.match(p,/严格服从已分析的游戏 Style DNA/);
+ assert.match(p,/保持游戏原有画风/);
+ assert.ok(p.length<76000);
+});
+test('QA evaluates visually observed issues, not imaginary game-engine code',()=>{
+ const p=a.qualityPrompt('签到','风格指南','原型');
+ assert.match(p,/CHECKER/);
+ assert.match(p,/Recurring failures/);
+ assert.match(p,/Accessibility/);
+ assert.match(p,/不得声称已测试不可见的按钮事件/);
+ assert.ok(p.length<38000);
+});

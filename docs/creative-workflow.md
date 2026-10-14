@@ -20,3 +20,10 @@
 - 模型调用仅在人工点击并确认后触发，超时、服务重启不会自动重复付费。图片模型继续复用原工作台。
 - 已正式引入并在运行时读取固定版本的 [tnbao91/ai_asset](https://github.com/tnbao91/ai_asset) 上游 STYLE、ASSET、CHECK、官方 Schema、风格词典及 [game-ui-design-workflow](https://github.com/guiguiyan930-source/game-ui-design-workflow) 原始设计 Skill；见 `vendor/UPSTREAM.md` 的版本、许可证和详细调用说明。STYLE 产出的 YAML 必须通过原 Schema 类型/枚举验证，不合格明确失败，不冒充已批准的风格。用户需核对颜色并手动锁定。无 Unity、切图、图集输出。
 - 测试使用独立开发分支和预览环境，正式站不变。真实策划文档与任何 API Key 不上传公开仓库。
+
+## 新增开源游戏 UI 技能（固定原始版本）
+- game-ui-ux：布局分析时检查安全区、比例和长文本；质检中检查可见文字、按钮边距。
+- threejs-game-ui-designer：美术总监加强活动/菜单的视觉主次、个性化组件造型、游戏世界观一致性；避免普通网页后台式排版。
+- 只提取适用于静态游戏 UI 图片的原文段落，不会自动编写 Three.js/Unity 运行时、交互事件和图集切片。
+- Style DNA 和策划 Word 优先；原型只提供功能元件及布局，不提供美术风格。禁止擅自新增奖励或功能。
+- 原始来源、许可和固定提交见 vendor/UPSTREAM.md。
