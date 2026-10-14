@@ -13,6 +13,9 @@ async function fake(t){
   calls.push({path:req.url,body:Buffer.concat(chunks),contentType:req.headers['content-type']});
   res.setHeader('Content-Type','application/json');
   if(req.url==='/v1/chat/completions'){
+   if(JSON.parse(Buffer.concat(chunks).toString()).model==='custom-chat-image'){
+    return res.end(JSON.stringify({choices:[{message:{content:'data:image/png;base64,'+png.toString('base64')}}]}));
+   }
    res.statusCode=400;
    return res.end(JSON.stringify({error:{message:'This model is not supported on the Chat Completions endpoint'}}));
   }
@@ -36,6 +39,20 @@ test('GPT Image 2.5 ignores generic chat-image mode when provided with style and
  assert.match(mock.calls[0].body.toString('latin1'),/name="image\[\]"/);
  assert.match(mock.calls[0].body.toString('latin1'),/gpt-image-2.5/);
  assert.match(mock.calls[0].body.toString('latin1'),/864x1536/);
+});
+test('custom chat image models retain chat routing and both reference images',async t=>{
+ const mock=await fake(t);
+ const refs=[{mime:'image/png',bytes:png},{mime:'image/png',bytes:png}];
+ const result=await generate(mock.provider,{model:'custom-chat-image',prompt:'game UI',ratio:'9:16',resolution:'1K',roleHints:['style','shape']},refs,null);
+ assert.equal(result.mime,'image/png');
+ assert.deepEqual(mock.calls.map(x=>x.path),['/v1/chat/completions']);
+ const body=JSON.parse(mock.calls[0].body.toString());
+ assert.equal(body.messages[0].content.filter(x=>x.type==='image_url').length,2);
+});
+test('DALL-E models ignore generic chat mode for generation',async t=>{
+ const mock=await fake(t);
+ await generate(mock.provider,{model:'dall-e-3',prompt:'game UI',ratio:'1:1',resolution:'1K',roleHints:[]},[],null);
+ assert.deepEqual(mock.calls.map(x=>x.path),['/v1/images/generations']);
 });
 test('GPT Image 2.5 without references uses image generations, not Chat Completions',async t=>{
  const mock=await fake(t);
