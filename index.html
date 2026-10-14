@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="assets/style.css">
 <link rel="stylesheet" href="assets/ui-system.css">
 <link rel="stylesheet" href="assets/creative-workflow.css">
+<link rel="stylesheet" href="assets/asset-derivation.css">
 </head><body>
 <svg aria-hidden="true" class="svg-sprites" xmlns="http://www.w3.org/2000/svg">
  <symbol id="ic-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
@@ -53,6 +54,7 @@
   <div id="projectList" class="project-list"></div>
   <div class="projects-bottom">
    <button class="side-action" id="openCreativeWorkflow" type="button"><svg class="icon"><use href="#ic-spark"/></svg> AI 美术工作流 <span class="side-count">NEW</span></button>
+   <button class="side-action" id="openDeriveAssets" type="button"><svg class="icon"><use href="#ic-image"/></svg> 一图衍生素材 <span class="side-count">NEW</span></button>
    <button class="side-action" id="openLibrary"><svg class="icon"><use href="#ic-image"/></svg> 作品图库 <span id="libraryCount" class="side-count">0</span></button>
    <button class="side-action" id="openTasks"><svg class="icon"><use href="#ic-clock"/></svg> 生成任务 <span id="queueBadge" class="side-count">0</span></button>
    <button class="side-action" id="manageProviders"><svg class="icon"><use href="#ic-settings"/></svg> 中转站管理</button>
@@ -212,8 +214,58 @@
  </div></div>
  <div class="modal-back hidden" id="maskModal"><div class="modal mask-modal"><div class="modal-head"><div><span class="eyebrow">LOCAL MASK EDITOR</span><h2>局部重绘</h2><p>涂抹需要修改的区域，透明蒙版指导 AI 编辑。只有支持 Images Edits 蒙版的模型可以使用；AI 可能无法严格限制在笔刷边界。</p></div><button class="icon-btn" data-close="maskModal"><svg class="icon"><use href="#ic-close"/></svg></button></div><div class="mask-stage"><div id="maskStage"><img id="maskImg" alt="需要修改的图片"><canvas id="maskCanvas"></canvas></div></div><div class="mask-controls"><button class="soft-btn active" id="paintTool">画笔</button><button class="soft-btn" id="eraseTool">橡皮擦</button><label>笔刷 <span id="brushLabel">48</span> px</label><input id="brushSize" type="range" min="8" max="200" value="48"><button class="soft-btn" id="clearBrush">清空</button><button class="primary-btn" id="acceptMask">应用蒙版</button></div></div></div>
 </div>
+<div class="modal-back hidden" id="deriveModal">
+ <section class="modal derive-modal" role="dialog" aria-modal="true" aria-labelledby="deriveTitle">
+  <div class="derive-head">
+   <div><span class="creative-kicker">ONE REFERENCE · FULL ASSET SET</span><h2 id="deriveTitle">一图衍生素材</h2><p>一套 Style DNA，生成同风格的完整 UI、组件、图标、背景和角色。无需 Word，分阶段确认费用。</p></div>
+   <button type="button" class="icon-btn" id="deriveClose" aria-label="关闭一图衍生素材"><svg class="icon"><use href="#ic-close"/></svg></button>
+  </div>
+  <div class="derive-body">
+   <div class="derive-setup">
+    <section class="derive-section">
+     <div class="derive-section-head"><span class="derive-step">01</span><div><h3>参考图与统一画风</h3><p>从当前画布选 1–5 张参考图，或者直接复用项目已完成的 Style DNA。</p></div></div>
+     <div id="deriveRefs" class="derive-refs"></div>
+     <label class="derive-line">画风来源<select class="field" id="deriveStyleSource"></select></label>
+     <p id="deriveStyleInfo" class="derive-hint"></p>
+     <div class="derive-models">
+      <label>视觉模型服务商<select class="field" id="deriveVisionProvider"></select></label>
+      <label>视觉模型 ID<input class="field" id="deriveVisionModel" placeholder="输入支持识图的模型 ID" autocomplete="off"></label>
+     </div>
+     <button type="button" class="soft-btn" id="deriveAnalyze">分析选中参考图 · 可能收费</button>
+    </section>
+    <section class="derive-section">
+     <div class="derive-section-head"><span class="derive-step">02</span><div><h3>素材任务清单</h3><p>五种类型可自由增减，最多一次准备 8 份；每份各自生成一张图。</p></div></div>
+     <div class="derive-items" id="deriveItems"></div>
+     <button type="button" class="soft-btn" id="deriveAdd">+ 添加一份素材任务</button>
+     <div class="derive-models">
+      <label>文字模型服务商<select class="field" id="deriveTextProvider"></select></label>
+      <label>文字模型 ID<input class="field" id="deriveTextModel" placeholder="输入文字模型 ID" autocomplete="off"></label>
+     </div>
+     <button type="button" class="primary-btn derive-wide" id="derivePrepare">按 ai_asset 自动准备多份提示词</button>
+    </section>
+   </div>
+   <div class="derive-results">
+    <div class="derive-results-head"><div><span class="creative-kicker">03 · REVIEW AND GENERATE</span><h3>检查草稿，确认批量生图</h3><p>草稿可直接修改；不会在准备完成后自动生成图片。</p></div><span id="deriveSummary" class="derive-summary"></span></div>
+    <div id="deriveBusy" class="derive-busy hidden"><span class="derive-spinner"></span>AI 正在处理，关闭窗口后仍会继续，请勿重复提交。</div>
+    <div id="deriveDrafts" class="derive-drafts"></div>
+    <div class="derive-submit-bar">
+     <div class="derive-models">
+      <label>生图服务商<select class="field" id="deriveImageProvider"></select></label>
+      <label>生图模型 ID<input class="field" id="deriveImageModel" placeholder="输入生图模型 ID" autocomplete="off"></label>
+      <label>分辨率<select class="field" id="deriveResolution"><option>1K</option><option>2K</option><option>4K</option></select></label>
+      <label>质量<select class="field" id="deriveQuality"><option value="auto">自动</option><option value="low">快速</option><option value="medium">标准</option><option value="high">高品质</option></select></label>
+     </div>
+     <div class="derive-cta"><button type="button" class="soft-btn" id="deriveSave">保存提示词修改</button><button type="button" class="primary-btn" id="deriveSubmit">确认费用并批量生图</button></div>
+     <div id="deriveStatus" class="derive-status" role="status" aria-live="polite"></div>
+    </div>
+   </div>
+  </div>
+ </section>
+</div>
+
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <script src="assets/app.js" defer></script>
 <script src="assets/ui-system.js" defer></script>
 <script src="assets/creative-workflow-v2.js" defer></script>
+<script src="assets/asset-derivation.js" defer></script>
 </body></html>
