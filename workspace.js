@@ -321,7 +321,7 @@ async function creativeQuality(p,historyId){
   const prompt=reference&&prototype
    ?creativeUpstream.qualityPrompt(context,f.styleDNA,page.analysis.layout)
    :'你是独立游戏 UI 视觉质检员，图像按顺序为'+(reference?'游戏风格参考、':'')+(prototype?'策划原型、':'')+'最终生成结果。仅对实际提供的图片负责。对比风格、界面结构和文字，标明无法判断的内容。\n设计要求：'+page.requirements+'\n风格规则：'+f.styleDNA+'\n布局规则：'+page.analysis.layout;
-  const report=await options.limiter.run(()=>analyzeCreativeImages(vision,photos,vm,prompt));
+  const report=await options.limiter.run(()=>analyzeCreativeImages(vision,photos,vm,prompt,{timeoutMs:165000}));
   page.quality={historyId,report,checkedAt:time()};
   f.quality=page.quality;f.stages.generation='done';f.stages.quality='done';f.status='review';page.status='review';touchProject(p);
   return creativeView(p);
