@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="assets/ui-system.css">
 <link rel="stylesheet" href="assets/creative-workflow.css">
 <link rel="stylesheet" href="assets/asset-derivation.css">
+<link rel="stylesheet" href="assets/game-ui-delivery.css">
 </head><body>
 <svg aria-hidden="true" class="svg-sprites" xmlns="http://www.w3.org/2000/svg">
  <symbol id="ic-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
@@ -54,6 +55,7 @@
   <div id="projectList" class="project-list"></div>
   <div class="projects-bottom">
    <button class="side-action" id="openCreativeWorkflow" type="button"><svg class="icon"><use href="#ic-spark"/></svg> AI 美术工作流 <span class="side-count">NEW</span></button>
+   <button class="side-action" id="openDelivery" type="button"><svg class="icon"><use href="#ic-image"/></svg> 组件交付 <span class="side-count">NEW</span></button>
    <button class="side-action" id="openDeriveAssets" type="button"><svg class="icon"><use href="#ic-image"/></svg> 一图衍生素材 <span class="side-count">NEW</span></button>
    <button class="side-action" id="openLibrary"><svg class="icon"><use href="#ic-image"/></svg> 作品图库 <span id="libraryCount" class="side-count">0</span></button>
    <button class="side-action" id="openTasks"><svg class="icon"><use href="#ic-clock"/></svg> 生成任务 <span id="queueBadge" class="side-count">0</span></button>
@@ -263,9 +265,47 @@
  </section>
 </div>
 
+<div class="modal-back hidden" id="deliveryModal">
+ <section class="modal delivery-modal" role="dialog" aria-modal="true" aria-labelledby="deliveryTitle">
+  <header class="delivery-head">
+   <div><span class="creative-kicker">GAME UI FACTORY · ASSET HANDOFF</span>
+   <h2 id="deliveryTitle">组件拆解与开发交付</h2>
+   <p>使用 game-ui-design-workflow 原始切图、Atlas 与引擎导出脚本。先拆图，人工复核，再打包。</p></div>
+   <button class="icon-btn" id="deliveryClose" aria-label="关闭组件交付窗口"><svg class="icon"><use href="#ic-close"/></svg></button>
+  </header>
+  <div class="delivery-body">
+   <div class="delivery-left">
+    <div class="delivery-heading"><span class="delivery-step">01</span><div><h3>选择已批准的素材板</h3><p>只选择元素分离、背景干净、无文字的 UI Kit 或图标板，不要选择完整游戏截图。</p></div></div>
+    <div id="deliverySources" class="delivery-sources"></div>
+    <label class="delivery-label"><input type="checkbox" id="deliveryPageApproved"> 我已确认这张素材板可以用于切图（如有文字、粘连需先重新生成）</label>
+    <div class="delivery-settings">
+     <label>识别模式<select class="field" id="deliveryMode"><option value="auto">自动识别透明/纯色背景</option><option value="alpha">优先透明通道</option><option value="background">纯色背景识别</option></select></label>
+     <label>背景容差<input class="field" id="deliveryTolerance" type="number" min="0" max="80" value="20"></label>
+     <label>相邻元素合并间距<input class="field" id="deliveryGap" type="number" min="0" max="10" value="2"></label>
+    </div>
+    <button class="primary-btn delivery-wide" id="deliverySplit">自动拆分为透明 PNG（本地免费）</button>
+    <p class="delivery-hint">本地运行切图脚本，不调用图片模型，也不消耗 Token。单个组件若与其他元素粘连或重叠，可能切不准确。</p>
+    <div class="delivery-heading delivery-second"><span class="delivery-step">02</span><div><h3>历史交付包</h3><p>可查看切图状态、重新打开审核结果。</p></div></div>
+    <div id="deliveryPacks" class="delivery-packs"></div>
+   </div>
+   <div class="delivery-right">
+    <div class="delivery-review-head"><div><span class="creative-kicker">03 · REVIEW AND PACKAGE</span><h3>逐个检查、命名和 9-slice</h3><p>每个切片都必须确认完整、透明、无乱码或残影。9-slice 边距需要你人工设定。</p></div><span id="deliverySummary" class="delivery-state"></span></div>
+    <div id="deliveryReview" class="delivery-review"></div>
+    <div class="delivery-footer">
+     <label class="delivery-label"><input type="checkbox" id="deliveryTextFree"> 已人工检查：所有切片无文字、无背景残留、无错误裁切</label>
+     <label class="delivery-label"><input type="checkbox" id="deliverySlicesReviewed"> 已检查组件命名、状态及 9-slice 边距</label>
+     <button type="button" class="primary-btn delivery-wide" id="deliveryExport">批准并生成 PNG ZIP、Atlas 和三种引擎 JSON</button>
+     <div id="deliveryDownloads" class="delivery-downloads"></div>
+     <div id="deliveryStatus" class="delivery-status" role="status" aria-live="polite"></div>
+    </div>
+   </div>
+  </div>
+ </section>
+</div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <script src="assets/app.js" defer></script>
 <script src="assets/ui-system.js" defer></script>
 <script src="assets/creative-workflow-v2.js" defer></script>
 <script src="assets/asset-derivation.js" defer></script>
+<script src="assets/game-ui-delivery.js" defer></script>
 </body></html>

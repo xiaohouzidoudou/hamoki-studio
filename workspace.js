@@ -131,6 +131,11 @@ for(const p of projects){
  const d=p.assetDerivation;
  if(d?.status==='running'){d.status='failed';d.error='服务重启中断了素材分析，可能已产生费用；请检查记录后决定是否重试';d.phase='';interruptedCreative=true}
 }
+for(const p of projects){
+ for(const pack of p.uiDeliveryPacks||[]){
+  if(['splitting','delivering'].includes(pack.status)){pack.status='failed';pack.error='服务重启中断了本地素材打包，可从原始图片重新拆分';interruptedCreative=true}
+ }
+}
 if(interruptedCreative)saveProjects();
 const creativeBusy=new Set();
 function creativeState(p){
@@ -769,6 +774,137 @@ function submitDerivation(p,body){
  return {groupId,jobs:created.map(publicJob)};
 }
 
+// Pinned upstream sprite splitting / atlas delivery integration. Each workspace
+// writes only inside its own DATA_DIR, never into public/static paths.
+const {execFile}=require('node:child_process');
+const {promisify}=require('node:util');
+const deliveryExecute=promisify(execFile);
+const deliveryBusy=new Set();
+const DELIVERY_ROOT=path.join(DATA_DIR,'game-ui-deliveries');
+fs.mkdirSync(DELIVERY_ROOT,{recursive:true,mode:0o700});
+function deliveryPack(p,id){
+ const item=(p.uiDeliveryPacks||[]).find(x=>x.id===id);
+ if(!item)throw Object.assign(Error('组件包不存在'),{status:404});
+ return item;
+}
+function deliveryPath(p,pack){
+ if(!/^[a-f0-9-]{36}$/.test(p.id)||!/^[a-f0-9-]{36}$/.test(pack.id))throw Error('交付包标识不合法');
+ return path.join(DELIVERY_ROOT,p.id,pack.id);
+}
+function deliveryView(p){
+ const files=(p.uiDeliveryPacks||[]).map(pack=>({
+  ...pack,
+  items:pack.items||[],
+  pngPreview:(pack.items||[]).map((item,index)=>BASE+'/api/projects/'+p.id+'/delivery/'+pack.id+'/file/sprite/'+index),
+  zipURL:pack.status==='delivered'?BASE+'/api/projects/'+p.id+'/delivery/'+pack.id+'/file/zip':null,
+  atlasURL:pack.status==='delivered'?BASE+'/api/projects/'+p.id+'/delivery/'+pack.id+'/file/atlas':null,
+  reviewedZipURL:pack.status==='delivered'?BASE+'/api/projects/'+p.id+'/delivery/'+pack.id+'/file/reviewed-zip':null
+ }));
+ return {packs:files,sources:history.filter(h=>h.projectId===p.id&&h.file).slice(0,120).map(h=>({
+  id:h.id,createdAt:h.createdAt,previewURL:BASE+'/api/previews/'+h.file,
+  url:BASE+'/api/media/'+h.file,prompt:(h.prompt||'').slice(0,140),size:h.resolution
+ })),maxPacks:20};
+}
+async function deliveryWorker(p,pack,task){
+ const dir=deliveryPath(p,pack);
+ try{
+  const {stdout}=await deliveryExecute('python3',[path.join(ROOT,'lib/game-ui-delivery.py'),task,dir],
+   {cwd:ROOT,timeout:task==='split'?110000:135000,maxBuffer:1024*1024,
+    env:{...nativeProcess.env,PYTHONUNBUFFERED:'1'}});
+  const output=JSON.parse(stdout.trim());
+  if(task==='split'){
+   pack.status='review';pack.items=output.items;pack.detectedMode=output.detectedMode;
+  }else{
+   pack.status='delivered';pack.atlasSize=output.atlasSize;pack.targets=output.manifestTargets;
+  }
+  pack.error='';pack.updatedAt=time();touchProject(p);
+ }catch(e){
+  pack.status='failed';pack.error=String(e.stderr||e.message||'本地资源处理失败').slice(0,450);
+  pack.updatedAt=time();touchProject(p);
+  diag({source:'delivery',level:'error',action:task,message:pack.error});
+ }finally{deliveryBusy.delete(p.id)}
+}
+function deliveryStart(p,body){
+ if(DEMO_MODE)throw Error('演示模式不支持素材切割');
+ if(deliveryBusy.has(p.id))throw Object.assign(Error('该项目已有切图任务进行中'),{status:409});
+ if((p.uiDeliveryPacks||[]).length>=20)throw Error('该项目最多保留 20 个交付包');
+ if(body.approvedPage!==true)throw Error('请先人工确认这是已批准的 UI Kit / 素材板，不是混杂文字的完整页面');
+ const item=history.find(h=>h.id===body.historyId&&h.projectId===p.id);
+ if(!item)throw Error('请选择当前项目已有的一张真实生图作品');
+ const mode=body.mode||'auto';
+ if(!['auto','alpha','background'].includes(mode))throw Error('切图识别模式不支持');
+ const tolerance=Number(body.tolerance??20),connectGap=Number(body.connectGap??2);
+ if(!Number.isInteger(tolerance)||tolerance<0||tolerance>80||
+   !Number.isInteger(connectGap)||connectGap<0||connectGap>10)throw Error('切图参数超出允许范围');
+ const file=mediaPath(item.file);
+ if(fs.statSync(file).size>18*1024*1024)throw Error('源图片超过 18 MB，无法安全切图');
+ const pack={id:crypto.randomUUID(),historyId:item.id,createdAt:time(),updatedAt:time(),status:'splitting',
+  error:'',detectedMode:'',items:[],sourcePrompt:(item.prompt||'').slice(0,700)};
+ const directory=deliveryPath(p,pack);
+ fs.mkdirSync(directory,{recursive:true,mode:0o700});
+ fs.copyFileSync(file,path.join(directory,'source.png'));
+ fs.writeFileSync(path.join(directory,'split-config.json'),JSON.stringify({mode,tolerance,connectGap}),{mode:0o600});
+ p.uiDeliveryPacks=[pack,...(p.uiDeliveryPacks||[])];touchProject(p);deliveryBusy.add(p.id);
+ void deliveryWorker(p,pack,'split');
+ return pack;
+}
+function deliveryApprove(p,pack,body){
+ if(deliveryBusy.has(p.id)||pack.status==='delivering')throw Object.assign(Error('组件包还在处理中'),{status:409});
+ if(pack.status!=='review')throw Error('请先拆分素材板并检查所有切片');
+ if(body.confirmTextFree!==true||body.confirmSlices!==true)throw Error('请确认切片无文字且透明边缘完整');
+ const items=body.items;
+ if(!Array.isArray(items)||items.length!==pack.items.length||items.length<1||items.length>64)throw Error('组件映射数量不匹配');
+ const names=new Set();
+ for(let i=0;i<items.length;i++){
+  const o=items[i],n=o?.semanticName;
+  if(o?.id!==pack.items[i].id||typeof n!=='string'||!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(n)||n.length>64||names.has(n))
+   throw Error('第 '+(i+1)+' 个组件的命名重复或非法（使用英文 kebab-case）');
+  names.add(n);
+  if(!['control','container','icon','character','decoration','background','object'].includes(o.category)||
+   !['default','pressed','selected','disabled','locked','claimed','loading'].includes(o.state)||
+   !['full','1:1','tile','9-slice'].includes(o.sliceType))throw Error('组件类别/状态/切片类型无效');
+  const m=o.margins;
+  if(!Array.isArray(m)||m.length!==4||m.some(v=>!Number.isInteger(v)||v<0||v>10000))throw Error('9-slice 边距必须为非负整数');
+  const [w,h]=pack.items[i].dimensions;
+  if(o.sliceType==='9-slice'&&(m[0]+m[1]>=w||m[2]+m[3]>=h))throw Error('9-slice 边距不能超出组件尺寸');
+ }
+ const dir=deliveryPath(p,pack);
+ fs.writeFileSync(path.join(dir,'delivery-config.json'),JSON.stringify({items}),{mode:0o600});
+ pack.items=pack.items.map((x,i)=>({...x,semanticName:items[i].semanticName,category:items[i].category,
+    state:items[i].state,sliceType:items[i].sliceType,margins:items[i].margins}));
+ pack.status='delivering';pack.updatedAt=time();touchProject(p);deliveryBusy.add(p.id);
+ void deliveryWorker(p,pack,'deliver');
+ return pack;
+}
+function deliveryDownload(req,res,p,pack,kind,index){
+ if(!['review','delivered'].includes(pack.status))throw Error('组件文件尚未准备完成');
+ const root=deliveryPath(p,pack);
+ let file,mime='application/octet-stream',download=false;
+ if(kind==='sprite'){
+  const i=Number(index);
+  if(!Number.isInteger(i)||i<0||i>63||i>=pack.items.length)throw Error('组件不存在');
+  file=path.join(root,'assets/sprites/detected',pack.items[i].filename);
+  mime='image/png';
+ }else{
+  if(pack.status!=='delivered')throw Error('请先人工审核组件后再导出');
+  const map={
+   'zip':['packages/game-ui-delivery.zip','application/zip'],
+   'reviewed-zip':['packages/sprites-reviewed.zip','application/zip'],
+   'atlas':['assets/atlases/main.png','image/png'],
+   'unity':['exports/unity/main.json','application/json'],
+   'cocos':['exports/cocos/main.json','application/json'],
+   'godot':['exports/godot/main.json','application/json'],
+   'generic':['exports/generic/main.json','application/json']
+  };
+  const found=map[kind];
+  if(!found)throw Error('不支持此组件资源');
+  file=path.join(root,found[0]);mime=found[1];download=true;
+ }
+ if(!fs.existsSync(file))return fail(res,404,'该组件文件尚未生成');
+ if(download)res.setHeader('Content-Disposition','attachment; filename="hamoki-'+pack.id.slice(0,8)+'-'+kind+(mime==='application/zip'?'.zip':mime==='image/png'?'.png':'.json')+'"');
+ return sendMedia(req,res,file,mime,'private, no-store');
+}
+
 function staticFile(res,pathname){if(pathname==='/')pathname='/index.html';if(!/^\/(?:index\.html|assets\/[a-zA-Z0-9-]+\.(?:css|js|png|webp|ico))$/.test(pathname))return fail(res,404,'资源不存在');fs.readFile(path.join(ROOT,pathname),(e,buf)=>{if(e)return fail(res,404,'资源不存在');const ext=path.extname(pathname);res.writeHead(200,{'Content-Type':({'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.png':'image/png','.webp':'image/webp','.ico':'image/x-icon'})[ext],'X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin','Content-Security-Policy':"default-src 'self'; img-src 'self' data: blob:; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'",'Cache-Control':'no-cache'});res.end(buf)})}
 async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').split(':')[0].toLowerCase()!==ALLOWED_HOST)return fail(res,421,'请求域名不符合独立安全域名配置');const url=new URL(req.url,'http://localhost');
   if(BASE && url.pathname===BASE){res.writeHead(308,{Location:BASE+'/'});return res.end()}
@@ -906,6 +1042,25 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
         return respond(res,202,{started:true,flowStatus:'running'});
       }
       return fail(res,405,'此工作流接口不支持该操作');
+    }
+    // Private project-scoped sprite slicing / engine export. No paid AI calls.
+    const packFileMatch=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/delivery\/([a-f0-9-]{36})\/file\/(sprite|zip|reviewed-zip|atlas|unity|cocos|godot|generic)(?:\/(\d+))?$/);
+    if(packFileMatch&&req.method==='GET'){
+     const p=assertProject(packFileMatch[1]),pack=deliveryPack(p,packFileMatch[2]);
+     return deliveryDownload(req,res,p,pack,packFileMatch[3],packFileMatch[4]);
+    }
+    const deliveryRoute=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/delivery(?:\/(split|approve))?$/);
+    if(deliveryRoute){
+     const p=assertProject(deliveryRoute[1]),action=deliveryRoute[2];
+     if(!action&&req.method==='GET')return respond(res,200,deliveryView(p));
+     if(action==='split'&&req.method==='POST'){
+      const b=await readJSON(req);return respond(res,202,{pack:deliveryStart(p,b)});
+     }
+     if(action==='approve'&&req.method==='POST'){
+      const b=await readJSON(req),pack=deliveryPack(p,b.packId);
+      return respond(res,202,{pack:deliveryApprove(p,pack,b)});
+     }
+     return fail(res,405,'此素材交付接口操作不支持');
     }
     const deriveMatch=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/derive(?:\/(style|prepare|drafts|submit))?$/);
     if(deriveMatch){
