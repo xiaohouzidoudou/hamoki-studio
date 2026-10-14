@@ -245,6 +245,8 @@ async function creativeSplit(p){
 }
 // A long-running text model can finish after the ordinary chat deadline.
 const DIRECTOR_TIMEOUT_MS=330000;
+// Only prototype image interpretation opts in to a longer deadline.
+const LAYOUT_VISION_TIMEOUT_MS=180000;
 async function creativeDirectorResult(f,page,layout,text,model){
  const d=creativePageDoc(f,page);
  if(!d)throw Error('此页面的 Word 来源已不存在');
@@ -294,7 +296,7 @@ async function creativeAnalyze(p,{pageId,batch=false}={}){
    const context='【页面】'+page.name+'\n【来源文件】'+d.name+'\n【本页需求】'+(page.requirements||d.text.slice(0,5000));
    stage='layout';f.progress.stage='layout';f.progress.startedAt=time();f.stages.layout=prototype?'running':'pending';page.status='analyzing';touchProject(p);
    const layout=prototype
-    ?await options.limiter.run(()=>analyzeCreativeImages(vision,[fetchMedia(prototype.file)],vm,creativeUpstream.layoutPrompt(context,f.notes)))
+    ?await options.limiter.run(()=>analyzeCreativeImages(vision,[fetchMedia(prototype.file)],vm,creativeUpstream.layoutPrompt(context,f.notes),{timeoutMs:LAYOUT_VISION_TIMEOUT_MS}))
     :'【无布局原型】此页面没有可靠的原型图。只能依据文档文字给出设计建议；禁止声称已还原原型位置。';
    f.stages.layout=prototype?'done':'pending';page.analysis.layout=layout;touchProject(p);
    stage='director';f.progress.stage='director';f.progress.startedAt=time();f.stages.director='running';touchProject(p);
@@ -307,7 +309,10 @@ async function creativeAnalyze(p,{pageId,batch=false}={}){
   f.status='ready';f.updatedAt=time();touchProject(p);
   return creativeView(p);
  }catch(e){
-  f.stages[stage]='failed';f.status='failed';f.error=String(e.message||e).slice(0,450);
+  f.stages[stage]='failed';f.status='failed';
+  f.error=(stage==='layout'&&e.timeout
+   ?'原型识图超时：等待约 3 分钟后仍未收到视觉模型结果。可能已计费，请检查上游记录；如反复发生，请更换视觉分析模型后手动重试。'
+   :(stage==='layout'?'原型分析失败：':'')+String(e.message||e)).slice(0,450);
   if(currentPage)currentPage.status='failed';
   touchProject(p);throw e;
  }finally{creativeBusy.delete(p.id)}
