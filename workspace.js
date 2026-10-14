@@ -446,6 +446,8 @@ function creativeModel(p,cap,selected){
  const label=cap==='text'?'文字分析':'视觉分析';
  const value=(typeof selected==='string'?selected.trim():'')||normalizedCapability(p,cap).defaultModel;
  if(!value)throw Error('尚未配置'+label+'模型 ID。请在 AI 美术工作流的「'+label+'」输入框填写实际模型 ID，或在中转站管理设置对应能力的默认模型');
+ if((cap==='vision'||cap==='text')&&/^(?:gpt-image(?:-|$)|dall-e(?:-|$)|nano-banana(?:-|$)|imagen(?:-|$))/i.test(value))
+  throw Error(label+'已误选图片生成模型「'+value+'」，它不能代替文字/看图分析模型。请在工作流选择支持'+(cap==='vision'?'图像理解':'文字输出')+'的模型；正式生图模型请放在「正式生图」栏');
  try{return assertModel(value)}catch(e){throw Error(label+'模型 ID 不正确：'+e.message)}
 }
 function mediaPath(id){if(!/^[a-f0-9-]{36}\.(?:png|jpg|webp)$/.test(id))throw Error('媒体文件名不合法');return path.join(MEDIA_DIR,id)}

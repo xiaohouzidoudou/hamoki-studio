@@ -207,7 +207,11 @@
   const id=$(prefix+'Provider').value;
   const p=(typeof providers!=='undefined'?providers:[]).find(x=>x.id===id);
   if(!p){say('请先在「中转站管理」添加并启用'+label+'服务商');return false}
-  if(!modelValue(cap)){
+  const model=modelValue(cap);
+  if(cap==='vision'&&/^(?:gpt-image(?:-|$)|dall-e(?:-|$)|nano-banana(?:-|$)|imagen(?:-|$))/i.test(model)){
+   say('视觉模型「'+model+'」属于图片生成模型，不能识图分析。请改选支持图像理解的模型；生图请在下方「正式生图」选择。');return false;
+  }
+  if(!model){
    say('还没有填写'+label+'模型 ID。请在上方「'+label+'」输入框填写该中转站实际支持的模型名。');
    (($(prefix+'ModelSelect').value===CUSTOM_MODEL)?$(prefix+'Model'):$(prefix+'ModelSelect')).focus();return false
   }

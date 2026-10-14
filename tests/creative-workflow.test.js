@@ -159,6 +159,12 @@ test('agent collaboration runs visual style, layout and art direction, then qual
  assert.equal(noVisionRun.code,400,'missing vision model must fail before a billable text call');
  assert.match(noVisionRun.payload.error,/视觉分析模型 ID/);
  assert.equal(received.length,0);
+ const imageAsVision=await request('/api/projects/'+project+'/creative/settings','POST',{styleNodeIds:[image],routing:{text:{providerId:pid,model:'test-text'},vision:{providerId:pid,model:'gpt-image-2.5'},image:{providerId:pid,model:'gpt-image-2.5'}}});
+ assert.equal(imageAsVision.code,200);
+ const invalidVision=await request('/api/projects/'+project+'/creative/analyze','POST',{});
+ assert.equal(invalidVision.code,400,'image generation model must not be used as vision analyzer');
+ assert.match(invalidVision.payload.error,/已误选图片生成模型/);
+ assert.equal(received.length,0,'invalid image model must be rejected without upstream call');
 
  const settings=await request('/api/projects/'+project+'/creative/settings','POST',{styleNodeIds:[image],layoutImageIndex:0,notes:'游戏周年庆',routing:{text:{providerId:pid,model:'test-text-v2'},vision:{providerId:pid,model:'test-vision-v2'},image:{providerId:pid,model:'test-image-v2'}}});assert.equal(settings.code,200);
  assert.equal(received.length,0,'no model calls from upload or settings');
