@@ -181,12 +181,12 @@ function creativeSetup(b,flow,p){
  flow.notes=clampText(b.notes,1800);
  if(b.styleLocked!==undefined)flow.styleLocked=!!b.styleLocked;
  const config=b.routing||{};
- for(const cap of ['text','vision']){
+ for(const cap of ['text','vision','image']){
   const binding=config[cap]||{};
   if(binding.providerId&&!state.providers.some(x=>x.id===binding.providerId))throw Error('所选'+cap+'中转站已不存在');
   if(binding.model!==undefined&&binding.model!=='' )assertModel(binding.model);
  }
- flow.routing={text:{providerId:trim(config.text?.providerId,70),model:trim(config.text?.model,150)},vision:{providerId:trim(config.vision?.providerId,70),model:trim(config.vision?.model,150)}};
+ flow.routing={text:{providerId:trim(config.text?.providerId,70),model:trim(config.text?.model,150)},vision:{providerId:trim(config.vision?.providerId,70),model:trim(config.vision?.model,150)},image:{providerId:trim(config.image?.providerId,70),model:trim(config.image?.model,150)}};
  flow.updatedAt=time();
 }
 function creativePictureFromNode(p,id){

@@ -107,8 +107,10 @@ test('agent collaboration runs visual style, layout and art direction, then qual
  const received=[];
  const mock=http.createServer(async(req,res)=>{
   let raw='';for await(const chunk of req)raw+=chunk.toString();
-  const body=JSON.parse(raw||'{}');received.push({path:req.url,body});
+  const body=JSON.parse(raw||'{}');
   res.setHeader('Content-Type','application/json');
+  if(req.url.endsWith('/models'))return res.end(JSON.stringify({data:[{id:'test-text'},{id:'test-text-v2'},{id:'test-vision'},{id:'test-vision-v2'},{id:'test-image-v2'}]}));
+  received.push({path:req.url,body});
   if(req.url.endsWith('/images/generations'))return res.end(JSON.stringify({data:[{b64_json:PNG.toString('base64')}]}));
   const content=body.messages?.[0]?.content||'';
   const multimodal=Array.isArray(content);
@@ -132,6 +134,14 @@ test('agent collaboration runs visual style, layout and art direction, then qual
  const upload=await request('/api/projects/'+project+'/creative/document','POST',{name:'周年庆.docx',data:doc.toString('base64')});assert.equal(upload.code,201);
  const provider=await request('/api/providers','POST',{name:'Mock 文本视觉和图片',url:'http://127.0.0.1:'+mock.address().port+'/v1',mode:'openai',imageMode:'images',imageModel:'test-image',visionModel:'test-vision',apiKey:'test-key',capabilities:{text:{defaultModel:'test-text'},vision:{defaultModel:'test-vision'}}});assert.equal(provider.code,201,JSON.stringify(provider.payload));
  const pid=provider.payload.provider.id;
+ const catalogText=await request('/api/models?providerId='+pid+'&capability=text');
+ const catalogVision=await request('/api/models?providerId='+pid+'&capability=vision');
+ const catalogImage=await request('/api/models?providerId='+pid+'&capability=image');
+ assert.equal(catalogText.code,200);assert.equal(catalogVision.code,200);assert.equal(catalogImage.code,200);
+ assert.ok(catalogText.payload.models.includes('test-text-v2'));
+ assert.ok(catalogVision.payload.models.includes('test-vision-v2'));
+ assert.ok(catalogImage.payload.models.includes('test-image-v2'));
+ assert.equal(received.length,0,'getting model names must not launch paid generation');
  // Regression: image-only relay was mistakenly allowed to start analysis,
  // returning HTTP 202 and logging a generic "model ID invalid" off-screen.
  const imageOnly=await request('/api/providers','POST',{name:'只有图片能力的中转站',url:'http://127.0.0.1:'+mock.address().port+'/v1',mode:'openai',imageModel:'nano banana (preview)',apiKey:'test-key'});
@@ -150,7 +160,7 @@ test('agent collaboration runs visual style, layout and art direction, then qual
  assert.match(noVisionRun.payload.error,/视觉分析模型 ID/);
  assert.equal(received.length,0);
 
- const settings=await request('/api/projects/'+project+'/creative/settings','POST',{styleNodeIds:[image],layoutImageIndex:0,notes:'游戏周年庆',routing:{text:{providerId:pid,model:'test-text'},vision:{providerId:pid,model:'test-vision'}}});assert.equal(settings.code,200);
+ const settings=await request('/api/projects/'+project+'/creative/settings','POST',{styleNodeIds:[image],layoutImageIndex:0,notes:'游戏周年庆',routing:{text:{providerId:pid,model:'test-text-v2'},vision:{providerId:pid,model:'test-vision-v2'},image:{providerId:pid,model:'test-image-v2'}}});assert.equal(settings.code,200);
  assert.equal(received.length,0,'no model calls from upload or settings');
  const run=await request('/api/projects/'+project+'/creative/analyze','POST',{});assert.equal(run.code,202);
  let flow;
@@ -158,6 +168,13 @@ test('agent collaboration runs visual style, layout and art direction, then qual
  assert.equal(flow.status,'ready',flow.error||'analysis has not completed');
  assert.match(flow.analysis.style,/深蓝金属/);assert.match(flow.analysis.layout,/槽位/);assert.match(flow.analysis.prompt,/绘制周年庆签到界面/);
  assert.equal(received.length,3,'exactly two vision calls plus one text model call');
+ assert.equal(received[0].body.model,'test-vision-v2','STYLE uses specifically selected vision model');
+ assert.equal(received[1].body.model,'test-vision-v2','TARGET uses specifically selected vision model');
+ assert.equal(received[2].body.model,'test-text-v2','director uses specifically selected text model');
+ const savedFlow=(await request('/api/projects/'+project+'/creative')).payload.flow;
+ assert.equal(savedFlow.routing.text.model,'test-text-v2','text model persists per project');
+ assert.equal(savedFlow.routing.vision.model,'test-vision-v2','vision model persists per project');
+ assert.equal(savedFlow.routing.image.model,'test-image-v2','image model persists per project');
  const job=await request('/api/jobs','POST',{projectId:project,providerId:pid,model:'test-image',prompt:flow.analysis.prompt,count:1,ratio:'9:16',resolution:'1K'});
  assert.equal(job.code,201,JSON.stringify(job.payload));
  let result;

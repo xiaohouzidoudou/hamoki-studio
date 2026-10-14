@@ -134,7 +134,21 @@
     <section class="creative-section"><div class="creative-section-top"><div><span class="creative-kicker">03 · STYLE & LAYOUT</span><h3>参考图与原型</h3><p>选中的画布图片用于学习游戏风格；Word 内的图片用于还原界面布局。两者不会混作同一种参考。</p></div></div>
      <div class="creative-form-grid"><label>Word 原型图<select class="field" id="creativeLayoutSelect"></select></label><label>补充创作需求<textarea class="field" id="creativeNotes" rows="2" maxlength="1800" placeholder="例如：完成周年庆签到页面，忠实保持原型结构"></textarea></label></div>
      <div class="creative-field-title">从当前画布选择游戏 STYLE 参考图（最多 5 张）</div><div class="creative-style-head"><span class="micro muted" id="creativeStyleStatus">保存为该项目通用 Style DNA，切换页面仍可复用。</span><button class="soft-btn" id="creativeStyleLock" type="button">风格锁定：否</button></div><div id="creativeStyleRefs" class="creative-ref-list"></div>
-     <div class="creative-form-grid"><label>文字分析 / 美术总监<select class="field" id="creativeTextProvider"></select><input class="field" id="creativeTextModel" maxlength="150" placeholder="GPT / DeepSeek 模型 ID"></label><label>视觉分析 / 双重质检<select class="field" id="creativeVisionProvider"></select><input class="field" id="creativeVisionModel" maxlength="150" placeholder="支持看图的 GPT / Gemini 模型 ID"></label></div>
+     <div class="creative-form-grid">
+      <div class="creative-model-group"><label for="creativeTextProvider">文字分析 / 美术总监 · 服务商</label><select class="field" id="creativeTextProvider"></select>
+       <label for="creativeTextModelSelect">选择文字模型</label><div class="creative-model-controls"><select class="field" id="creativeTextModelSelect"><option value="">请选择文字模型</option></select><button type="button" class="soft-btn creative-model-fetch" id="creativeTextFetch">获取模型</button></div>
+       <input class="field creative-model-custom hidden" id="creativeTextModel" maxlength="150" placeholder="也可手动填写文字模型 ID" autocomplete="off"><p id="creativeTextModelStatus" class="micro muted">从候选中选择，或选择手动输入。</p>
+      </div>
+      <div class="creative-model-group"><label for="creativeVisionProvider">视觉分析 / 双重质检 · 服务商</label><select class="field" id="creativeVisionProvider"></select>
+       <label for="creativeVisionModelSelect">选择视觉模型</label><div class="creative-model-controls"><select class="field" id="creativeVisionModelSelect"><option value="">请选择视觉模型</option></select><button type="button" class="soft-btn creative-model-fetch" id="creativeVisionFetch">获取模型</button></div>
+       <input class="field creative-model-custom hidden" id="creativeVisionModel" maxlength="150" placeholder="也可手动填写支持看图的模型 ID" autocomplete="off"><p id="creativeVisionModelStatus" class="micro muted">视觉模型必须能够识图，不能用普通文字模型代替。</p>
+      </div>
+     </div>
+     <div class="creative-model-group creative-image-route">
+      <label for="creativeImageProvider">正式生图 · 服务商（方案送入画布时应用）</label><select class="field" id="creativeImageProvider"></select>
+      <label for="creativeImageModelSelect">选择图片生成模型</label><div class="creative-model-controls"><select class="field" id="creativeImageModelSelect"><option value="">请选择图片模型</option></select><button type="button" class="soft-btn creative-model-fetch" id="creativeImageFetch">获取模型</button></div>
+      <input class="field creative-model-custom hidden" id="creativeImageModel" maxlength="150" placeholder="也可手动填写 GPT Image / Gemini 图片模型 ID" autocomplete="off"><p id="creativeImageModelStatus" class="micro muted">只有点击画布上的「开始生成」才会调用生图 API。</p>
+     </div><div class="creative-model-summary"><span id="creativeModelSummary">模型路由按当前项目保存。</span><button type="button" class="soft-btn" id="creativeSaveModels">保存模型选择</button></div>
      <div class="creative-actions"><button type="button" class="primary-btn" id="creativeAnalyze"><svg class="icon sm"><use href="#ic-spark"/></svg> 分析当前页面</button><button type="button" class="soft-btn" id="creativeAnalyzeAll">批量完成缺失页面方案（最多 8 页）</button><span id="creativeMessage" class="creative-notice" role="status"></span></div>
     </section>
     <section class="creative-section"><div class="creative-section-top"><div><span class="creative-kicker">04 · ART DIRECTION</span><h3>AI 团队分析结论</h3><p>可查看每个角色的实际输出，不用相信一个没有根据的「合格分数」。</p></div></div>

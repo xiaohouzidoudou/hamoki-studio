@@ -24,24 +24,69 @@
    root.append(row);
   }
  }
+ const modelCatalog=new Map(), CUSTOM_MODEL='__manual_model__';
+ const modelPrefix=cap=>cap==='text'?'creativeText':cap==='vision'?'creativeVision':'creativeImage';
+ const providerList=cap=>(typeof providers==='undefined'?[]:providers).filter(p=>p.capabilities?.[cap]?.enabled!==false&&(p.hasKey||p.capabilities?.[cap]?.hasKey));
+ const modelKey=(cap,id)=>cap+'|'+id;
+ function modelSuggestions(cap,id){
+  const p=providerList(cap).find(x=>x.id===id);
+  if(!p)return [];
+  const saved=p.capabilities?.[cap]?.models||[];
+  const defaults=[p.capabilities?.[cap]?.defaultModel,cap==='vision'?p.visionModel:cap==='image'?p.imageModel:p.textModel];
+  const live=modelCatalog.get(modelKey(cap,id))||[];
+  return [...new Set([...live,...saved,...defaults].map(m=>typeof m==='string'?m:typeof m?.id==='string'?m.id:'').map(x=>x.trim()).filter(Boolean))].slice(0,450);
+ }
+ function modelValue(cap){
+  const prefix=modelPrefix(cap),choice=$(prefix+'ModelSelect').value;
+  return choice===CUSTOM_MODEL?$(prefix+'Model').value.trim():choice.trim();
+ }
+ function presentModel(cap,id,chosen){
+  const prefix=modelPrefix(cap),modelList=modelSuggestions(cap,id);
+  const select=$(prefix+'ModelSelect');
+  pick(prefix+'ModelSelect',[{value:'',label:'请选择具体模型'},...modelList.map(x=>({value:x,label:x})),{value:CUSTOM_MODEL,label:'手动输入其它模型 ID…'}],modelList.includes(chosen)?chosen:chosen?CUSTOM_MODEL:'');
+  $(prefix+'Model').classList.toggle('hidden',select.value!==CUSTOM_MODEL);
+  $(prefix+'Model').value=chosen&&!modelList.includes(chosen)?chosen:'';
+  $(prefix+'ModelStatus').textContent=modelList.length?
+   '可选 '+modelList.length+' 个模型 · 选中后保存或直接分析'+(cap==='vision'?'（须支持图片输入）':''):
+   '当前服务商没有已知模型，请点「获取模型」或「手动输入」。';
+ }
  function providersUI(){
-  const pp=typeof providers==='undefined'?[]:providers;
-  for(const cap of ['text','vision']){
-   const prefix=cap==='text'?'creativeText':'creativeVision';
-   const available=pp.filter(p=>p.capabilities?.[cap]?.enabled!==false&&(p.hasKey||p.capabilities?.[cap]?.hasKey));
-   const list=available.map(p=>({value:p.id,label:p.name}));
-   if(!list.length)list.push({value:'',label:'请先配置'+(cap==='text'?'文字':'视觉')+'模型中转站'});
-   const current=f?.routing?.[cap]||{};
+  for(const cap of ['text','vision','image']){
+   const prefix=modelPrefix(cap),available=providerList(cap),current=f?.routing?.[cap]||{};
    const runtime=typeof runtimeRoutes!=='undefined'?runtimeRoutes?.[cap]||{}:{};
    const wanted=current.providerId||runtime.providerId||(typeof activeId!=='undefined'?activeId:'')||'';
-   const val=available.some(p=>p.id===wanted)?wanted:list[0].value;
-   pick(prefix+'Provider',list,val);
+   const val=available.some(p=>p.id===wanted)?wanted:available[0]?.id||'';
+   pick(prefix+'Provider',available.length?available.map(p=>({value:p.id,label:p.name})):[{value:'',label:'请先在中转站管理配置'+(cap==='text'?'文字':cap==='vision'?'视觉':'生图')+'服务商'}],val);
    const p=available.find(x=>x.id===val);
-   $(prefix+'Model').value=(current.providerId===val&&current.model?current.model:'')||
+   const chosen=(current.providerId===val&&current.model?current.model:'')||
      (runtime.providerId===val&&runtime.model?runtime.model:'')||
      p?.capabilities?.[cap]?.defaultModel||
-     (cap==='text'?p?.textModel:p?.visionModel)||'';
+     (cap==='vision'?p?.visionModel:cap==='image'?p?.imageModel:p?.textModel)||'';
+   presentModel(cap,val,chosen);
   }
+  updateModelSummary();
+ }
+ function updateModelSummary(){
+  $('creativeModelSummary').textContent='文字：'+(modelValue('text')||'未选')+' · 视觉：'+(modelValue('vision')||'未选')+' · 生图：'+(modelValue('image')||'沿用画布当前模型')+'。';
+ }
+ async function fetchCreativeModels(cap){
+  const prefix=modelPrefix(cap),id=$(prefix+'Provider').value,btn=$(prefix+'Fetch');
+  if(!id)return say('请先选择'+(cap==='text'?'文字':cap==='vision'?'视觉':'生图')+'服务商');
+  const chosen=modelValue(cap),expectedProject=projectId,key=modelKey(cap,id);
+  btn.disabled=true;$(prefix+'ModelStatus').textContent='正在获取此服务商的模型目录…';
+  try{
+   const response=await api('models?providerId='+encodeURIComponent(id)+'&capability='+cap);
+   if(expectedProject!==projectId||$(prefix+'Provider').value!==id)return;
+   const models=[...new Set((response.models||[]).map(m=>typeof m==='string'?m:m?.id).filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim()))].slice(0,450);
+   modelCatalog.set(key,models);
+   presentModel(cap,id,chosen);
+   $(prefix+'ModelStatus').textContent='已从中转站读取 '+models.length+' 个模型；若列表包含不支持'+(cap==='text'?'文字':cap==='vision'?'看图':'生图')+'的模型，请以服务商实际能力为准。';
+  }catch(e){
+   if(expectedProject!==projectId||$(prefix+'Provider').value!==id)return;
+   presentModel(cap,id,chosen);
+   $(prefix+'ModelStatus').textContent='在线模型目录获取失败：'+e.message+'。仍可选已保存模型，或手动填写 ID。';
+  }finally{btn.disabled=false}
+  updateModelSummary();
  }
  function refsUI(){
   const box=$('creativeStyleRefs'),ids=new Set((f?.documents||[]).flatMap(d=>d.images.map(i=>i.nodeId)));
@@ -151,19 +196,20 @@
     notes:$('creativeNotes').value,
     activePageId:f.activePageId,
     routing:{
-     text:{providerId:$('creativeTextProvider').value,model:$('creativeTextModel').value.trim()},
-     vision:{providerId:$('creativeVisionProvider').value,model:$('creativeVisionModel').value.trim()}
+     text:{providerId:$('creativeTextProvider').value,model:modelValue('text')},
+     vision:{providerId:$('creativeVisionProvider').value,model:modelValue('vision')},
+     image:{providerId:$('creativeImageProvider').value,model:modelValue('image')}
     }};
  }
  function modelConfigured(cap){
   const prefix=cap==='text'?'creativeText':'creativeVision';
-  const label=cap==='text'?'文字分析':'视觉分析';
+  const label=cap==='text'?'文字分析':cap==='vision'?'视觉分析':'图片生成';
   const id=$(prefix+'Provider').value;
   const p=(typeof providers!=='undefined'?providers:[]).find(x=>x.id===id);
   if(!p){say('请先在「中转站管理」添加并启用'+label+'服务商');return false}
-  if(!$(prefix+'Model').value.trim()&&!p.capabilities?.[cap]?.defaultModel){
+  if(!modelValue(cap)){
    say('还没有填写'+label+'模型 ID。请在上方「'+label+'」输入框填写该中转站实际支持的模型名。');
-   $(prefix+'Model').focus();return false
+   (($(prefix+'ModelSelect').value===CUSTOM_MODEL)?$(prefix+'Model'):$(prefix+'ModelSelect')).focus();return false
   }
   return true;
  }
@@ -238,10 +284,23 @@
   }catch(e){failure='执行失败：'+e.message;try{await load()}catch{}}
   finally{setBusy(false);if(f)render();if(failure)say(failure)}
  }
- function canvasPrompt(extra=''){
+ async function canvasPrompt(extra=''){
   const page=active();
   if(!page?.analysis?.prompt){say('请先生成当前页面的美术总监方案');return}
   if(!currentProject||currentProject.id!==projectId){say('当前项目已切换，请重新打开工作流');return}
+  const selectedImage=f.routing?.image||{};
+  if(selectedImage.providerId&&selectedImage.model){
+   if(!(typeof providers!=='undefined'&&providers.some(x=>x.id===selectedImage.providerId))){
+    say('原生图服务商已删除，请重新选择图片模型');return;
+   }
+   if(typeof activeId!=='undefined'&&activeId!==selectedImage.providerId){
+    if(typeof activate!=='function'){say('当前画布不支持切换图片服务商');return}
+    await activate(selectedImage.providerId);
+    if(activeId!==selectedImage.providerId){say('切换生图服务商失败，未修改生图操作台');return}
+   }
+   $('imageModel').value=selectedImage.model;
+   if(typeof rememberQuickModel==='function')rememberQuickModel(selectedImage.model,selectedImage.providerId);
+  }
   if(typeof setComposerMode==='function')setComposerMode('image');
   $('prompt').value=page.analysis.prompt+extra;
   const refs=(f.styleNodeIds||[]).map(nodeId=>({nodeId,role:'style'}));
@@ -264,14 +323,27 @@
  }
  $('openCreativeWorkflow').addEventListener('click',open);
  $('creativeDocInput').addEventListener('change',upload);
- for(const cap of ['text','vision']){
-  const prefix=cap==='text'?'creativeText':'creativeVision';
+ for(const cap of ['text','vision','image']){
+  const prefix=modelPrefix(cap);
   $(prefix+'Provider').addEventListener('change',()=>{
-   const p=(typeof providers!=='undefined'?providers:[]).find(x=>x.id===$(prefix+'Provider').value);
-   $(prefix+'Model').value=p?.capabilities?.[cap]?.defaultModel||(cap==='text'?p?.textModel:p?.visionModel)||'';
-   if(!$(prefix+'Model').value)say('请填写当前中转站的'+(cap==='text'?'文字':'视觉')+'模型 ID；不会自动使用图片生成模型。');
+   const p=providerList(cap).find(x=>x.id===$(prefix+'Provider').value);
+   const suggested=p?.capabilities?.[cap]?.defaultModel||(cap==='text'?p?.textModel:cap==='vision'?p?.visionModel:p?.imageModel)||'';
+   presentModel(cap,p?.id||'',suggested);
+   updateModelSummary();
   });
+  $(prefix+'ModelSelect').addEventListener('change',()=>{
+   $(prefix+'Model').classList.toggle('hidden',$(prefix+'ModelSelect').value!==CUSTOM_MODEL);
+   if($(prefix+'ModelSelect').value===CUSTOM_MODEL)$(prefix+'Model').focus();
+   updateModelSummary();
+  });
+  $(prefix+'Model').addEventListener('input',updateModelSummary);
+  $(prefix+'Fetch').addEventListener('click',()=>fetchCreativeModels(cap));
  }
+ $('creativeSaveModels').addEventListener('click',async()=>{
+  if(busy||!f)return;
+  try{await saveSettings();render();toast('本项目使用的文字和视觉模型已经保存')}
+  catch(e){say('模型选择保存失败：'+e.message)}
+ });
  $('creativeSplit').addEventListener('click',()=>run('split'));
  $('creativeSavePage').addEventListener('click',savePage);
  $('creativeAnalyze').addEventListener('click',()=>run('analyze'));
