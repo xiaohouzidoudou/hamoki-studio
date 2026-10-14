@@ -2,6 +2,7 @@ FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=8028 DATA_DIR=/app/data
 COPY --chown=node:node package.json package-lock.json ./
+RUN apk add --no-cache python3 py3-pillow py3-yaml
 RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY --chown=node:node server.js workspace.js gateway.js index.html ./
 COPY --chown=node:node lib ./lib
