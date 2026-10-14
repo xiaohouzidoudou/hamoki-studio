@@ -12,7 +12,9 @@ const fs=require('node:fs');
 const path=require('node:path');
 const crypto=require('node:crypto');
 const zlib=require('node:zlib');
-const {checkedURL,imageFromDataURL,guessMime,extension,reverse:upstreamReverse,generate:upstreamGenerate,listModels:upstreamListModels,generateText,streamText}=require('./lib/upstream');
+const {checkedURL,imageFromDataURL,guessMime,extension,reverse:upstreamReverse,generate:upstreamGenerate,listModels:upstreamListModels,generateText,streamText,analyzeCreativeImages}=require('./lib/upstream');
+const {parseDocx,MAX_DOCX}=require('./lib/creative-docx');
+const creative=require('./lib/creative-workflow');
 const generate=(...args)=>options.limiter.run(()=>upstreamGenerate(...args));
 const reverse=(...args)=>options.limiter.run(()=>upstreamReverse(...args));
 const listModels=(...args)=>options.limiter.run(()=>upstreamListModels(...args));
@@ -114,6 +116,106 @@ function defaultProject(){return projects.find(p=>!p.archived)}
 function nodeView(n){return {...n,url:n.kind==='reference'?BASE+'/api/media/'+n.assetFile:null,previewUrl:n.kind==='reference'?BASE+'/api/previews/'+n.assetFile:null}}
 function projectView(p){const {removedBatches,...visible}=p;return {...visible,nodes:p.nodes.map(nodeView)}}
 function touchProject(p){p.revision=(p.revision||0)+1;p.updatedAt=time();saveProjects()}
+let interruptedCreative=false;
+for(const p of projects){
+ const f=p.creativeWorkflow;
+ if(f?.status==='running'||f?.stages&&Object.values(f.stages).includes('running')){
+  f.status='failed';f.error='服务重启中断了上次分析，请检查上游账单后决定是否重新运行';
+  for(const key of Object.keys(f.stages||{}))if(f.stages[key]==='running')f.stages[key]='failed';
+  interruptedCreative=true;
+ }
+}
+if(interruptedCreative)saveProjects();
+const creativeBusy=new Set();
+function creativeView(p){
+ const flow=p.creativeWorkflow||creative.make();
+ if(!flow.document)return {flow};
+ return {flow:{...flow,document:{...flow.document,images:flow.document.images.map(x=>({...x,url:BASE+'/api/media/'+x.file}))}}};
+}
+function creativeSetup(b,flow,p){
+ if(!b||typeof b!=='object')throw Error('工作流参数格式有误');
+ const refs=Array.isArray(b.styleNodeIds)?b.styleNodeIds:[];
+ if(refs.length>5||new Set(refs).size!==refs.length)throw Error('最多选择 5 张不同的风格参考图');
+ for(const id of refs){const node=p.nodes.find(n=>n.id===id);if(!node||node.kind==='note')throw Error('风格参考图必须来自当前项目画布')}
+ flow.styleNodeIds=refs;
+ flow.layoutImageIndex=Math.max(0,Math.min(19,Math.floor(Number(b.layoutImageIndex)||0)));
+ flow.notes=clampText(b.notes,1800);
+ const config=b.routing||{};
+ for(const cap of ['text','vision']){
+  const binding=config[cap]||{};
+  if(binding.providerId&&!state.providers.some(x=>x.id===binding.providerId))throw Error('所选'+cap+'中转站已不存在');
+  if(binding.model&& !/^[-\w.:/]{1,150}$/.test(binding.model))throw Error('模型名称不合法');
+ }
+ flow.routing={text:{providerId:trim(config.text?.providerId,70),model:trim(config.text?.model,150)},vision:{providerId:trim(config.vision?.providerId,70),model:trim(config.vision?.model,150)}};
+ flow.updatedAt=time();
+}
+function creativePictureFromNode(p,id){
+ const n=p.nodes.find(x=>x.id===id);
+ if(!n||n.kind==='note')throw Error('参考图不在当前画布');
+ const h=n.kind==='reference'?null:history.find(x=>x.id===n.historyId&&x.projectId===p.id);
+ const filename=n.kind==='reference'?n.assetFile:h?.file;
+ if(!filename)throw Error('找不到参考图原文件');
+ return fetchMedia(filename);
+}
+async function creativeAnalyze(p){
+ const flow=p.creativeWorkflow;
+ if(!flow?.document)throw Error('请先上传 Word 文档');
+ if(creativeBusy.has(p.id))throw Object.assign(Error('此项目已有进行中的 AI 分析'),{status:409});
+ if(DEMO_MODE)throw Error('演示模式不能调用付费 AI');
+ const refs=flow.styleNodeIds.map(id=>creativePictureFromNode(p,id));
+ if(!refs.length)throw Error('请先从画布选择至少一张游戏美术风格参考图');
+ const layout=flow.document.images[flow.layoutImageIndex];
+ if(!layout)throw Error('文档未提取到可用于布局分析的原型图');
+ const rp=flow.routing||{};
+ const vision=effectiveProvider(provider(rp.vision?.providerId||state.activeId),'vision');
+ const text=effectiveProvider(provider(rp.text?.providerId||state.activeId),'text');
+ emptyProvider(vision);emptyProvider(text);
+ const vm=assertModel(rp.vision?.model||vision.visionModel);
+ const tm=assertModel(rp.text?.model||normalizedCapability(text,'text').defaultModel);
+ // Reserve one analysis pipeline per project; there is no automatic retry on paid API failures.
+ creativeBusy.add(p.id);
+ flow.error='';flow.quality=null;flow.status='running';
+ for(const k of ['style','layout','director','generation','quality'])flow.stages[k]='pending';
+ flow.analysis={};touchProject(p);
+ let stage='style';
+ try{
+  flow.stages.style='running';touchProject(p);
+  flow.analysis.style=await options.limiter.run(()=>analyzeCreativeImages(vision,refs,vm,creative.stylePrompt(flow.notes)));
+  flow.stages.style='done';touchProject(p);
+  stage='layout';flow.stages.layout='running';touchProject(p);
+  flow.analysis.layout=await options.limiter.run(()=>analyzeCreativeImages(vision,[fetchMedia(layout.file)],vm,creative.layoutPrompt(flow.document.text,flow.notes)));
+  flow.stages.layout='done';touchProject(p);
+  stage='director';flow.stages.director='running';touchProject(p);
+  flow.analysis.director=await options.limiter.run(()=>generateText(text,{model:tm,prompt:creative.directorPrompt(flow.document.text,flow.analysis.style,flow.analysis.layout,flow.notes)}));
+  flow.analysis.prompt=creative.extractPrompt(flow.analysis.director);
+  flow.stages.director='done';flow.status='ready';flow.updatedAt=time();touchProject(p);
+  return creativeView(p);
+ }catch(e){
+  flow.stages[stage]='failed';flow.status='failed';flow.error=String(e.message||e).slice(0,450);touchProject(p);
+  throw e;
+ }finally{creativeBusy.delete(p.id)}
+}
+async function creativeQuality(p,historyId){
+ const flow=p.creativeWorkflow;
+ if(!flow?.analysis?.director)throw Error('请先完成 AI 创作方案');
+ if(creativeBusy.has(p.id))throw Object.assign(Error('此项目正在执行 AI 操作'),{status:409});
+ const image=history.find(h=>h.id===historyId&&h.projectId===p.id);
+ if(!image)throw Error('请选择当前项目的一张生成图进行质检');
+ const layout=flow.document?.images?.[flow.layoutImageIndex];
+ if(!layout||!flow.styleNodeIds?.length)throw Error('缺少风格参考图或原型图');
+ const config=flow.routing?.vision||{};
+ const vision=effectiveProvider(provider(config.providerId||state.activeId),'vision');
+ emptyProvider(vision);const model=assertModel(config.model||vision.visionModel);
+ if(DEMO_MODE)throw Error('演示模式不能执行付费质检');
+ creativeBusy.add(p.id);flow.stages.quality='running';flow.error='';touchProject(p);
+ try{
+  const pics=[creativePictureFromNode(p,flow.styleNodeIds[0]),fetchMedia(layout.file),fetchMedia(image.file)];
+  const report=await options.limiter.run(()=>analyzeCreativeImages(vision,pics,model,creative.qualityPrompt(flow.document.text,flow.analysis.style,flow.analysis.layout)));
+  flow.quality={historyId,report,checkedAt:time()};flow.stages.generation='done';flow.stages.quality='done';flow.status='review';touchProject(p);
+  return creativeView(p);
+ }catch(e){flow.stages.quality='failed';flow.error=String(e.message||e).slice(0,450);touchProject(p);throw e}
+ finally{creativeBusy.delete(p.id)}
+}
 function appendGeneratedNode(h,j){const p=project(j.projectId||defaultProject()?.id);if(!p)return;
  const parent=p.nodes.find(n=>n.historyId===h.parentId)||p.nodes.find(n=>n.id===j.sourceNodeId);
  const relatives=p.nodes.filter(n=>n.parentNodeId===(parent?.id||'!'));
@@ -132,7 +234,7 @@ function projectBackup(p){
  const fileIds=new Set(selectedHistory.map(h=>h.file).concat(p.nodes.filter(n=>n.kind==='reference').map(n=>n.assetFile)));
  let total=0;const media=[];
  for(const id of fileIds){const img=fetchMedia(id);total+=img.bytes.length;if(total>BUNDLE_MAX)throw Object.assign(Error('此项目媒体超过32MB，请分批备份后再导入'),{status:413});media.push({file:id,mime:img.mime,data:img.bytes.toString('base64')});}
- const safeProject={title:p.title,viewport:p.viewport,nodes:p.nodes,messages:p.messages};
+ const safeProject={title:p.title,viewport:p.viewport,nodes:p.nodes,messages:p.messages,creativeWorkflow:p.creativeWorkflow||null};
  return zlib.gzipSync(Buffer.from(JSON.stringify({kind:'hamoki-project',schema:1,exportedAt:time(),project:safeProject,history:selectedHistory,media})),{level:6});
 }
 function importProject(b){
@@ -163,6 +265,20 @@ function importProject(b){
   return next;
  });
  proj.messages=data.project.messages.map(m=>({id:crypto.randomUUID(),role:['user','result','assistant'].includes(m.role)?m.role:'user',content:clampText(m.content,4000),createdAt:typeof m.createdAt==='string'?m.createdAt:time(),imageId:oldHistId.get(m.imageId)||null,sourceId:oldHistId.get(m.sourceId)||null,referenceRoles:Array.isArray(m.referenceRoles)?m.referenceRoles.slice(0,8).filter(x=>oldNodeId.has(x.nodeId)).map(x=>({nodeId:oldNodeId.get(x.nodeId),role:REFERENCE_ROLES[x.role]?x.role:'general'})):[]}));
+ // Import creative plan and remap references, never copy model keys or account routing.
+ const oldFlow=data.project.creativeWorkflow;
+ if(oldFlow?.version===1&&oldFlow.document&&Array.isArray(oldFlow.document.images)){
+  const f=creative.make(),d=oldFlow.document;
+  f.document={name:clampText(d.name,140),text:clampText(d.text,55000),hash:clampText(d.hash,64),
+   importedAt:time(),warnings:Array.isArray(d.warnings)?d.warnings.slice(0,8).map(x=>clampText(x,160)):[],
+   blocks:Array.isArray(d.blocks)?d.blocks.slice(0,1200).filter(x=>x&&['text','image'].includes(x.kind)).map(x=>x.kind==='text'?{kind:'text',text:clampText(x.text,1800)}:{kind:'image',index:num(x.index,0,0,19)}):[],
+   images:d.images.slice(0,20).filter(x=>oldNodeId.has(x.nodeId)&&mediaIds.has(x.file)).map(x=>({index:num(x.index,0,0,19),file:mediaIds.get(x.file),nodeId:oldNodeId.get(x.nodeId),mime:trim(x.mime,40),size:num(x.size,0,0,8*1024*1024)}))};
+  f.styleNodeIds=(Array.isArray(oldFlow.styleNodeIds)?oldFlow.styleNodeIds:[]).slice(0,5).filter(x=>oldNodeId.has(x)).map(x=>oldNodeId.get(x));
+  f.layoutImageIndex=num(oldFlow.layoutImageIndex,0,0,Math.max(0,f.document.images.length-1));f.notes=clampText(oldFlow.notes,1800);
+  f.analysis=Object.fromEntries(['style','layout','director','prompt'].map(k=>[k,clampText(oldFlow.analysis?.[k],k==='prompt'?11500:16000)]));
+  f.stages.document='done';for(const s of ['style','layout','director'])if(f.analysis[s])f.stages[s]='done';
+  f.status=f.analysis.prompt?'ready':'document-ready';proj.creativeWorkflow=f;
+ }
  projects.unshift(proj);history.unshift(...importedHistory);saveProjects();saveHistory();return projectView(proj);
 }
 
@@ -190,6 +306,12 @@ function cleanupMessages(project,removedHistoryId=null,removedNodeIds=new Set())
 function overSpace(incomingSize){return storageUsage(true).totalBytes+incomingSize>MEDIA_QUOTA_BYTES||(typeof options.globalBytesLeft==='function'&&options.globalBytesLeft()<incomingSize)}
 function releaseForQuota(incomingSize){
  const protectedFiles=new Set();
+ // Keep document prototypes and approved style inputs available across sessions.
+ for(const current of projects){
+  const f=current.creativeWorkflow;
+  for(const img of f?.document?.images||[])if(img.file)protectedFiles.add(img.file);
+  for(const nodeId of f?.styleNodeIds||[]){const node=current.nodes.find(n=>n.id===nodeId);if(node?.kind==='reference')protectedFiles.add(node.assetFile)}
+ }
  for(const job of jobs)if(['queued','running'].includes(job.status)){
    if(job.sourceId){const h=history.find(x=>x.id===job.sourceId);if(h)protectedFiles.add(h.file)}
    for(const f of job.referenceMedia||[])protectedFiles.add(f);
@@ -357,6 +479,55 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
     if(route==='/api/logout'&&req.method==='POST'&&process.env.ANON_WORKSPACE==='1')return fail(res,405,'免登录工作区无需退出');
     if(route==='/api/logout'&&req.method==='POST'){sessions.delete(cookie(req));res.setHeader('Set-Cookie',`hs_session=; HttpOnly; SameSite=Strict; Path=${BASE||''}/; Max-Age=0`);return respond(res,200,{ok:true})}
     if(req.method==='GET'&&route==='/api/storage')return respond(res,200,{...storageUsage(),mode:'local',concurrency:CONCURRENCY,notice:'每个账号默认 1GB 空间，空间不足时会自动清理最旧的历史图片和浏览器预览；请定期导出重要作品。'});
+    const creativeMatch=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/creative(?:\/(document|settings|analyze|quality))?$/);
+    if(creativeMatch){
+      const p=assertProject(creativeMatch[1]),action=creativeMatch[2];
+      if(!action&&req.method==='GET')return respond(res,200,creativeView(p));
+      if(creativeBusy.has(p.id))return fail(res,409,'此项目的创作流程正在运行，请完成后再修改');
+      if(action==='document'&&req.method==='POST'){
+        const b=await readJSON(req);
+        if(typeof b.name!=='string'||!b.name.toLowerCase().endsWith('.docx'))throw Error('只支持 Word .docx 文件');
+        if(typeof b.data!=='string'||b.data.length>MAX_DOCX*1.38||!/^([A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(b.data))throw Error('文件格式不合法或超出 12MB');
+        const raw=Buffer.from(b.data,'base64'),existing=p.nodes.length;
+        if(existing+20>1800)throw Error('当前画布空间不足，无法导入文档图片');
+        const extracted=await parseDocx(raw,img=>storeMedia(img));
+        const flow=creative.make();
+        flow.document={name:clampText(b.name,140),text:extracted.text,blocks:extracted.blocks,images:extracted.images.map((im,i)=>({...im,nodeId:null})),hash:extracted.hash,warnings:extracted.warnings,importedAt:time()};
+        for(const im of flow.document.images){
+          const n={id:crypto.randomUUID(),kind:'reference',assetFile:im.file,title:'文档原型 '+String(im.index+1),x:60+im.index%4*320,y:60+Math.floor(im.index/4)*370,w:288,h:320,createdAt:time()};
+          p.nodes.push(n);im.nodeId=n.id;
+        }
+        flow.stages.document='done';flow.status='document-ready';p.creativeWorkflow=flow;touchProject(p);
+        return respond(res,201,{...creativeView(p),importedImages:flow.document.images.length});
+      }
+      if(action==='settings'&&req.method==='POST'){
+        const flow=p.creativeWorkflow||creative.make();
+        creativeSetup(await readJSON(req),flow,p);
+        // Config changed: all AI judgments must be recomputed instead of presenting stale approvals.
+        flow.analysis={};flow.quality=null;flow.error='';flow.status=flow.document?'document-ready':'empty';
+        for(const k of ['style','layout','director','quality'])flow.stages[k]='pending';
+        p.creativeWorkflow=flow;touchProject(p);return respond(res,200,creativeView(p));
+      }
+      if(action==='analyze'&&req.method==='POST'){
+        if(!p.creativeWorkflow?.document)throw Error('请先上传 Word 文档');
+        if(!p.creativeWorkflow.styleNodeIds?.length)throw Error('请先指定至少一张风格参考图');
+        if(!p.creativeWorkflow.document.images?.length)throw Error('Word 文档没有可用的原型图');
+        void creativeAnalyze(p).catch(e=>{
+          const f=p.creativeWorkflow;if(f&&!f.error){f.status='failed';f.error=String(e.message||e).slice(0,450);touchProject(p)}
+          diag({source:'creative',level:'error',action:'analyze',message:String(e.message||e).slice(0,350)});
+        });
+        return respond(res,202,{started:true,flowStatus:'running'});
+      }
+      if(action==='quality'&&req.method==='POST'){
+        const b=await readJSON(req);if(typeof b.historyId!=='string'||!history.some(h=>h.id===b.historyId&&h.projectId===p.id))throw Error('请选择当前项目的一张有效生成图');
+        void creativeQuality(p,b.historyId).catch(e=>{
+          const f=p.creativeWorkflow;if(f&&!f.error){f.status='failed';f.error=String(e.message||e).slice(0,450);touchProject(p)}
+          diag({source:'creative',level:'error',action:'quality',message:String(e.message||e).slice(0,350)});
+        });
+        return respond(res,202,{started:true,flowStatus:'running'});
+      }
+      return fail(res,405,'此工作流接口不支持该操作');
+    }
     // Project, board, and conversation state are stored on the server, not localStorage.
     if(route==='/api/projects'&&req.method==='GET')return respond(res,200,{projects:projects.filter(p=>!p.archived).map(p=>({id:p.id,title:p.title,createdAt:p.createdAt,updatedAt:p.updatedAt,imageCount:p.nodes.filter(n=>n.kind!=='note').length})),defaultId:defaultProject()?.id||null});
     if(route==='/api/projects'&&req.method==='POST'){
