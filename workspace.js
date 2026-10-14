@@ -127,6 +127,10 @@ for(const p of projects){
   interruptedCreative=true;
  }
 }
+for(const p of projects){
+ const d=p.assetDerivation;
+ if(d?.status==='running'){d.status='failed';d.error='服务重启中断了素材分析，可能已产生费用；请检查记录后决定是否重试';d.phase='';interruptedCreative=true}
+}
 if(interruptedCreative)saveProjects();
 const creativeBusy=new Set();
 function creativeState(p){
@@ -659,6 +663,112 @@ function submit(b){
  proj.messages.push({id:crypto.randomUUID(),role:'user',content:valid.editInstruction,createdAt:time(),groupId,sourceId:valid.sourceId,referenceRoles:valid.referenceNodes.map(n=>({nodeId:n.nodeId,role:n.role})),providerIds:valid.targets.map(t=>t.providerId)});
  proj.messages=proj.messages.slice(-400);touchProject(proj);schedule();return {jobs:created.map(publicJob),groupId};
 }
+const derivedAssets=require('./lib/asset-derivation');
+const derivationBusy=new Set();
+function derivationState(p){
+ return p.assetDerivation||(p.assetDerivation={version:1,status:'idle',phase:'',error:'',styleDNA:'',referenceNodeIds:[],drafts:[],updatedAt:time()});
+}
+function derivationView(p){
+ const d=derivationState(p),saved=p.creativeWorkflow?.styleDNA||'';
+ return {derivation:{...d,styleDNA:d.styleDNA||'',drafts:(d.drafts||[]).map(item=>{
+   const job=jobs.find(j=>j.id===item.jobId&&j.projectId===p.id);
+   return {...item,status:job?.status||item.status,resultId:job?.resultId||null,error:job?.error||''};
+  })},projectStyle:{available:!!saved,styleDNA:saved},types:derivedAssets.list()};
+}
+function validateStyleRefs(p,ids,required=false){
+ if(!Array.isArray(ids)||ids.length>5||new Set(ids).size!==ids.length||(required&&!ids.length))
+  throw Error('请选择 1 至 5 张不同的游戏风格参考图');
+ for(const id of ids)creativePictureFromNode(p,id);
+ return ids.slice();
+}
+function deriveProvider(config,cap){
+ if(!config||typeof config!=='object')throw Error('请配置'+cap+'模型');
+ const selected=effectiveProvider(provider(config.providerId||state.activeId),cap);
+ emptyProvider(selected);
+ return {provider:selected,model:creativeModel(selected,cap,config.model)};
+}
+function derivationStarted(p,phase){
+ if(DEMO_MODE)throw Error('演示模式不能执行真实付费 AI');
+ if(derivationBusy.has(p.id)||creativeBusy.has(p.id))throw Object.assign(Error('当前项目有分析任务正在运行'),{status:409});
+ derivationBusy.add(p.id);
+ const d=derivationState(p);
+ d.status='running';d.phase=phase;d.error='';d.startedAt=time();d.updatedAt=time();touchProject(p);
+ return d;
+}
+async function deriveStyle(p,ids,setting){
+ const d=derivationStarted(p,'style');
+ try{
+  const conf=deriveProvider(setting,'vision');
+  const refs=ids.map(id=>creativePictureFromNode(p,id));
+  const text=await options.limiter.run(()=>analyzeCreativeImages(conf.provider,refs,conf.model,
+    creativeUpstream.stylePrompt('为后续多个游戏素材提取共用 Style DNA；一张真实游戏画风图也可以使用。'),{timeoutMs:180000}));
+  const guide=creativeUpstream.validateGuide(text);
+  d.styleDNA=guide.yaml;d.referenceNodeIds=ids;d.styleReview=guide.review;
+  // Plans produced for a previous visual DNA must not be silently submitted.
+  for(const draft of d.drafts||[])if(draft.status==='draft')draft.status='stale';
+  d.status='ready';d.phase='';d.updatedAt=time();touchProject(p);
+ }catch(e){d.status='failed';d.error=String(e.message||e).slice(0,450);touchProject(p);throw e}
+ finally{derivationBusy.delete(p.id)}
+}
+async function derivePrepare(p,items,ids,styleSource,setting){
+ const d=derivationStarted(p,'prepare');
+ try{
+  const styleDNA=styleSource==='project'?p.creativeWorkflow?.styleDNA:d.styleDNA;
+  if(styleSource==='derived'&&ids.length&&JSON.stringify(ids)!==JSON.stringify(d.referenceNodeIds||[]))
+   throw Error('所选参考图与当前分析的画风不一致；请重新识图或取消本次参考图选择');
+  if(!styleDNA)throw Error('没有可复用的 Style DNA，请先分析参考图');
+  const conf=deriveProvider(setting,'text');
+  const instruction=derivedAssets.buildPlanPrompt(items,styleDNA);
+  const response=await options.limiter.run(()=>generateText(conf.provider,
+   {model:conf.model,prompt:instruction,maxPromptChars:58000,maxOutputTokens:7600,timeoutMs:330000}));
+  const next=derivedAssets.parsePlan(response,items);
+  d.referenceNodeIds=ids;d.source=styleSource;
+  d.styleHash=crypto.createHash('sha256').update(styleDNA).digest('hex');
+  d.drafts=next.map(x=>({...x,id:crypto.randomUUID(),createdAt:time(),jobId:null}));
+  d.status='ready';d.phase='';d.updatedAt=time();touchProject(p);
+ }catch(e){d.status='failed';d.error=String(e.message||e).slice(0,450);touchProject(p);throw e}
+ finally{derivationBusy.delete(p.id)}
+}
+function submitDerivation(p,body){
+ if(DEMO_MODE)throw Error('演示模式不可调用付费图片生成');
+ if(body.confirmCost!==true)throw Error('必须人工确认此次批量生图会产生费用');
+ if(derivationBusy.has(p.id)||creativeBusy.has(p.id))throw Object.assign(Error('分析正在运行，请等待完成'),{status:409});
+ const d=derivationState(p),ids=body.ids;
+ const latestStyle=d.source==='project'?p.creativeWorkflow?.styleDNA:d.styleDNA;
+ if(!latestStyle||crypto.createHash('sha256').update(latestStyle).digest('hex')!==d.styleHash)
+  throw Error('Style DNA 已发生改变；旧草稿需要重新准备，不能直接批量生成');
+ if(!Array.isArray(ids)||ids.length<1||ids.length>8||new Set(ids).size!==ids.length)throw Error('每次只能提交 1 至 8 个不同的草稿');
+ const drafts=ids.map(id=>d.drafts.find(x=>x.id===id));
+ if(drafts.some(x=>!x||x.status!=='draft'||x.jobId))throw Error('草稿不存在或已提交，不能重复扣费');
+ if(jobs.filter(j=>['queued','running'].includes(j.status)).length+drafts.length>MAX_QUEUED)
+  throw Error('生图队列已满，请等待现有任务完成');
+ const conf=deriveProvider(body.image,'image');
+ const refs=validateStyleRefs(p,d.referenceNodeIds||[]);
+ const valid=drafts.map((draft,index)=>{
+  const request={projectId:p.id,prompt:draft.prompt,referenceNodes:refs.map(nodeId=>({nodeId,role:'style'})),providerId:body.image.providerId,
+   model:conf.model,ratio:draft.ratio,resolution:body.resolution||'1K',quality:body.quality||'auto',count:1,
+   canvasX:220+(index%4)*330,canvasY:180+Math.floor(index/4)*400};
+  const checked=validateCreation(request);
+  if(checked.capability!=='image')throw Error('衍生素材只能走独立图片生成通道');
+  return checked;
+ });
+ // All requests, image references, models, queue capacity and draft state are
+ // verified BEFORE a single paid job is persisted. No partial batch submissions.
+ const groupId=crypto.randomUUID(),created=[];
+ for(let i=0;i<valid.length;i++){
+  const entry=valid[i],refs=entry.referenceNodes,store={input:refs.map(r=>r.file),roleHints:refs.map(r=>r.role),mask:null,maskSource:null};
+  created.push(makeJob({...entry,batchIndex:i},store,conf.provider.id,conf.model,groupId));
+ }
+ jobs.unshift(...created);saveJobs();
+ drafts.forEach((draft,i)=>{draft.status='queued';draft.jobId=created[i].id});
+ d.status='submitted';d.lastGroupId=groupId;d.updatedAt=time();
+ p.messages.push({id:crypto.randomUUID(),role:'user',createdAt:time(),groupId,
+  content:'一图衍生素材：'+drafts.map(x=>derivedAssets.TYPES[x.kind].label+' / '+x.description).join('；'),
+  providerIds:[conf.provider.id]});
+ p.messages=p.messages.slice(-400);touchProject(p);schedule();
+ return {groupId,jobs:created.map(publicJob)};
+}
+
 function staticFile(res,pathname){if(pathname==='/')pathname='/index.html';if(!/^\/(?:index\.html|assets\/[a-zA-Z0-9-]+\.(?:css|js|png|webp|ico))$/.test(pathname))return fail(res,404,'资源不存在');fs.readFile(path.join(ROOT,pathname),(e,buf)=>{if(e)return fail(res,404,'资源不存在');const ext=path.extname(pathname);res.writeHead(200,{'Content-Type':({'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.png':'image/png','.webp':'image/webp','.ico':'image/x-icon'})[ext],'X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin','Content-Security-Policy':"default-src 'self'; img-src 'self' data: blob:; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'",'Cache-Control':'no-cache'});res.end(buf)})}
 async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').split(':')[0].toLowerCase()!==ALLOWED_HOST)return fail(res,421,'请求域名不符合独立安全域名配置');const url=new URL(req.url,'http://localhost');
   if(BASE && url.pathname===BASE){res.writeHead(308,{Location:BASE+'/'});return res.end()}
@@ -796,6 +906,50 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
         return respond(res,202,{started:true,flowStatus:'running'});
       }
       return fail(res,405,'此工作流接口不支持该操作');
+    }
+    const deriveMatch=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/derive(?:\/(style|prepare|drafts|submit))?$/);
+    if(deriveMatch){
+      const p=assertProject(deriveMatch[1]),action=deriveMatch[2],d=derivationState(p);
+      if(!action&&req.method==='GET')return respond(res,200,derivationView(p));
+      if(derivationBusy.has(p.id)||creativeBusy.has(p.id))return fail(res,409,'此项目已有 AI 分析任务，请稍后再操作');
+      if(action==='style'&&req.method==='POST'){
+       const b=await readJSON(req);
+       if(b.confirmCost!==true)throw Error('必须确认付费风格识图请求');
+       const ids=validateStyleRefs(p,b.referenceNodeIds,true);
+       deriveProvider(b.vision,'vision');
+       void deriveStyle(p,ids,b.vision).catch(e=>diag({source:'derive',level:'error',action:'style',message:String(e.message||e).slice(0,300)}));
+       return respond(res,202,{started:true,phase:'style'});
+      }
+      if(action==='prepare'&&req.method==='POST'){
+       const b=await readJSON(req),items=derivedAssets.validateItems(b.items);
+       const ids=validateStyleRefs(p,b.referenceNodeIds||[]);
+       if(b.styleSource!=='project'&&b.styleSource!=='derived')throw Error('必须选择要使用的 Style DNA');
+       const style=b.styleSource==='project'?p.creativeWorkflow?.styleDNA:d.styleDNA;
+       if(!style)throw Error('当前没有已分析的 Style DNA');
+       if(b.confirmCost!==true)throw Error('必须确认付费文字模型会用于准备素材草稿');
+       deriveProvider(b.text,'text');
+       void derivePrepare(p,items,ids,b.styleSource,b.text).catch(e=>diag({source:'derive',level:'error',action:'prepare',message:String(e.message||e).slice(0,300)}));
+       return respond(res,202,{started:true,phase:'prepare'});
+      }
+      if(action==='drafts'&&req.method==='POST'){
+       const b=await readJSON(req),edits=b.edits;
+       if(!Array.isArray(edits)||edits.length<1||edits.length>8||new Set(edits.map(x=>x.id)).size!==edits.length)throw Error('草稿更新格式无效');
+       for(const edit of edits){
+        const draft=d.drafts?.find(x=>x.id===edit.id);
+        if(!draft||draft.status!=='draft'||draft.jobId)throw Error('草稿已提交或不存在');
+        if(typeof edit.prompt!=='string'||edit.prompt.trim().length<40||edit.prompt.length>7000)throw Error('提示词需为 40 至 7000 字');
+        if(edit.ratio!==undefined&&!['1:1','3:2','2:3','16:9','9:16','4:3','3:4'].includes(edit.ratio))throw Error('不支持此生图比例');
+       }
+       for(const edit of edits){
+        const draft=d.drafts.find(x=>x.id===edit.id);draft.prompt=edit.prompt.trim();if(edit.ratio)draft.ratio=edit.ratio;
+       }
+       d.updatedAt=time();touchProject(p);return respond(res,200,derivationView(p));
+      }
+      if(action==='submit'&&req.method==='POST'){
+       const b=await readJSON(req);
+       return respond(res,201,submitDerivation(p,b));
+      }
+      return fail(res,405,'衍生素材接口操作不支持');
     }
     // Project, board, and conversation state are stored on the server, not localStorage.
     if(route==='/api/projects'&&req.method==='GET')return respond(res,200,{projects:projects.filter(p=>!p.archived).map(p=>({id:p.id,title:p.title,createdAt:p.createdAt,updatedAt:p.updatedAt,imageCount:p.nodes.filter(n=>n.kind!=='note').length})),defaultId:defaultProject()?.id||null});
