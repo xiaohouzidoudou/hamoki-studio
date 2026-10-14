@@ -14,7 +14,7 @@
   for(const o of items){const x=el('option',null,o.label);x.value=String(o.value);node.append(x)}
   if(val!=null)node.value=String(val);
  }
- function setBusy(value){busy=value;for(const name of ['creativeAnalyze','creativeAnalyzeAll','creativeSplit','creativeQuality','creativeSavePage','creativeDocInput'])$(name).disabled=value}
+ function setBusy(value){busy=value;for(const name of ['creativeAnalyze','creativeAnalyzeAll','creativeRetryDirector','creativeSplit','creativeQuality','creativeSavePage','creativeDocInput'])$(name).disabled=value}
  function roleLines(){
   const root=$('creativeSteps');root.replaceChildren();
   for(const [key,title] of stages){
@@ -140,6 +140,9 @@
   const d=pageDoc(selected),imgs=d?.images||[];
   pick('creativeLayoutSelect',[{value:'-1',label:'未指定原型图（仅按文字分析）'},...imgs.map(img=>({value:img.index,label:d.name+' · 原型 '+(img.index+1)}))],selected?(selected.layoutImageIndex??selected.imageIndexes?.[0]??-1):-1);
   $('creativeAnalyze').disabled=!selected||busy;
+   const retry=!!selected?.analysis?.layout&&!selected?.analysis?.prompt&&selected?.status==='failed'&&f?.stages?.director==='failed';
+   $('creativeRetryDirector').classList.toggle('hidden',!retry);
+   $('creativeRetryDirector').disabled=!retry||busy;
   $('creativeAnalyzeAll').disabled=!pages.some(p=>!p.analysis?.prompt)||busy;
  }
  function resultsUI(){
@@ -156,12 +159,18 @@
   $('creativeQuality').disabled=!analysis.director||!rows.length||busy;
   $('creativeUseFix').disabled=!page?.quality?.report||busy;
  }
+ function progressText(){
+  const phase=({style:'分析风格',layout:'分析原型',director:'生成美术总监方案'})[f?.progress?.stage]||'处理页面';
+  const seconds=f?.progress?.startedAt?Math.max(0,Math.floor((Date.now()-new Date(f.progress.startedAt).getTime())/1000)):0;
+  return f?.progress?.pageName?`正在${phase}：「${f.progress.pageName}」 · ${f.progress.done}/${f.progress.total} 页面 · 已等待 ${Math.floor(seconds/60)} 分 ${seconds%60} 秒。关闭面板不会中断，暂不重复提交。`:'AI 正在处理文档或生成创作方案。你可以关闭面板，后台仍会继续。';
+ }
  function render(){
   if(!f)return;
   roleLines();providersUI();refsUI();docsUI();pagesUI();resultsUI();
   $('creativeNotes').value=f.notes||'';
   if(f.error)say('执行失败：'+f.error);
-  else if(!busy)say(f.status==='ready'?'页面设计方案已准备好，可送到生图操作台。':f.status==='split-ready'?'AI 智能拆页完成，请逐项核对原型关联。':'');
+  else if(f.status==='running')say(progressText());
+   else if(!busy)say(f.status==='ready'?'页面设计方案已准备好，可送到生图操作台。':f.status==='split-ready'?'AI 智能拆页完成，请逐项核对原型关联。':'');
  }
  async function load(){
   const id=projectId;if(!id)return;
@@ -256,14 +265,14 @@
  }
  async function waitUntil(wanted){
   const id=projectId,start=Date.now();
-  while(Date.now()-start<420000){
+  while(Date.now()-start<900000){
    await new Promise(ok=>setTimeout(ok,1700));
    const out=await api('projects/'+id+'/creative');
    if(id!==projectId)return;
    f=out.flow;roleLines();
    if(f.status==='failed')throw Error(f.error||'AI 工作流失败');
    if(wanted.includes(f.status)){render();return}
-   say(f.progress?.pageName?`正在处理「${f.progress.pageName}」 · ${f.progress.done}/${f.progress.total} 页面`:'AI 正在处理文档或生成创作方案。你可以关闭面板，后台仍会继续。');
+   say(progressText());
   }
   throw Error('任务仍在后台执行，稍后重新打开面板查看，不要重复提交');
  }
@@ -286,6 +295,24 @@
    await waitUntil(action==='split'?['split-ready']:['ready','review']);
    toast(action==='split'?'页面智能拆分完成':'AI 页面设计方案完成');
   }catch(e){failure='执行失败：'+e.message;try{await load()}catch{}}
+  finally{setBusy(false);if(f)render();if(failure)say(failure)}
+ }
+ async function retryDirector(){
+  const page=active();
+  if(!page?.analysis?.layout||page.analysis.prompt||page.status!=='failed')return say('当前页面没有可直接重试的美术总监任务');
+  if(!modelConfigured('text'))return;
+  const data=settings();
+  if(JSON.stringify(data.styleNodeIds)!==JSON.stringify(f.styleNodeIds||[])||
+     Number($('creativeLayoutSelect').value)!==(page.layoutImageIndex??page.imageIndexes?.[0]??-1)){
+    return say('你更改了风格参考图或原型关联，请先重新分析页面，避免使用过期的布局');
+  }
+  if(!confirm('只重新调用文字模型完成美术总监方案，保留已完成的风格与原型分析。此次调用仍可能收费，确认重试吗？'))return;
+  setBusy(true);say('正在保存所选文字模型…');let failure='';
+  try{
+   await saveSettings();
+   await api('projects/'+projectId+'/creative/director-retry',{method:'POST',body:{pageId:page.id}});
+   await waitUntil(['ready']);toast('美术总监方案已完成，原有风格与原型分析已保留');
+  }catch(e){failure='重试失败：'+e.message;try{await load()}catch{}}
   finally{setBusy(false);if(f)render();if(failure)say(failure)}
  }
  async function canvasPrompt(extra=''){
@@ -351,6 +378,7 @@
  $('creativeSplit').addEventListener('click',()=>run('split'));
  $('creativeSavePage').addEventListener('click',savePage);
  $('creativeAnalyze').addEventListener('click',()=>run('analyze'));
+ $('creativeRetryDirector').addEventListener('click',retryDirector);
  $('creativeAnalyzeAll').addEventListener('click',()=>run('analyze',true));
  $('creativeStyleLock').addEventListener('click',async()=>{
   if(!f?.styleDNA){say('先分析一张游戏风格图才能锁定 Style DNA');return}

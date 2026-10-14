@@ -104,7 +104,7 @@ test('workflow APIs are authenticated, project-bound, restart-persistent and do 
 
 test('agent collaboration runs visual style, layout and art direction, then quality review through existing model adapters',async t=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hamoki-creative-agents-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
- const received=[];
+ const received=[];let directorFailsOnce=true;
  const mock=http.createServer(async(req,res)=>{
   let raw='';for await(const chunk of req)raw+=chunk.toString();
   const body=JSON.parse(raw||'{}');
@@ -119,6 +119,7 @@ test('agent collaboration runs visual style, layout and art direction, then qual
    String(content[0]?.text||'').includes('layout_spec')?'Layout Blueprint: 保留登录奖励的所有槽位':
    '质检报告：建议：可提交人工审核'
   ):'页面清单\n登录奖励\n最终生图提示词：\n绘制周年庆签到界面，深蓝色金属切角风格，保持原型槽位。\n质检清单：检查颜色和布局';
+  if(!multimodal&&directorFailsOnce){directorFailsOnce=false;res.statusCode=504;return res.end(JSON.stringify({error:{message:'模拟文字上游超时'}}));}
   return res.end(JSON.stringify({choices:[{message:{content:reply}}]}));
  });
  await new Promise(resolve=>mock.listen(0,'127.0.0.1',resolve));t.after(()=>mock.close());
@@ -171,12 +172,29 @@ test('agent collaboration runs visual style, layout and art direction, then qual
  const run=await request('/api/projects/'+project+'/creative/analyze','POST',{});assert.equal(run.code,202);
  let flow;
  for(let i=0;i<120;i++){flow=(await request('/api/projects/'+project+'/creative')).payload.flow;if(['ready','failed'].includes(flow.status))break;await wait(50)}
- assert.equal(flow.status,'ready',flow.error||'analysis has not completed');
+ assert.equal(flow.status,'failed','first director request intentionally fails');
+ assert.match(flow.error,/504/);
+ assert.equal(flow.stages.style,'done','style result must remain saved');
+ assert.equal(flow.stages.layout,'done','layout result must remain saved');
+ assert.equal(flow.stages.director,'failed');
+ const beforeRetry=flow.pages.find(x=>x.id===flow.activePageId);
+ assert.match(beforeRetry.analysis.layout,/槽位/);
+ assert.match(flow.styleDNA,/深蓝金属/);
+ assert.equal(received.length,3,'failed call uses exactly two vision calls and one text request');
+ const retry=await request('/api/projects/'+project+'/creative/director-retry','POST',{pageId:flow.activePageId});
+ assert.equal(retry.code,202,JSON.stringify(retry.payload));
+ for(let i=0;i<120;i++){flow=(await request('/api/projects/'+project+'/creative')).payload.flow;if(['ready','failed'].includes(flow.status))break;await wait(50)}
+ assert.equal(flow.status,'ready',flow.error||'retry has not completed');
  assert.match(flow.analysis.style,/深蓝金属/);assert.match(flow.analysis.layout,/槽位/);assert.match(flow.analysis.prompt,/绘制周年庆签到界面/);
- assert.equal(received.length,3,'exactly two vision calls plus one text model call');
+ assert.equal(received.length,4,'retry must reuse prior style/layout with exactly one additional text call');
+ assert.equal(received.filter(x=>Array.isArray(x.body.messages?.[0]?.content)).length,2,'no new vision requests on retry');
+ const redundant=await request('/api/projects/'+project+'/creative/director-retry','POST',{pageId:flow.activePageId});
+ assert.equal(redundant.code,400,'completed plans must not be billed for a redundant retry');
+ assert.equal(received.length,4);
  assert.equal(received[0].body.model,'test-vision-v2','STYLE uses specifically selected vision model');
  assert.equal(received[1].body.model,'test-vision-v2','TARGET uses specifically selected vision model');
- assert.equal(received[2].body.model,'test-text-v2','director uses specifically selected text model');
+ assert.equal(received[2].body.model,'test-text-v2','initial director uses text model');
+ assert.equal(received[3].body.model,'test-text-v2','retry uses text model');
  const savedFlow=(await request('/api/projects/'+project+'/creative')).payload.flow;
  assert.equal(savedFlow.routing.text.model,'test-text-v2','text model persists per project');
  assert.equal(savedFlow.routing.vision.model,'test-vision-v2','vision model persists per project');
@@ -192,15 +210,15 @@ test('agent collaboration runs visual style, layout and art direction, then qual
  for(let i=0;i<120;i++){flow=(await request('/api/projects/'+project+'/creative')).payload.flow;if(['review','failed'].includes(flow.status))break;await wait(50)}
  assert.equal(flow.status,'review',flow.error||'quality review timed out');
  assert.match(flow.quality.report,/质检报告/);
- assert.equal(received.length,5,'two style/layout vision, art director, image generation, quality review');
+ assert.equal(received.length,6,'style/layout vision, failed and retried director, image generation, quality review');
  assert.match(received[0].body.messages[0].content[0].text,/OUTPUT SKELETON/,'actual ai_asset analyzer must be sent to vision model');
  assert.ok(received[0].body.messages[0].content[0].text.length>20000,'official STYLE rules must not be truncated by legacy 11500-character limit');
  assert.match(received[1].body.messages[0].content[0].text,/layout_spec/,'real upstream TARGET schema must reach visual model');
  assert.match(received[2].body.messages[0].content,/SYNTHESIZER/,'real upstream ASSET rules must reach text model');
  assert.ok(received[2].body.messages[0].content.length>20000,'long third-party page guidance must not be truncated by ordinary chat limit');
- assert.match(received[4].body.messages[0].content[0].text,/CHECKER/,'real upstream QA rules must reach vision model');
+ assert.match(received[5].body.messages[0].content[0].text,/CHECKER/,'real upstream QA rules must reach vision model');
  assert.equal(received[0].body.messages[0].content.filter(p=>p.type==='image_url').length,1);
  assert.equal(received[1].body.messages[0].content.filter(p=>p.type==='image_url').length,1);
- assert.equal(received[4].body.messages[0].content.filter(p=>p.type==='image_url').length,3);
+ assert.equal(received[5].body.messages[0].content.filter(p=>p.type==='image_url').length,3);
 });
 
