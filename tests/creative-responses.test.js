@@ -10,6 +10,7 @@ async function fakeRelay(t,kind='endpoint-rejected'){
   const body=JSON.parse(Buffer.concat(chunks).toString()||'{}');
   paths.push(req.url);bodies.push(body);res.setHeader('Content-Type','application/json');
   if(req.url==='/v1/chat/completions'){
+   if(kind==='gateway-timeout'){res.statusCode=504;return res.end('<html><head><title>504 Gateway Time-out</title><script src="/pigcc/plugin.js"></script></head><body>504</body></html>')}
    res.statusCode=kind==='rate-limit'?429:400;
    return res.end(JSON.stringify({error:{message:kind==='rate-limit'?'Too many requests':'This model is not supported on the Chat Completions endpoint'}}));
   }
@@ -40,6 +41,11 @@ test('vision Responses input carries images, not only text',async t=>{
  assert.equal(relay.bodies[1].input[0].content[0].type,'input_text');
  assert.equal(relay.bodies[1].input[0].content[1].type,'input_image');
  assert.match(relay.bodies[1].input[0].content[1].image_url,/^data:image\/png;base64,/);
+});
+test('HTML 504 shows an actionable message without leaking injected proxy HTML or retrying',async t=>{
+ const relay=await fakeRelay(t,'gateway-timeout');
+ await assert.rejects(generateText(relay.provider,{model:'gpt-5.5',prompt:'分屏'}),err=>err.upstreamStatus===504&&/网关等待上游模型超时/.test(err.message)&&!err.message.includes('pigcc'));
+ assert.deepEqual(relay.paths,['/v1/chat/completions']);
 });
 test('429 is not retried or double charged through Responses',async t=>{
  const relay=await fakeRelay(t,'rate-limit');
