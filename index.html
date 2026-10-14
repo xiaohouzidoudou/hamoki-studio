@@ -120,22 +120,30 @@
   <div class="creative-shell">
    <aside class="creative-sidebar"><div class="creative-side-title">当前项目流程</div><div id="creativeSteps" class="creative-steps"></div><div class="creative-side-foot">每个项目独立保存。文字、视觉分析会产生 API 费用，只有点击按钮才会调用；生图仍由你手动提交。</div></aside>
    <div class="creative-main">
-    <section class="creative-section"><div class="creative-section-top"><div><span class="creative-kicker">01 · DOCUMENT</span><h3>策划文档</h3><p>上传 Word 后自动提取文字、表格和内嵌原型图，不会马上调用 AI。</p></div><label for="creativeDocInput" class="soft-btn creative-upload"><svg class="icon sm"><use href="#ic-upload"/></svg> 上传 Word</label></div>
-     <input type="file" id="creativeDocInput" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
-     <div id="creativeDocumentInfo" class="creative-doc-info">当前项目尚未上传策划文档。</div><div id="creativeDocumentImages" class="creative-doc-images"></div></section>
-    <section class="creative-section"><div class="creative-section-top"><div><span class="creative-kicker">02 · STYLE & LAYOUT</span><h3>参考图与原型</h3><p>选中的画布图片用于学习游戏风格；Word 内的图片用于还原界面布局。两者不会混作同一种参考。</p></div></div>
-     <div class="creative-form-grid"><label>Word 原型图<select class="field" id="creativeLayoutSelect"></select></label><label>补充创作需求<textarea class="field" id="creativeNotes" rows="2" maxlength="1800" placeholder="例如：完成周年庆签到页面，忠实保持原型结构"></textarea></label></div>
-     <div class="creative-field-title">从当前画布选择 STYLE 美术参考图（最多 5 张）</div><div id="creativeStyleRefs" class="creative-ref-list"></div>
-     <div class="creative-form-grid"><label>文字分析 / 美术总监<select class="field" id="creativeTextProvider"></select><input class="field" id="creativeTextModel" maxlength="150" placeholder="GPT / DeepSeek 模型 ID"></label><label>视觉分析 / 双重质检<select class="field" id="creativeVisionProvider"></select><input class="field" id="creativeVisionModel" maxlength="150" placeholder="支持看图的 GPT / Gemini 模型 ID"></label></div>
-     <div class="creative-actions"><button type="button" class="primary-btn" id="creativeAnalyze"><svg class="icon sm"><use href="#ic-spark"/></svg> 开始 AI 协同分析</button><span id="creativeMessage" class="creative-notice" role="status"></span></div>
+    <section class="creative-section"><div class="creative-section-top"><div><span class="creative-kicker">01 · DOCUMENT</span><h3>策划文档</h3><p>可以连续上传多份 Word（每份最大 12MB），自动合并成同一项目的页面任务，不会覆盖旧文档。</p></div><label for="creativeDocInput" class="soft-btn creative-upload"><svg class="icon sm"><use href="#ic-upload"/></svg> 追加 Word</label></div>
+     <input type="file" id="creativeDocInput" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple hidden>
+     <div id="creativeDocumentInfo" class="creative-doc-info">当前项目尚未上传策划文档。</div><div id="creativeDocList" class="creative-document-list"></div>
+     <div id="creativeDocumentImages" class="creative-doc-images"></div></section>
+    <section class="creative-section"><div class="creative-section-top"><div><span class="creative-kicker">02 · PAGE TASKS</span><h3>页面设计任务</h3><p>上传后先按文档标题和原型位置免费初步拆页，也可以让文字模型重新理解完整文档。</p></div><button class="soft-btn" type="button" id="creativeSplit">AI 智能拆页</button></div>
+      <div id="creativePageSummary" class="creative-doc-info">上传 Word 后将在此显示页面任务。</div>
+      <div id="creativePageList" class="creative-page-list"></div>
+      <div class="creative-page-editor"><div class="creative-field-title" id="creativePageTitle">请先选择页面</div><p id="creativePageSource" class="micro muted"></p>
+      <label class="creative-editor-label">当前页面的功能需求与约束<textarea class="field" id="creativePageRequirement" rows="4" maxlength="4400" placeholder="AI 从 Word 提取；可以直接修改，没有写清楚的内容不要猜测"></textarea></label>
+      <button class="soft-btn" id="creativeSavePage" type="button">保存页面要求与原型关联</button></div>
     </section>
-    <section class="creative-section"><div class="creative-section-top"><div><span class="creative-kicker">03 · ART DIRECTION</span><h3>AI 团队分析结论</h3><p>可查看每个角色的实际输出，不用相信一个没有根据的「合格分数」。</p></div></div>
+    <section class="creative-section"><div class="creative-section-top"><div><span class="creative-kicker">03 · STYLE & LAYOUT</span><h3>参考图与原型</h3><p>选中的画布图片用于学习游戏风格；Word 内的图片用于还原界面布局。两者不会混作同一种参考。</p></div></div>
+     <div class="creative-form-grid"><label>Word 原型图<select class="field" id="creativeLayoutSelect"></select></label><label>补充创作需求<textarea class="field" id="creativeNotes" rows="2" maxlength="1800" placeholder="例如：完成周年庆签到页面，忠实保持原型结构"></textarea></label></div>
+     <div class="creative-field-title">从当前画布选择游戏 STYLE 参考图（最多 5 张）</div><div class="creative-style-head"><span class="micro muted" id="creativeStyleStatus">保存为该项目通用 Style DNA，切换页面仍可复用。</span><button class="soft-btn" id="creativeStyleLock" type="button">风格锁定：否</button></div><div id="creativeStyleRefs" class="creative-ref-list"></div>
+     <div class="creative-form-grid"><label>文字分析 / 美术总监<select class="field" id="creativeTextProvider"></select><input class="field" id="creativeTextModel" maxlength="150" placeholder="GPT / DeepSeek 模型 ID"></label><label>视觉分析 / 双重质检<select class="field" id="creativeVisionProvider"></select><input class="field" id="creativeVisionModel" maxlength="150" placeholder="支持看图的 GPT / Gemini 模型 ID"></label></div>
+     <div class="creative-actions"><button type="button" class="primary-btn" id="creativeAnalyze"><svg class="icon sm"><use href="#ic-spark"/></svg> 分析当前页面</button><button type="button" class="soft-btn" id="creativeAnalyzeAll">批量完成缺失页面方案（最多 8 页）</button><span id="creativeMessage" class="creative-notice" role="status"></span></div>
+    </section>
+    <section class="creative-section"><div class="creative-section-top"><div><span class="creative-kicker">04 · ART DIRECTION</span><h3>AI 团队分析结论</h3><p>可查看每个角色的实际输出，不用相信一个没有根据的「合格分数」。</p></div></div>
      <details class="creative-result"><summary>风格分析师 · Style DNA</summary><pre id="creativeStyleResult">尚未分析</pre></details>
      <details class="creative-result"><summary>原型分析师 · Layout Blueprint</summary><pre id="creativeLayoutResult">尚未分析</pre></details>
      <details class="creative-result" open><summary>AI 美术总监 · 生图方案</summary><pre id="creativeDirectorResult">尚未分析</pre></details>
      <div class="creative-actions"><button class="primary-btn" type="button" id="creativeUsePrompt" disabled><svg class="icon sm"><use href="#ic-arrow"/></svg> 送入画布生图操作台</button><span class="micro muted">不会自动生成或扣除生图费用</span></div>
     </section>
-    <section class="creative-section"><div class="creative-section-top"><div><span class="creative-kicker">04 · ART REVIEW</span><h3>生成后的视觉质检</h3><p>先在画布完成生图，再选择这张作品。独立视觉模型同时对照原型与风格进行审核。</p></div></div>
+    <section class="creative-section"><div class="creative-section-top"><div><span class="creative-kicker">05 · ART REVIEW</span><h3>生成后的视觉质检</h3><p>先在画布完成生图，再选择这张作品。独立视觉模型同时对照原型与风格进行审核。</p></div></div>
       <div class="creative-actions"><select class="field" id="creativeGeneratedSelect" aria-label="要质检的生成图"></select><button type="button" class="soft-btn" id="creativeQuality" disabled><svg class="icon sm"><use href="#ic-search"/></svg> 检查生成图</button><button type="button" class="soft-btn" id="creativeUseFix" disabled>将返工建议放入生图框</button></div>
       <pre id="creativeQualityResult" class="creative-quality-result">尚未质检</pre>
     </section>
@@ -193,5 +201,5 @@
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <script src="assets/app.js" defer></script>
 <script src="assets/ui-system.js" defer></script>
-<script src="assets/creative-workflow.js" defer></script>
+<script src="assets/creative-workflow-v2.js" defer></script>
 </body></html>

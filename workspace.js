@@ -15,6 +15,7 @@ const zlib=require('node:zlib');
 const {checkedURL,imageFromDataURL,guessMime,extension,reverse:upstreamReverse,generate:upstreamGenerate,listModels:upstreamListModels,generateText,streamText,analyzeCreativeImages}=require('./lib/upstream');
 const {parseDocx,MAX_DOCX}=require('./lib/creative-docx');
 const creative=require('./lib/creative-workflow');
+const creativePages=require('./lib/creative-pages');
 const generate=(...args)=>options.limiter.run(()=>upstreamGenerate(...args));
 const reverse=(...args)=>options.limiter.run(()=>upstreamReverse(...args));
 const listModels=(...args)=>options.limiter.run(()=>upstreamListModels(...args));
@@ -127,19 +128,57 @@ for(const p of projects){
 }
 if(interruptedCreative)saveProjects();
 const creativeBusy=new Set();
+function creativeState(p){
+ const f=p.creativeWorkflow||(p.creativeWorkflow=creative.make());
+ if(!Array.isArray(f.documents)){
+  const old=f.document;
+  f.documents=old?[{...old,id:crypto.randomUUID()}]:[];
+  f.version=2;
+ }
+ if(!Array.isArray(f.pages))f.pages=creativePages.mergePages([],f.documents);
+ if(!f.activePageId||!f.pages.some(x=>x.id===f.activePageId))f.activePageId=f.pages[0]?.id||null;
+ if(typeof f.styleDNA!=='string')f.styleDNA=String(f.analysis?.style||'');
+ if(typeof f.styleLocked!=='boolean')f.styleLocked=!!f.styleDNA;
+ f.document=f.documents.at(-1)||null;
+ return f;
+}
+function creativeCurrent(f){return f.pages.find(x=>x.id===f.activePageId)||null}
+function creativePageDoc(f,page){return f.documents.find(d=>d.id===page?.docId)||null}
+function creativePagePicture(f,page){
+ const d=creativePageDoc(f,page);
+ const idx=page?.layoutImageIndex??page?.imageIndexes?.[0];
+ return d?.images?.find(img=>img.index===idx)||null;
+}
 function creativeView(p){
- const flow=p.creativeWorkflow||creative.make();
- if(!flow.document)return {flow};
- return {flow:{...flow,document:{...flow.document,images:flow.document.images.map(x=>({...x,url:BASE+'/api/media/'+x.file}))}}};
+ const f=creativeState(p);
+ const decorate=d=>({...d,images:(d.images||[]).map(img=>({...img,url:BASE+'/api/media/'+img.file}))});
+ return {flow:{...f,documents:f.documents.map(decorate),document:f.document?decorate(f.document):null}};
 }
 function creativeSetup(b,flow,p){
  if(!b||typeof b!=='object')throw Error('工作流参数格式有误');
  const refs=Array.isArray(b.styleNodeIds)?b.styleNodeIds:[];
  if(refs.length>5||new Set(refs).size!==refs.length)throw Error('最多选择 5 张不同的风格参考图');
  for(const id of refs){const node=p.nodes.find(n=>n.id===id);if(!node||node.kind==='note')throw Error('风格参考图必须来自当前项目画布')}
+ const changed=JSON.stringify(flow.styleNodeIds||[])!==JSON.stringify(refs);
  flow.styleNodeIds=refs;
- flow.layoutImageIndex=Math.max(0,Math.min(19,Math.floor(Number(b.layoutImageIndex)||0)));
+ if(changed){
+  flow.styleDNA='';flow.styleLocked=false;
+  for(const page of flow.pages||[]){page.analysis={};page.quality=null;page.status='draft'}
+ }
+ if(b.activePageId!==undefined){
+  if(!flow.pages?.some(x=>x.id===b.activePageId))throw Error('当前页面已不存在');
+  flow.activePageId=b.activePageId;
+ }
+ const current=creativeCurrent(flow),d=creativePageDoc(flow,current);
+ if(b.layoutImageIndex!==undefined&&current){
+  const idx=Number(b.layoutImageIndex);
+  if(!Number.isInteger(idx)||idx<-1||idx>=d.images.length)throw Error('原型图片编号错误');
+  current.layoutImageIndex=idx<0?null:idx;
+  current.imageIndexes=idx<0?[]:[idx];
+ }
+ flow.layoutImageIndex=current?.layoutImageIndex??current?.imageIndexes?.[0]??0;
  flow.notes=clampText(b.notes,1800);
+ if(b.styleLocked!==undefined)flow.styleLocked=!!b.styleLocked;
  const config=b.routing||{};
  for(const cap of ['text','vision']){
   const binding=config[cap]||{};
@@ -157,63 +196,101 @@ function creativePictureFromNode(p,id){
  if(!filename)throw Error('找不到参考图原文件');
  return fetchMedia(filename);
 }
-async function creativeAnalyze(p){
- const flow=p.creativeWorkflow;
- if(!flow?.document)throw Error('请先上传 Word 文档');
- if(creativeBusy.has(p.id))throw Object.assign(Error('此项目已有进行中的 AI 分析'),{status:409});
+async function creativeSplit(p){
+ const f=creativeState(p);
+ if(!f.documents.length)throw Error('请先上传至少一份 Word');
+ if(creativeBusy.has(p.id))throw Error('已有正在执行的 AI 工作流');
  if(DEMO_MODE)throw Error('演示模式不能调用付费 AI');
- const refs=flow.styleNodeIds.map(id=>creativePictureFromNode(p,id));
- if(!refs.length)throw Error('请先从画布选择至少一张游戏美术风格参考图');
- const layout=flow.document.images[flow.layoutImageIndex];
- if(!layout)throw Error('文档未提取到可用于布局分析的原型图');
- const rp=flow.routing||{};
- const vision=effectiveProvider(provider(rp.vision?.providerId||state.activeId),'vision');
- const text=effectiveProvider(provider(rp.text?.providerId||state.activeId),'text');
- emptyProvider(vision);emptyProvider(text);
- const vm=assertModel(rp.vision?.model||vision.visionModel);
- const tm=assertModel(rp.text?.model||normalizedCapability(text,'text').defaultModel);
- // Reserve one analysis pipeline per project; there is no automatic retry on paid API failures.
- creativeBusy.add(p.id);
- flow.error='';flow.quality=null;flow.status='running';
- for(const k of ['style','layout','director','generation','quality'])flow.stages[k]='pending';
- flow.analysis={};touchProject(p);
- let stage='style';
+ const cfg=f.routing?.text||{},text=effectiveProvider(provider(cfg.providerId||state.activeId),'text');
+ emptyProvider(text);const model=assertModel(cfg.model||normalizedCapability(text,'text').defaultModel);
+ creativeBusy.add(p.id);f.status='running';f.error='';f.stages.document='running';touchProject(p);
  try{
-  flow.stages.style='running';touchProject(p);
-  flow.analysis.style=await options.limiter.run(()=>analyzeCreativeImages(vision,refs,vm,creative.stylePrompt(flow.notes)));
-  flow.stages.style='done';touchProject(p);
-  stage='layout';flow.stages.layout='running';touchProject(p);
-  flow.analysis.layout=await options.limiter.run(()=>analyzeCreativeImages(vision,[fetchMedia(layout.file)],vm,creative.layoutPrompt(flow.document.text,flow.notes)));
-  flow.stages.layout='done';touchProject(p);
-  stage='director';flow.stages.director='running';touchProject(p);
-  flow.analysis.director=await options.limiter.run(()=>generateText(text,{model:tm,prompt:creative.directorPrompt(flow.document.text,flow.analysis.style,flow.analysis.layout,flow.notes)}));
-  flow.analysis.prompt=creative.extractPrompt(flow.analysis.director);
-  flow.stages.director='done';flow.status='ready';flow.updatedAt=time();touchProject(p);
+  const result=await options.limiter.run(()=>generateText(text,{model,prompt:creativePages.splitPrompt(f.documents)}));
+  const pages=creativePages.parsePageResponse(result,f.documents,f.pages);
+  f.pages=pages;f.activePageId=pages.some(x=>x.id===f.activePageId)?f.activePageId:pages[0].id;
+  f.analysis=creativeCurrent(f)?.analysis||{};f.status='split-ready';f.stages.document='done';f.updatedAt=time();touchProject(p);
+ }catch(e){f.status='failed';f.stages.document='failed';f.error=String(e.message||e).slice(0,450);touchProject(p);throw e}
+ finally{creativeBusy.delete(p.id)}
+}
+async function creativeAnalyze(p,{pageId,batch=false}={}){
+ const f=creativeState(p);
+ if(!f.documents.length||!f.pages.length)throw Error('请先上传 Word 文档并确认拆分页面');
+ if(creativeBusy.has(p.id))throw Error('已有正在执行的 AI 工作流');
+ if(DEMO_MODE)throw Error('演示模式不能调用付费 AI');
+ const current=f.pages.find(x=>x.id===(pageId||f.activePageId));
+ if(!current)throw Error('待分析页面不存在');
+ const selected=batch?f.pages.filter(x=>!x.analysis?.prompt).slice(0,8):[current];
+ if(!selected.length)throw Error('所有页面已有创作方案；如需修改请先更新具体页面');
+ const rp=f.routing||{},txt=rp.text||{};
+ const text=effectiveProvider(provider(txt.providerId||state.activeId),'text');
+ emptyProvider(text);const tm=assertModel(txt.model||normalizedCapability(text,'text').defaultModel);
+ const refs=f.styleNodeIds.map(id=>creativePictureFromNode(p,id));
+ const needsVision=(refs.length>0&&!f.styleDNA)||selected.some(page=>!!creativePagePicture(f,page));
+ let vision=null,vm='';
+ if(needsVision){
+  const cfg=rp.vision||{};
+  vision=effectiveProvider(provider(cfg.providerId||state.activeId),'vision');
+  emptyProvider(vision);vm=assertModel(cfg.model||vision.visionModel);
+ }
+ creativeBusy.add(p.id);f.error='';f.status='running';f.quality=null;
+ for(const k of ['style','layout','director','generation','quality'])f.stages[k]='pending';
+ f.analysis={};f.progress={done:0,total:selected.length,pageId:selected[0]?.id,pageName:selected[0]?.name};touchProject(p);
+ let stage='style',currentPage=null;
+ try{
+  if(refs.length&&!f.styleDNA){
+   f.stages.style='running';touchProject(p);
+   f.styleDNA=await options.limiter.run(()=>analyzeCreativeImages(vision,refs,vm,creative.stylePrompt(f.notes)));
+   f.stages.style='done';f.styleLocked=true;touchProject(p);
+  }else f.stages.style=f.styleDNA?'done':'pending';
+  for(const page of selected){
+   currentPage=page;f.progress.pageId=page.id;f.progress.pageName=page.name;
+   const d=creativePageDoc(f,page),prototype=creativePagePicture(f,page);
+   const context='【页面】'+page.name+'\n【来源文件】'+d.name+'\n【本页需求】'+(page.requirements||d.text.slice(0,5000));
+   stage='layout';f.stages.layout=prototype?'running':'pending';page.status='analyzing';touchProject(p);
+   const layout=prototype
+    ?await options.limiter.run(()=>analyzeCreativeImages(vision,[fetchMedia(prototype.file)],vm,creative.layoutPrompt(context,f.notes)))
+    :'【无布局原型】此页面没有可靠的原型图。只能依据文档文字给出设计建议；禁止声称已还原原型位置。';
+   f.stages.layout=prototype?'done':'pending';page.analysis.layout=layout;touchProject(p);
+   stage='director';f.stages.director='running';touchProject(p);
+   const director=await options.limiter.run(()=>generateText(text,{model:tm,prompt:creative.directorPrompt(context,f.styleDNA||'【未提供风格参考图】需等待用户提供游戏实际 UI 截图后确定最终画风。',layout,f.notes)}));
+   page.analysis={style:f.styleDNA||'',layout,director,prompt:creative.extractPrompt(director)};
+   page.status='ready';page.updatedAt=time();f.progress.done++;f.stages.director='done';touchProject(p);
+  }
+  // A batch produces independent plans, and the selected page is not silently switched.
+  f.analysis=creativeCurrent(f)?.analysis||{};
+  f.status='ready';f.updatedAt=time();touchProject(p);
   return creativeView(p);
  }catch(e){
-  flow.stages[stage]='failed';flow.status='failed';flow.error=String(e.message||e).slice(0,450);touchProject(p);
-  throw e;
+  f.stages[stage]='failed';f.status='failed';f.error=String(e.message||e).slice(0,450);
+  if(currentPage)currentPage.status='failed';
+  touchProject(p);throw e;
  }finally{creativeBusy.delete(p.id)}
 }
 async function creativeQuality(p,historyId){
- const flow=p.creativeWorkflow;
- if(!flow?.analysis?.director)throw Error('请先完成 AI 创作方案');
- if(creativeBusy.has(p.id))throw Object.assign(Error('此项目正在执行 AI 操作'),{status:409});
- const image=history.find(h=>h.id===historyId&&h.projectId===p.id);
- if(!image)throw Error('请选择当前项目的一张生成图进行质检');
- const layout=flow.document?.images?.[flow.layoutImageIndex];
- if(!layout||!flow.styleNodeIds?.length)throw Error('缺少风格参考图或原型图');
- const config=flow.routing?.vision||{};
- const vision=effectiveProvider(provider(config.providerId||state.activeId),'vision');
- emptyProvider(vision);const model=assertModel(config.model||vision.visionModel);
+ const f=creativeState(p),page=creativeCurrent(f);
+ if(!page?.analysis?.director)throw Error('请先完成所选页面的 AI 创作方案');
+ if(creativeBusy.has(p.id))throw Error('已有正在执行的 AI 操作');
+ const generated=history.find(h=>h.id===historyId&&h.projectId===p.id);
+ if(!generated)throw Error('请选择当前项目的一张生成图进行质检');
+ const reference=f.styleNodeIds[0]&&creativePictureFromNode(p,f.styleNodeIds[0]);
+ const prototype=creativePagePicture(f,page);
+ const photos=[...(reference?[reference]:[]),...(prototype?[fetchMedia(prototype.file)]:[]),fetchMedia(generated.file)];
+ if(photos.length<2)throw Error('至少需要一张游戏风格图或原型图才能执行视觉对比');
+ const cfg=f.routing?.vision||{};
+ const vision=effectiveProvider(provider(cfg.providerId||state.activeId),'vision');
+ emptyProvider(vision);const vm=assertModel(cfg.model||vision.visionModel);
  if(DEMO_MODE)throw Error('演示模式不能执行付费质检');
- creativeBusy.add(p.id);flow.stages.quality='running';flow.error='';touchProject(p);
+ creativeBusy.add(p.id);f.stages.quality='running';f.error='';touchProject(p);
  try{
-  const pics=[creativePictureFromNode(p,flow.styleNodeIds[0]),fetchMedia(layout.file),fetchMedia(image.file)];
-  const report=await options.limiter.run(()=>analyzeCreativeImages(vision,pics,model,creative.qualityPrompt(flow.document.text,flow.analysis.style,flow.analysis.layout)));
-  flow.quality={historyId,report,checkedAt:time()};flow.stages.generation='done';flow.stages.quality='done';flow.status='review';touchProject(p);
+  const context=(creativePageDoc(f,page)?.text||'').slice(0,4000);
+  const prompt=reference&&prototype
+   ?creative.qualityPrompt(context,f.styleDNA,page.analysis.layout)
+   :'你是独立游戏 UI 视觉质检员，图像按顺序为'+(reference?'游戏风格参考、':'')+(prototype?'策划原型、':'')+'最终生成结果。仅对实际提供的图片负责。对比风格、界面结构和文字，标明无法判断的内容。\n设计要求：'+page.requirements+'\n风格规则：'+f.styleDNA+'\n布局规则：'+page.analysis.layout;
+  const report=await options.limiter.run(()=>analyzeCreativeImages(vision,photos,vm,prompt));
+  page.quality={historyId,report,checkedAt:time()};
+  f.quality=page.quality;f.stages.generation='done';f.stages.quality='done';f.status='review';page.status='review';touchProject(p);
   return creativeView(p);
- }catch(e){flow.stages.quality='failed';flow.error=String(e.message||e).slice(0,450);touchProject(p);throw e}
+ }catch(e){f.stages.quality='failed';f.error=String(e.message||e).slice(0,450);touchProject(p);throw e}
  finally{creativeBusy.delete(p.id)}
 }
 function appendGeneratedNode(h,j){const p=project(j.projectId||defaultProject()?.id);if(!p)return;
@@ -265,19 +342,52 @@ function importProject(b){
   return next;
  });
  proj.messages=data.project.messages.map(m=>({id:crypto.randomUUID(),role:['user','result','assistant'].includes(m.role)?m.role:'user',content:clampText(m.content,4000),createdAt:typeof m.createdAt==='string'?m.createdAt:time(),imageId:oldHistId.get(m.imageId)||null,sourceId:oldHistId.get(m.sourceId)||null,referenceRoles:Array.isArray(m.referenceRoles)?m.referenceRoles.slice(0,8).filter(x=>oldNodeId.has(x.nodeId)).map(x=>({nodeId:oldNodeId.get(x.nodeId),role:REFERENCE_ROLES[x.role]?x.role:'general'})):[]}));
- // Import creative plan and remap references, never copy model keys or account routing.
+ // Import multi-document creative plans and remap every image/node ID safely.
+ // Provider credentials, configured endpoints and model routes stay account-local.
  const oldFlow=data.project.creativeWorkflow;
- if(oldFlow?.version===1&&oldFlow.document&&Array.isArray(oldFlow.document.images)){
-  const f=creative.make(),d=oldFlow.document;
-  f.document={name:clampText(d.name,140),text:clampText(d.text,55000),hash:clampText(d.hash,64),
-   importedAt:time(),warnings:Array.isArray(d.warnings)?d.warnings.slice(0,8).map(x=>clampText(x,160)):[],
-   blocks:Array.isArray(d.blocks)?d.blocks.slice(0,1200).filter(x=>x&&['text','image'].includes(x.kind)).map(x=>x.kind==='text'?{kind:'text',text:clampText(x.text,1800)}:{kind:'image',index:num(x.index,0,0,19)}):[],
-   images:d.images.slice(0,20).filter(x=>oldNodeId.has(x.nodeId)&&mediaIds.has(x.file)).map(x=>({index:num(x.index,0,0,19),file:mediaIds.get(x.file),nodeId:oldNodeId.get(x.nodeId),mime:trim(x.mime,40),size:num(x.size,0,0,8*1024*1024)}))};
+ if(oldFlow?.document||Array.isArray(oldFlow?.documents)){
+  const f=creative.make();
+  const incoming=Array.isArray(oldFlow.documents)?oldFlow.documents:[oldFlow.document];
+  const docIds=new Map(),pageIds=new Map();
+  f.documents=incoming.slice(0,creativePages.MAX_DOCUMENTS).filter(Boolean).map(d=>{
+   const id=crypto.randomUUID();if(d.id)docIds.set(d.id,id);
+   const images=(Array.isArray(d.images)?d.images:[]).slice(0,20)
+    .filter(x=>oldNodeId.has(x.nodeId)&&mediaIds.has(x.file))
+    .map(x=>({index:num(x.index,0,0,19),file:mediaIds.get(x.file),nodeId:oldNodeId.get(x.nodeId),
+      mime:trim(x.mime,40),size:num(x.size,0,0,8*1024*1024)}));
+   return {id,name:clampText(d.name,140),text:clampText(d.text,55000),hash:clampText(d.hash,64),importedAt:time(),
+    warnings:Array.isArray(d.warnings)?d.warnings.slice(0,8).map(x=>clampText(x,160)):[],
+    blocks:Array.isArray(d.blocks)?d.blocks.slice(0,1200).filter(x=>x&&['text','image'].includes(x.kind))
+     .map(x=>x.kind==='text'?{kind:'text',text:clampText(x.text,1800),...(Number.isInteger(x.level)?{level:x.level}:{})}:{kind:'image',index:num(x.index,0,0,19)}):[],
+    images};
+  });
+  f.document=f.documents.at(-1)||null;
+  f.pages=Array.isArray(oldFlow.pages)?oldFlow.pages.slice(0,creativePages.MAX_PAGES).filter(x=>docIds.has(x.docId))
+   .map(x=>{
+    const id=crypto.randomUUID();pageIds.set(x.id,id);
+    const doc=f.documents.find(d=>d.id===docIds.get(x.docId));
+    const indexes=(Array.isArray(x.imageIndexes)?x.imageIndexes:[]).filter(i=>Number.isInteger(i)&&doc?.images.some(img=>img.index===i)).slice(0,8);
+    return {id,docId:docIds.get(x.docId),name:clampText(x.name,80),sourceName:doc?.name||'',
+      requirements:clampText(x.requirements,4400),imageIndexes:indexes,
+      layoutImageIndex:doc?.images.some(img=>img.index===x.layoutImageIndex)?x.layoutImageIndex:(indexes[0]??null),
+      status:['draft','ready','review','needs-prototype','needs-review'].includes(x.status)?x.status:'draft',
+      analysis:Object.fromEntries(['style','layout','director','prompt'].map(k=>[k,clampText(x.analysis?.[k],k==='prompt'?11500:16000)])),
+      issues:Array.isArray(x.issues)?x.issues.slice(0,6).map(s=>clampText(s,150)):[],
+      quality:x.quality?.report?{historyId:oldHistId.get(x.quality.historyId)||null,report:clampText(x.quality.report,16000),checkedAt:time()}:null};
+   }):creativePages.mergePages([],f.documents);
+  f.activePageId=pageIds.get(oldFlow.activePageId)||f.pages[0]?.id||null;
   f.styleNodeIds=(Array.isArray(oldFlow.styleNodeIds)?oldFlow.styleNodeIds:[]).slice(0,5).filter(x=>oldNodeId.has(x)).map(x=>oldNodeId.get(x));
-  f.layoutImageIndex=num(oldFlow.layoutImageIndex,0,0,Math.max(0,f.document.images.length-1));f.notes=clampText(oldFlow.notes,1800);
-  f.analysis=Object.fromEntries(['style','layout','director','prompt'].map(k=>[k,clampText(oldFlow.analysis?.[k],k==='prompt'?11500:16000)]));
-  f.stages.document='done';for(const s of ['style','layout','director'])if(f.analysis[s])f.stages[s]='done';
-  f.status=f.analysis.prompt?'ready':'document-ready';proj.creativeWorkflow=f;
+  f.styleDNA=clampText(oldFlow.styleDNA||oldFlow.analysis?.style,16000);
+  f.styleLocked=!!oldFlow.styleLocked&&!!f.styleDNA;
+  f.notes=clampText(oldFlow.notes,1800);
+  f.analysis=f.pages.find(x=>x.id===f.activePageId)?.analysis||{};
+  f.quality=f.pages.find(x=>x.id===f.activePageId)?.quality||null;
+  f.stages.document=f.documents.length?'done':'pending';
+  if(f.styleDNA)f.stages.style='done';
+  if(f.analysis.layout)f.stages.layout='done';
+  if(f.analysis.prompt)f.stages.director='done';
+  f.status=f.analysis.prompt?'ready':f.documents.length?'document-ready':'empty';
+  proj.creativeWorkflow=f;
  }
  projects.unshift(proj);history.unshift(...importedHistory);saveProjects();saveHistory();return projectView(proj);
 }
@@ -309,8 +419,8 @@ function releaseForQuota(incomingSize){
  // Keep document prototypes and approved style inputs available across sessions.
  for(const current of projects){
   const f=current.creativeWorkflow;
-  for(const img of f?.document?.images||[])if(img.file)protectedFiles.add(img.file);
-  for(const nodeId of f?.styleNodeIds||[]){const node=current.nodes.find(n=>n.id===nodeId);if(node?.kind==='reference')protectedFiles.add(node.assetFile)}
+  for(const doc of f?.documents||(f?.document?[f.document]:[]))for(const img of doc.images||[])if(img.file)protectedFiles.add(img.file);
+  for(const nodeId of f?.styleNodeIds||[]){const node=current.nodes.find(n=>n.id===nodeId);if(node?.kind==='reference')protectedFiles.add(node.assetFile);if(node?.kind==='generated'){const h=history.find(x=>x.id===node.historyId&&x.projectId===current.id);if(h?.file)protectedFiles.add(h.file)}}
  }
  for(const job of jobs)if(['queued','running'].includes(job.status)){
    if(job.sourceId){const h=history.find(x=>x.id===job.sourceId);if(h)protectedFiles.add(h.file)}
@@ -479,51 +589,86 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
     if(route==='/api/logout'&&req.method==='POST'&&process.env.ANON_WORKSPACE==='1')return fail(res,405,'免登录工作区无需退出');
     if(route==='/api/logout'&&req.method==='POST'){sessions.delete(cookie(req));res.setHeader('Set-Cookie',`hs_session=; HttpOnly; SameSite=Strict; Path=${BASE||''}/; Max-Age=0`);return respond(res,200,{ok:true})}
     if(req.method==='GET'&&route==='/api/storage')return respond(res,200,{...storageUsage(),mode:'local',concurrency:CONCURRENCY,notice:'每个账号默认 1GB 空间，空间不足时会自动清理最旧的历史图片和浏览器预览；请定期导出重要作品。'});
-    const creativeMatch=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/creative(?:\/(document|settings|analyze|quality))?$/);
+    const creativeMatch=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/creative(?:\/(document|settings|analyze|quality|split|page))?$/);
     if(creativeMatch){
-      const p=assertProject(creativeMatch[1]),action=creativeMatch[2];
+      const p=assertProject(creativeMatch[1]),action=creativeMatch[2],f=creativeState(p);
       if(!action&&req.method==='GET')return respond(res,200,creativeView(p));
-      if(creativeBusy.has(p.id))return fail(res,409,'此项目的创作流程正在运行，请完成后再修改');
+      if(creativeBusy.has(p.id))return fail(res,409,'此项目的 AI 任务正在运行，请待完成后再修改');
       if(action==='document'&&req.method==='POST'){
         const b=await readJSON(req);
         if(typeof b.name!=='string'||!b.name.toLowerCase().endsWith('.docx'))throw Error('只支持 Word .docx 文件');
-        if(typeof b.data!=='string'||b.data.length>MAX_DOCX*1.38||!/^([A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(b.data))throw Error('文件格式不合法或超出 12MB');
-        const raw=Buffer.from(b.data,'base64'),existing=p.nodes.length;
-        if(existing+20>1800)throw Error('当前画布空间不足，无法导入文档图片');
+        if(f.documents.length>=creativePages.MAX_DOCUMENTS)throw Error('当前项目最多保存 12 份 Word，请另建一个项目');
+        if(typeof b.data!=='string'||b.data.length>MAX_DOCX*1.38||!/^([A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(b.data))throw Error('Word 文件格式错误或超过 12MB');
+        const raw=Buffer.from(b.data,'base64'),hash=crypto.createHash('sha256').update(raw).digest('hex');
+        if(f.documents.some(x=>x.hash===hash))return fail(res,409,'这份 Word 已经上传过了，避免重复导入');
+        if(p.nodes.length+20>1800)throw Error('画布素材数量不足，无法继续导入原型图');
         const extracted=await parseDocx(raw,img=>storeMedia(img));
-        const flow=creative.make();
-        flow.document={name:clampText(b.name,140),text:extracted.text,blocks:extracted.blocks,images:extracted.images.map((im,i)=>({...im,nodeId:null})),hash:extracted.hash,warnings:extracted.warnings,importedAt:time()};
-        for(const im of flow.document.images){
-          const n={id:crypto.randomUUID(),kind:'reference',assetFile:im.file,title:'文档原型 '+String(im.index+1),x:60+im.index%4*320,y:60+Math.floor(im.index/4)*370,w:288,h:320,createdAt:time()};
-          p.nodes.push(n);im.nodeId=n.id;
+        const doc={id:crypto.randomUUID(),name:clampText(b.name,140),text:extracted.text,blocks:extracted.blocks,
+          images:extracted.images.map(im=>({...im,nodeId:null})),hash:extracted.hash,warnings:extracted.warnings,importedAt:time()};
+        for(const im of doc.images){
+          const i=p.nodes.length;
+          const node={id:crypto.randomUUID(),kind:'reference',assetFile:im.file,title:doc.name+' · 原型 '+(im.index+1),
+            x:80+(i%6)*330,y:70+Math.floor(i/6)*360,w:288,h:320,createdAt:time()};
+          p.nodes.push(node);im.nodeId=node.id;
         }
-        flow.stages.document='done';flow.status='document-ready';p.creativeWorkflow=flow;touchProject(p);
-        return respond(res,201,{...creativeView(p),importedImages:flow.document.images.length});
+        f.documents.push(doc);f.document=doc;
+        f.pages=creativePages.mergePages(f.pages,f.documents);
+        if(!f.activePageId||!f.pages.some(x=>x.id===f.activePageId))f.activePageId=f.pages[0]?.id||null;
+        f.analysis=creativeCurrent(f)?.analysis||{};
+        f.stages.document='done';f.status='document-ready';f.error='';f.progress=null;
+        touchProject(p);
+        return respond(res,201,{...creativeView(p),importedImages:doc.images.length,createdPages:f.pages.length});
       }
       if(action==='settings'&&req.method==='POST'){
-        const flow=p.creativeWorkflow||creative.make();
-        creativeSetup(await readJSON(req),flow,p);
-        // Config changed: all AI judgments must be recomputed instead of presenting stale approvals.
-        flow.analysis={};flow.quality=null;flow.error='';flow.status=flow.document?'document-ready':'empty';
-        for(const k of ['style','layout','director','quality'])flow.stages[k]='pending';
-        p.creativeWorkflow=flow;touchProject(p);return respond(res,200,creativeView(p));
+        const oldRefs=JSON.stringify(f.styleNodeIds||[]);
+        creativeSetup(await readJSON(req),f,p);
+        f.analysis=creativeCurrent(f)?.analysis||{};
+        f.quality=creativeCurrent(f)?.quality||null;
+        if(oldRefs!==JSON.stringify(f.styleNodeIds||[])){f.stages.style='pending';f.stages.director='pending'}
+        f.error='';f.status=f.analysis.prompt?'ready':f.documents.length?'document-ready':'empty';
+        p.creativeWorkflow=f;touchProject(p);return respond(res,200,creativeView(p));
+      }
+      if(action==='page'&&req.method==='POST'){
+        const b=await readJSON(req),page=f.pages.find(x=>x.id===b.pageId);
+        if(!page)throw Error('无法找到所选页面');
+        f.activePageId=page.id;
+        let changed=false;
+        const d=creativePageDoc(f,page);
+        if(b.prototypeIndex!==undefined){
+          const idx=Number(b.prototypeIndex);
+          if(!Number.isInteger(idx)||idx< -1||idx>=d.images.length)throw Error('原型编号超出文档范围');
+          const before=page.layoutImageIndex??page.imageIndexes?.[0]??null;
+          const after=idx<0?null:idx;
+          if(before!==after){page.layoutImageIndex=after;page.imageIndexes=after===null?[]:[after];changed=true}
+        }
+        if(b.requirements!==undefined){
+          const next=clampText(b.requirements,4400).trim();
+          if(!next)throw Error('本页需求不能为空');
+          if(next!==page.requirements){page.requirements=next;changed=true}
+        }
+        if(b.reset===true)changed=true;
+        if(changed){page.analysis={};page.quality=null;page.status='draft';f.stages.director='pending';f.stages.layout='pending'}
+        f.analysis=page.analysis||{};f.quality=page.quality||null;f.status=f.analysis.prompt?'ready':'document-ready';
+        touchProject(p);return respond(res,200,creativeView(p));
+      }
+      if(action==='split'&&req.method==='POST'){
+        if(!f.documents.length)throw Error('请先上传 Word 策划文档');
+        if(!state.providers.length)throw Error('请先在中转站管理配置文字模型');
+        void creativeSplit(p).catch(e=>diag({source:'creative',level:'error',action:'split',message:String(e.message||e).slice(0,350)}));
+        return respond(res,202,{started:true,flowStatus:'running'});
       }
       if(action==='analyze'&&req.method==='POST'){
-        if(!p.creativeWorkflow?.document)throw Error('请先上传 Word 文档');
-        if(!p.creativeWorkflow.styleNodeIds?.length)throw Error('请先指定至少一张风格参考图');
-        if(!p.creativeWorkflow.document.images?.length)throw Error('Word 文档没有可用的原型图');
-        void creativeAnalyze(p).catch(e=>{
-          const f=p.creativeWorkflow;if(f&&!f.error){f.status='failed';f.error=String(e.message||e).slice(0,450);touchProject(p)}
-          diag({source:'creative',level:'error',action:'analyze',message:String(e.message||e).slice(0,350)});
-        });
+        if(!f.documents.length||!f.pages.length)throw Error('请先上传 Word 并拆解页面');
+        if(!state.providers.length)throw Error('请先配置文字模型，才能执行 AI 分析');
+        const b=await readJSON(req);
+        if(b.pageId&&!f.pages.some(x=>x.id===b.pageId))throw Error('未找到该页面');
+        void creativeAnalyze(p,{pageId:b.pageId,batch:b.batch===true}).catch(e=>diag({source:'creative',level:'error',action:'analyze',message:String(e.message||e).slice(0,350)}));
         return respond(res,202,{started:true,flowStatus:'running'});
       }
       if(action==='quality'&&req.method==='POST'){
-        const b=await readJSON(req);if(typeof b.historyId!=='string'||!history.some(h=>h.id===b.historyId&&h.projectId===p.id))throw Error('请选择当前项目的一张有效生成图');
-        void creativeQuality(p,b.historyId).catch(e=>{
-          const f=p.creativeWorkflow;if(f&&!f.error){f.status='failed';f.error=String(e.message||e).slice(0,450);touchProject(p)}
-          diag({source:'creative',level:'error',action:'quality',message:String(e.message||e).slice(0,350)});
-        });
+        const b=await readJSON(req);
+        if(typeof b.historyId!=='string'||!history.some(h=>h.id===b.historyId&&h.projectId===p.id))throw Error('请选择当前项目的一张有效生成图');
+        void creativeQuality(p,b.historyId).catch(e=>diag({source:'creative',level:'error',action:'quality',message:String(e.message||e).slice(0,350)}));
         return respond(res,202,{started:true,flowStatus:'running'});
       }
       return fail(res,405,'此工作流接口不支持该操作');
