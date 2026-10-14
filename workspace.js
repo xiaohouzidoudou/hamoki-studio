@@ -184,7 +184,7 @@ function creativeSetup(b,flow,p){
  for(const cap of ['text','vision']){
   const binding=config[cap]||{};
   if(binding.providerId&&!state.providers.some(x=>x.id===binding.providerId))throw Error('所选'+cap+'中转站已不存在');
-  if(binding.model&& !/^[-\w.:/]{1,150}$/.test(binding.model))throw Error('模型名称不合法');
+  if(binding.model!==undefined&&binding.model!=='' )assertModel(binding.model);
  }
  flow.routing={text:{providerId:trim(config.text?.providerId,70),model:trim(config.text?.model,150)},vision:{providerId:trim(config.vision?.providerId,70),model:trim(config.vision?.model,150)}};
  flow.updatedAt=time();
@@ -197,13 +197,37 @@ function creativePictureFromNode(p,id){
  if(!filename)throw Error('找不到参考图原文件');
  return fetchMedia(filename);
 }
+function creativeCheckModels(f,stage,{pageId,batch=false}={}){
+ const config=f.routing||{};
+ if(stage==='analyze'||stage==='split'){
+  const c=config.text||{};
+  const text=effectiveProvider(provider(c.providerId||state.activeId),'text');
+  emptyProvider(text);creativeModel(text,'text',c.model);
+ }
+ if(stage==='analyze'){
+  const selected=batch?f.pages.filter(x=>!x.analysis?.prompt).slice(0,8):
+    [f.pages.find(x=>x.id===(pageId||f.activePageId))].filter(Boolean);
+  const requiresVision=((f.styleNodeIds||[]).length>0&&!f.styleDNA)||
+    selected.some(x=>!!creativePagePicture(f,x));
+  if(requiresVision){
+   const c=config.vision||{};
+   const vision=effectiveProvider(provider(c.providerId||state.activeId),'vision');
+   emptyProvider(vision);creativeModel(vision,'vision',c.model);
+  }
+ }
+ if(stage==='quality'){
+  const c=config.vision||{};
+  const vision=effectiveProvider(provider(c.providerId||state.activeId),'vision');
+  emptyProvider(vision);creativeModel(vision,'vision',c.model);
+ }
+}
 async function creativeSplit(p){
  const f=creativeState(p);
  if(!f.documents.length)throw Error('请先上传至少一份 Word');
  if(creativeBusy.has(p.id))throw Error('已有正在执行的 AI 工作流');
  if(DEMO_MODE)throw Error('演示模式不能调用付费 AI');
  const cfg=f.routing?.text||{},text=effectiveProvider(provider(cfg.providerId||state.activeId),'text');
- emptyProvider(text);const model=assertModel(cfg.model||normalizedCapability(text,'text').defaultModel);
+ emptyProvider(text);const model=creativeModel(text,'text',cfg.model);
  creativeBusy.add(p.id);f.status='running';f.error='';f.stages.document='running';touchProject(p);
  try{
   const result=await options.limiter.run(()=>generateText(text,{model,prompt:creativeUpstream.screenPrompt(creativePages.splitPrompt(f.documents)),maxPromptChars:58000,maxOutputTokens:5600}));
@@ -224,14 +248,14 @@ async function creativeAnalyze(p,{pageId,batch=false}={}){
  if(!selected.length)throw Error('所有页面已有创作方案；如需修改请先更新具体页面');
  const rp=f.routing||{},txt=rp.text||{};
  const text=effectiveProvider(provider(txt.providerId||state.activeId),'text');
- emptyProvider(text);const tm=assertModel(txt.model||normalizedCapability(text,'text').defaultModel);
+ emptyProvider(text);const tm=creativeModel(text,'text',txt.model);
  const refs=f.styleNodeIds.map(id=>creativePictureFromNode(p,id));
  const needsVision=(refs.length>0&&!f.styleDNA)||selected.some(page=>!!creativePagePicture(f,page));
  let vision=null,vm='';
  if(needsVision){
   const cfg=rp.vision||{};
   vision=effectiveProvider(provider(cfg.providerId||state.activeId),'vision');
-  emptyProvider(vision);vm=assertModel(cfg.model||vision.visionModel);
+  emptyProvider(vision);vm=creativeModel(vision,'vision',cfg.model);
  }
  creativeBusy.add(p.id);f.error='';f.status='running';f.quality=null;
  for(const k of ['style','layout','director','generation','quality'])f.stages[k]='pending';
@@ -283,7 +307,7 @@ async function creativeQuality(p,historyId){
  if(photos.length<2)throw Error('至少需要一张游戏风格图或原型图才能执行视觉对比');
  const cfg=f.routing?.vision||{};
  const vision=effectiveProvider(provider(cfg.providerId||state.activeId),'vision');
- emptyProvider(vision);const vm=assertModel(cfg.model||vision.visionModel);
+ emptyProvider(vision);const vm=creativeModel(vision,'vision',cfg.model);
  if(DEMO_MODE)throw Error('演示模式不能执行付费质检');
  creativeBusy.add(p.id);f.stages.quality='running';f.error='';touchProject(p);
  try{
@@ -410,7 +434,20 @@ function provider(id){return state.providers.find(p=>p.id===id)}
 function safe(p){return {id:p.id,name:p.name,url:p.url,mode:p.mode,imageMode:p.imageMode||'images',imageModel:p.imageModel,visionModel:p.visionModel,responseModel:p.responseModel||'',hasKey:!!p.apiKey,checks:p.checks||{},verifiedCapabilities:p.verifiedCapabilities||{},capabilities:safeCapabilities(p)}}
 function capabilities(p){const images=p.mode==='openai'&&p.imageMode==='images';return {protocol:p.imageMode||'images',support:{textToImage:'available-by-protocol',referenceImage:'available-by-protocol',mask:images?'model-dependent':'unsupported',transparentBackground:images?'model-dependent':'unsupported',imageReverse:'depends-on-vision-model',aspectRatio:'model-dependent',resolution:'model-dependent'},verified:p.verifiedCapabilities||{},checks:p.checks||{},note:'协议能力仅是推测；实际支持情况以显式付费测试及成功生图任务为准。'}}
 function recordCapability(p,feature,success,model,detail={}){if(DEMO_MODE)return;p.verifiedCapabilities ||= {};p.verifiedCapabilities[feature]={success:!!success,model,checkedAt:time(),...detail};encrypt(state)}
-function assertModel(v){const t=trim(v,150);if(!t||!/^[-\w.:/]+$/.test(t))throw Error('模型 ID 不合法');return t}
+function assertModel(v){
+ // Model IDs are opaque strings provided by upstream services. Accept aliases with
+ // spaces/Unicode/parentheses; reject controls and multiline content, never coerce objects.
+ if(typeof v!=='string'||!v.trim())throw Error('请先填写模型 ID');
+ const t=v.trim();
+ if(t.length>150||/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/.test(t))throw Error('模型 ID 格式不正确：请填写不超过 150 字符的单行名称');
+ return t;
+}
+function creativeModel(p,cap,selected){
+ const label=cap==='text'?'文字分析':'视觉分析';
+ const value=(typeof selected==='string'?selected.trim():'')||normalizedCapability(p,cap).defaultModel;
+ if(!value)throw Error('尚未配置'+label+'模型 ID。请在 AI 美术工作流的「'+label+'」输入框填写实际模型 ID，或在中转站管理设置对应能力的默认模型');
+ try{return assertModel(value)}catch(e){throw Error(label+'模型 ID 不正确：'+e.message)}
+}
 function mediaPath(id){if(!/^[a-f0-9-]{36}\.(?:png|jpg|webp)$/.test(id))throw Error('媒体文件名不合法');return path.join(MEDIA_DIR,id)}
 function previewPath(id,format='webp'){mediaPath(id);return path.join(PREVIEW_DIR,id+'.'+format)}
 function folderUsage(folder){let bytes=0,files=0;for(const entry of fs.readdirSync(folder,{withFileTypes:true})){if(!entry.isFile())continue;const stat=fs.statSync(path.join(folder,entry.name));bytes+=stat.size;files++}return {bytes,files}}
@@ -677,6 +714,7 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
       if(action==='split'&&req.method==='POST'){
         if(!f.documents.length)throw Error('请先上传 Word 策划文档');
         if(!state.providers.length)throw Error('请先在中转站管理配置文字模型');
+        creativeCheckModels(f,'split');
         void creativeSplit(p).catch(e=>diag({source:'creative',level:'error',action:'split',message:String(e.message||e).slice(0,350)}));
         return respond(res,202,{started:true,flowStatus:'running'});
       }
@@ -685,12 +723,14 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
         if(!state.providers.length)throw Error('请先配置文字模型，才能执行 AI 分析');
         const b=await readJSON(req);
         if(b.pageId&&!f.pages.some(x=>x.id===b.pageId))throw Error('未找到该页面');
+        creativeCheckModels(f,'analyze',{pageId:b.pageId,batch:b.batch===true});
         void creativeAnalyze(p,{pageId:b.pageId,batch:b.batch===true}).catch(e=>diag({source:'creative',level:'error',action:'analyze',message:String(e.message||e).slice(0,350)}));
         return respond(res,202,{started:true,flowStatus:'running'});
       }
       if(action==='quality'&&req.method==='POST'){
         const b=await readJSON(req);
         if(typeof b.historyId!=='string'||!history.some(h=>h.id===b.historyId&&h.projectId===p.id))throw Error('请选择当前项目的一张有效生成图');
+        creativeCheckModels(f,'quality');
         void creativeQuality(p,b.historyId).catch(e=>diag({source:'creative',level:'error',action:'quality',message:String(e.message||e).slice(0,350)}));
         return respond(res,202,{started:true,flowStatus:'running'});
       }

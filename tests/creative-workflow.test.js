@@ -132,6 +132,24 @@ test('agent collaboration runs visual style, layout and art direction, then qual
  const upload=await request('/api/projects/'+project+'/creative/document','POST',{name:'周年庆.docx',data:doc.toString('base64')});assert.equal(upload.code,201);
  const provider=await request('/api/providers','POST',{name:'Mock 文本视觉和图片',url:'http://127.0.0.1:'+mock.address().port+'/v1',mode:'openai',imageMode:'images',imageModel:'test-image',visionModel:'test-vision',apiKey:'test-key',capabilities:{text:{defaultModel:'test-text'},vision:{defaultModel:'test-vision'}}});assert.equal(provider.code,201,JSON.stringify(provider.payload));
  const pid=provider.payload.provider.id;
+ // Regression: image-only relay was mistakenly allowed to start analysis,
+ // returning HTTP 202 and logging a generic "model ID invalid" off-screen.
+ const imageOnly=await request('/api/providers','POST',{name:'只有图片能力的中转站',url:'http://127.0.0.1:'+mock.address().port+'/v1',mode:'openai',imageModel:'nano banana (preview)',apiKey:'test-key'});
+ assert.equal(imageOnly.code,201,JSON.stringify(imageOnly.payload));
+ const imageId=imageOnly.payload.provider.id;
+ const noTextSetup=await request('/api/projects/'+project+'/creative/settings','POST',{styleNodeIds:[image],routing:{text:{providerId:imageId,model:''},vision:{providerId:pid,model:'test-vision'}}});
+ assert.equal(noTextSetup.code,200);
+ const noTextRun=await request('/api/projects/'+project+'/creative/analyze','POST',{});
+ assert.equal(noTextRun.code,400,'missing text model must fail BEFORE returning started');
+ assert.match(noTextRun.payload.error,/文字分析模型 ID/);
+ assert.equal(received.length,0,'invalid config must not spend tokens');
+ const noVisionSetup=await request('/api/projects/'+project+'/creative/settings','POST',{styleNodeIds:[image],routing:{text:{providerId:pid,model:'test-text'},vision:{providerId:imageId,model:''}}});
+ assert.equal(noVisionSetup.code,200);
+ const noVisionRun=await request('/api/projects/'+project+'/creative/analyze','POST',{});
+ assert.equal(noVisionRun.code,400,'missing vision model must fail before a billable text call');
+ assert.match(noVisionRun.payload.error,/视觉分析模型 ID/);
+ assert.equal(received.length,0);
+
  const settings=await request('/api/projects/'+project+'/creative/settings','POST',{styleNodeIds:[image],layoutImageIndex:0,notes:'游戏周年庆',routing:{text:{providerId:pid,model:'test-text'},vision:{providerId:pid,model:'test-vision'}}});assert.equal(settings.code,200);
  assert.equal(received.length,0,'no model calls from upload or settings');
  const run=await request('/api/projects/'+project+'/creative/analyze','POST',{});assert.equal(run.code,202);

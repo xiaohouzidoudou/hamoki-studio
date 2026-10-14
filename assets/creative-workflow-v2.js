@@ -26,16 +26,21 @@
  }
  function providersUI(){
   const pp=typeof providers==='undefined'?[]:providers;
-  const list=pp.filter(p=>p.hasKey).map(p=>({value:p.id,label:p.name}));
-  if(!list.length)list.push({value:'',label:'先配置文字/视觉中转站'});
   for(const cap of ['text','vision']){
    const prefix=cap==='text'?'creativeText':'creativeVision';
+   const available=pp.filter(p=>p.capabilities?.[cap]?.enabled!==false&&(p.hasKey||p.capabilities?.[cap]?.hasKey));
+   const list=available.map(p=>({value:p.id,label:p.name}));
+   if(!list.length)list.push({value:'',label:'请先配置'+(cap==='text'?'文字':'视觉')+'模型中转站'});
    const current=f?.routing?.[cap]||{};
    const runtime=typeof runtimeRoutes!=='undefined'?runtimeRoutes?.[cap]||{}:{};
-   const val=current.providerId||runtime.providerId||(typeof activeId!=='undefined'?activeId:'')||list[0].value;
+   const wanted=current.providerId||runtime.providerId||(typeof activeId!=='undefined'?activeId:'')||'';
+   const val=available.some(p=>p.id===wanted)?wanted:list[0].value;
    pick(prefix+'Provider',list,val);
-   const p=pp.find(p=>p.id===$(prefix+'Provider').value);
-   $(prefix+'Model').value=current.model||runtime.model||p?.capabilities?.[cap]?.defaultModel||(cap==='text'?p?.textModel:p?.visionModel)||'';
+   const p=available.find(x=>x.id===val);
+   $(prefix+'Model').value=(current.providerId===val&&current.model?current.model:'')||
+     (runtime.providerId===val&&runtime.model?runtime.model:'')||
+     p?.capabilities?.[cap]?.defaultModel||
+     (cap==='text'?p?.textModel:p?.visionModel)||'';
   }
  }
  function refsUI(){
@@ -150,6 +155,18 @@
      vision:{providerId:$('creativeVisionProvider').value,model:$('creativeVisionModel').value.trim()}
     }};
  }
+ function modelConfigured(cap){
+  const prefix=cap==='text'?'creativeText':'creativeVision';
+  const label=cap==='text'?'文字分析':'视觉分析';
+  const id=$(prefix+'Provider').value;
+  const p=(typeof providers!=='undefined'?providers:[]).find(x=>x.id===id);
+  if(!p){say('请先在「中转站管理」添加并启用'+label+'服务商');return false}
+  if(!$(prefix+'Model').value.trim()&&!p.capabilities?.[cap]?.defaultModel){
+   say('还没有填写'+label+'模型 ID。请在上方「'+label+'」输入框填写该中转站实际支持的模型名。');
+   $(prefix+'Model').focus();return false
+  }
+  return true;
+ }
  async function saveSettings(){
   const data=settings();
   const refsChanged=JSON.stringify(data.styleNodeIds)!==JSON.stringify(f.styleNodeIds||[]);
@@ -203,18 +220,23 @@
  async function run(action,batch=false){
   if(!(f?.documents||[]).length){say('请先上传 Word 文档');return}
   if(action==='analyze'&&!active()){say('请先选择页面任务');return}
-  if(action==='split'&&!$('creativeTextModel').value.trim()){say('请先配置文字模型 ID 才能执行 AI 智能拆页');return}
+  if(!modelConfigured('text'))return;
+  const needsVision=action==='analyze'&&
+   (((f?.styleNodeIds||[]).length&&!f.styleDNA)||$(
+   'creativeStyleRefs').querySelectorAll('input:checked').length>0&&!f.styleDNA||
+   (batch?f.pages.filter(p=>!p.analysis?.prompt).slice(0,8).some(p=>(p.imageIndexes||[]).length):!!active()?.imageIndexes?.length));
+  if(needsVision&&!modelConfigured('vision'))return;
   const label=action==='split'?'AI 智能拆页':batch?'批量生成页面创作方案':'AI 分析当前页面';
   const count=batch?Math.min(8,(f.pages||[]).filter(p=>!p.analysis?.prompt).length):1;
   if(!confirm(`即将调用你配置的 AI 模型执行「${label}」，可能产生多次 API 费用${batch?'（最多 '+count+' 页，每页最多一次原型识图及一次文字创作）':''}。确定开始？`))return;
-  setBusy(true);say('正在保存 AI 模型与风格配置…');
+  setBusy(true);say('正在保存 AI 模型与风格配置…');let failure='';
   try{
    await saveSettings();
    await api('projects/'+projectId+'/creative/'+action,{method:'POST',body:action==='analyze'?{pageId:f.activePageId,batch}:{}});
    await waitUntil(action==='split'?['split-ready']:['ready','review']);
    toast(action==='split'?'页面智能拆分完成':'AI 页面设计方案完成');
-  }catch(e){say('执行失败：'+e.message);try{await load()}catch{}}
-  finally{setBusy(false);if(f)render()}
+  }catch(e){failure='执行失败：'+e.message;try{await load()}catch{}}
+  finally{setBusy(false);if(f)render();if(failure)say(failure)}
  }
  function canvasPrompt(extra=''){
   const page=active();
@@ -242,6 +264,14 @@
  }
  $('openCreativeWorkflow').addEventListener('click',open);
  $('creativeDocInput').addEventListener('change',upload);
+ for(const cap of ['text','vision']){
+  const prefix=cap==='text'?'creativeText':'creativeVision';
+  $(prefix+'Provider').addEventListener('change',()=>{
+   const p=(typeof providers!=='undefined'?providers:[]).find(x=>x.id===$(prefix+'Provider').value);
+   $(prefix+'Model').value=p?.capabilities?.[cap]?.defaultModel||(cap==='text'?p?.textModel:p?.visionModel)||'';
+   if(!$(prefix+'Model').value)say('请填写当前中转站的'+(cap==='text'?'文字':'视觉')+'模型 ID；不会自动使用图片生成模型。');
+  });
+ }
  $('creativeSplit').addEventListener('click',()=>run('split'));
  $('creativeSavePage').addEventListener('click',savePage);
  $('creativeAnalyze').addEventListener('click',()=>run('analyze'));
