@@ -174,8 +174,10 @@ function creativeSetup(b,flow,p){
  if(b.layoutImageIndex!==undefined&&current){
   const idx=Number(b.layoutImageIndex);
   if(!Number.isInteger(idx)||idx<-1||idx>=d.images.length)throw Error('原型图片编号错误');
-  current.layoutImageIndex=idx<0?null:idx;
+  const after=idx<0?null:idx,before=current.layoutImageIndex??current.imageIndexes?.[0]??null;
+  current.layoutImageIndex=after;
   current.imageIndexes=idx<0?[]:[idx];
+  if(before!==after){current.analysis={};current.quality=null;current.status='draft'}
  }
  flow.layoutImageIndex=current?.layoutImageIndex??current?.imageIndexes?.[0]??0;
  flow.notes=clampText(b.notes,1800);
@@ -233,7 +235,11 @@ async function creativeSplit(p){
   const result=await options.limiter.run(()=>generateText(text,{model,prompt:creativeUpstream.screenPrompt(creativePages.splitPrompt(f.documents)),maxPromptChars:58000,maxOutputTokens:5600}));
   const pages=creativePages.parsePageResponse(result,f.documents,f.pages);
   f.pages=pages;f.activePageId=pages.some(x=>x.id===f.activePageId)?f.activePageId:pages[0].id;
-  f.analysis=creativeCurrent(f)?.analysis||{};f.status='split-ready';f.stages.document='done';f.updatedAt=time();touchProject(p);
+  f.analysis=creativeCurrent(f)?.analysis||{};f.quality=creativeCurrent(f)?.quality||null;
+  f.layoutImageIndex=creativeCurrent(f)?.layoutImageIndex??creativeCurrent(f)?.imageIndexes?.[0]??0;
+  f.stages.layout=f.analysis.layout?'done':'pending';f.stages.director=f.analysis.prompt?'done':'pending';
+  f.stages.quality=f.quality?'done':'pending';
+  f.status='split-ready';f.stages.document='done';f.updatedAt=time();touchProject(p);
  }catch(e){f.status='failed';f.stages.document='failed';f.error=String(e.message||e).slice(0,450);touchProject(p);throw e}
  finally{creativeBusy.delete(p.id)}
 }
@@ -659,8 +665,8 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
         f.documents.push(doc);f.document=doc;
         f.pages=creativePages.mergePages(f.pages,f.documents);
         if(!f.activePageId||!f.pages.some(x=>x.id===f.activePageId))f.activePageId=f.pages[0]?.id||null;
-        f.analysis=creativeCurrent(f)?.analysis||{};
-        f.stages.document='done';f.status='document-ready';f.error='';f.progress=null;
+        f.analysis=creativeCurrent(f)?.analysis||{};f.quality=creativeCurrent(f)?.quality||null;
+        f.stages.document='done';f.status=f.analysis.prompt?'ready':'document-ready';f.error='';f.progress=null;
         touchProject(p);
         return respond(res,201,{...creativeView(p),importedImages:doc.images.length,createdPages:f.pages.length});
       }
