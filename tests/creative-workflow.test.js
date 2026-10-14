@@ -222,3 +222,12 @@ test('agent collaboration runs visual style, layout and art direction, then qual
  assert.equal(received[5].body.messages[0].content.filter(p=>p.type==='image_url').length,3);
 });
 
+
+test('prototype vision analysis opts into 180-second deadline and names timeout failures',()=>{
+ const workspace=fs.readFileSync(path.join(__dirname,'..','workspace.js'),'utf8');
+ assert.match(workspace,/const LAYOUT_VISION_TIMEOUT_MS=180000;/);
+ assert.match(workspace,/creativeUpstream\.layoutPrompt\(context,f\.notes\),\{timeoutMs:LAYOUT_VISION_TIMEOUT_MS\}/);
+ assert.match(workspace,/stage==='layout'&&e\.timeout/);
+ assert.match(workspace,/更换视觉分析模型后手动重试/);
+ assert.match(workspace,/const DIRECTOR_TIMEOUT_MS=330000;/,'text director deadline remains independent');
+});
