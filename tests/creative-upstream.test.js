@@ -49,7 +49,9 @@ test('page discovery loads original upstream workflow and extension skills rathe
  assert.match(prompt,/game-ui-extension/);
  assert.match(prompt,/game-ui-workflow/);
  assert.match(prompt,/Word pages: 登录奖励/);
- assert.match(prompt,/不允许新增不存在的页/);
+ assert.match(prompt,/不允许新增不存在的页|不.*补造.*不存在/);
+ assert.ok(prompt.length<2800,'screen inventory must not include full artwork/slicing workflow');
+ assert.doesNotMatch(prompt,/### 8\. Sprite-sheet splitting|### 9\. Atlas and engine handoff/);
 });
 test('CHECK role uses original §5 and quality gate of upstream UI page skill',()=>{
  const prompt=a.qualityPrompt('奖励活动','风格','界面原型');

@@ -232,7 +232,7 @@ async function creativeSplit(p){
  emptyProvider(text);const model=creativeModel(text,'text',cfg.model);
  creativeBusy.add(p.id);f.status='running';f.error='';f.stages.document='running';touchProject(p);
  try{
-  const result=await options.limiter.run(()=>generateText(text,{model,prompt:creativeUpstream.screenPrompt(creativePages.splitPrompt(f.documents)),maxPromptChars:58000,maxOutputTokens:5600}));
+  const result=await options.limiter.run(()=>generateText(text,{model,prompt:creativeUpstream.screenPrompt(creativePages.splitPrompt(f.documents)),maxPromptChars:36000,maxOutputTokens:Math.min(4800,Math.max(2000,f.pages.length*180)),timeoutMs:145000}));
   const pages=creativePages.parsePageResponse(result,f.documents,f.pages);
   f.pages=pages;f.activePageId=pages.some(x=>x.id===f.activePageId)?f.activePageId:pages[0].id;
   f.analysis=creativeCurrent(f)?.analysis||{};f.quality=creativeCurrent(f)?.quality||null;
