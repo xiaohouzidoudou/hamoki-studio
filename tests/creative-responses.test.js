@@ -57,3 +57,13 @@ test('unavailable Responses produces direct compatibility instruction',async t=>
  await assert.rejects(generateText(relay.provider,{model:'gpt-6.1-sol',prompt:'test'}),/没有开放 \/responses/);
  assert.deepEqual(relay.paths,['/v1/chat/completions','/v1/responses']);
 });
+
+// Regression: review of multi-image artwork needs a longer deadline, but
+// normal vision analyses remain bounded and timeouts are never blindly retried.
+test('vision review accepts explicit longer timeout without changing default requests',async t=>{
+ const relay=await fakeRelay(t);
+ const image=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLduAAAAABJRU5ErkJggg==','base64');
+ const output=await analyzeCreativeImages(relay.provider,[{mime:'image/png',bytes:image}],'gpt-6.1-sol','校验周年庆',{timeoutMs:165000});
+ assert.match(output,/周年庆活动/);
+ assert.deepEqual(relay.paths,['/v1/chat/completions','/v1/responses']);
+});
