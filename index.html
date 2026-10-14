@@ -7,6 +7,7 @@
 <link rel="icon" href="assets/hamoki-avatar-32.png" type="image/png"><link rel="apple-touch-icon" href="assets/hamoki-avatar-192.webp">
 <link rel="stylesheet" href="assets/style.css">
 <link rel="stylesheet" href="assets/ui-system.css">
+<link rel="stylesheet" href="assets/creative-workflow.css">
 </head><body>
 <svg aria-hidden="true" class="svg-sprites" xmlns="http://www.w3.org/2000/svg">
  <symbol id="ic-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
@@ -51,6 +52,7 @@
   <div class="projects-heading"><span>创作项目</span><button class="icon-btn" id="newProject" title="新建项目"><svg class="icon"><use href="#ic-plus"/></svg></button></div>
   <div id="projectList" class="project-list"></div>
   <div class="projects-bottom">
+   <button class="side-action" id="openCreativeWorkflow" type="button"><svg class="icon"><use href="#ic-spark"/></svg> AI 美术工作流 <span class="side-count">NEW</span></button>
    <button class="side-action" id="openLibrary"><svg class="icon"><use href="#ic-image"/></svg> 作品图库 <span id="libraryCount" class="side-count">0</span></button>
    <button class="side-action" id="openTasks"><svg class="icon"><use href="#ic-clock"/></svg> 生成任务 <span id="queueBadge" class="side-count">0</span></button>
    <button class="side-action" id="manageProviders"><svg class="icon"><use href="#ic-settings"/></svg> 中转站管理</button>
@@ -111,6 +113,57 @@
 <input type="file" id="canvasFiles" accept="image/png,image/jpeg,image/webp" multiple hidden>
 <input type="file" id="referenceFiles" accept="image/png,image/jpeg,image/webp" multiple hidden>
 <div id="dialogLayer">
+
+ <div class="modal-back hidden" id="creativeModal"><section class="modal creative-modal" role="dialog" aria-modal="true" aria-labelledby="creativeTitle">
+  <header class="creative-head"><div><span class="eyebrow">CREATIVE ART TEAM</span><h2 id="creativeTitle">AI 美术创作工作流</h2><p>策划文档 → 风格与原型理解 → 美术总监方案 → 画布生图 → 视觉质检</p></div>
+    <button class="icon-btn" type="button" data-close="creativeModal" aria-label="关闭创作工作流"><svg class="icon"><use href="#ic-close"/></svg></button></header>
+  <div class="creative-shell">
+   <aside class="creative-sidebar"><div class="creative-side-title">当前项目流程</div><div id="creativeSteps" class="creative-steps"></div><div class="creative-side-foot">每个项目独立保存。文字、视觉分析会产生 API 费用，只有点击按钮才会调用；生图仍由你手动提交。</div></aside>
+   <div class="creative-main">
+    <section class="creative-section"><div class="creative-section-top"><div><span class="creative-kicker">01 · DOCUMENT</span><h3>策划文档</h3><p>可以连续上传多份 Word（每份最大 12MB），自动合并成同一项目的页面任务，不会覆盖旧文档。</p></div><label for="creativeDocInput" class="soft-btn creative-upload"><svg class="icon sm"><use href="#ic-upload"/></svg> 追加 Word</label></div>
+     <input type="file" id="creativeDocInput" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple hidden>
+     <div id="creativeDocumentInfo" class="creative-doc-info">当前项目尚未上传策划文档。</div><div id="creativeDocList" class="creative-document-list"></div>
+     <div id="creativeDocumentImages" class="creative-doc-images"></div></section>
+    <section class="creative-section"><div class="creative-section-top"><div><span class="creative-kicker">02 · PAGE TASKS</span><h3>页面设计任务</h3><p>上传后先按文档标题和原型位置免费初步拆页，也可以让文字模型重新理解完整文档。</p></div><button class="soft-btn" type="button" id="creativeSplit">AI 智能拆页</button></div>
+      <div id="creativePageSummary" class="creative-doc-info">上传 Word 后将在此显示页面任务。</div>
+      <div id="creativePageList" class="creative-page-list"></div>
+      <div class="creative-page-editor"><div class="creative-field-title" id="creativePageTitle">请先选择页面</div><p id="creativePageSource" class="micro muted"></p>
+      <label class="creative-editor-label">当前页面的功能需求与约束<textarea class="field" id="creativePageRequirement" rows="4" maxlength="4400" placeholder="AI 从 Word 提取；可以直接修改，没有写清楚的内容不要猜测"></textarea></label>
+      <button class="soft-btn" id="creativeSavePage" type="button">保存页面要求与原型关联</button></div>
+    </section>
+    <section class="creative-section"><div class="creative-section-top"><div><span class="creative-kicker">03 · STYLE & LAYOUT</span><h3>参考图与原型</h3><p>选中的画布图片用于学习游戏风格；Word 内的图片用于还原界面布局。两者不会混作同一种参考。</p></div></div>
+     <div class="creative-form-grid"><label>Word 原型图<select class="field" id="creativeLayoutSelect"></select></label><label>补充创作需求<textarea class="field" id="creativeNotes" rows="2" maxlength="1800" placeholder="例如：完成周年庆签到页面，忠实保持原型结构"></textarea></label></div>
+     <div class="creative-field-title">从当前画布选择游戏 STYLE 参考图（最多 5 张）</div><div class="creative-style-head"><span class="micro muted" id="creativeStyleStatus">保存为该项目通用 Style DNA，切换页面仍可复用。</span><button class="soft-btn" id="creativeStyleLock" type="button">风格锁定：否</button></div><div id="creativeStyleRefs" class="creative-ref-list"></div>
+     <div class="creative-form-grid">
+      <div class="creative-model-group"><label for="creativeTextProvider">文字分析 / 美术总监 · 服务商</label><select class="field" id="creativeTextProvider"></select>
+       <label for="creativeTextModelSelect">选择文字模型</label><div class="creative-model-controls"><select class="field" id="creativeTextModelSelect"><option value="">请选择文字模型</option></select><button type="button" class="soft-btn creative-model-fetch" id="creativeTextFetch">获取模型</button></div>
+       <input class="field creative-model-custom hidden" id="creativeTextModel" maxlength="150" placeholder="也可手动填写文字模型 ID" autocomplete="off"><p id="creativeTextModelStatus" class="micro muted">从候选中选择，或选择手动输入。</p>
+      </div>
+      <div class="creative-model-group"><label for="creativeVisionProvider">视觉分析 / 双重质检 · 服务商</label><select class="field" id="creativeVisionProvider"></select>
+       <label for="creativeVisionModelSelect">选择视觉模型</label><div class="creative-model-controls"><select class="field" id="creativeVisionModelSelect"><option value="">请选择视觉模型</option></select><button type="button" class="soft-btn creative-model-fetch" id="creativeVisionFetch">获取模型</button></div>
+       <input class="field creative-model-custom hidden" id="creativeVisionModel" maxlength="150" placeholder="也可手动填写支持看图的模型 ID" autocomplete="off"><p id="creativeVisionModelStatus" class="micro muted">视觉模型必须能够识图，不能用普通文字模型代替。</p>
+      </div>
+     </div>
+     <div class="creative-model-group creative-image-route">
+      <label for="creativeImageProvider">正式生图 · 服务商（方案送入画布时应用）</label><select class="field" id="creativeImageProvider"></select>
+      <label for="creativeImageModelSelect">选择图片生成模型</label><div class="creative-model-controls"><select class="field" id="creativeImageModelSelect"><option value="">请选择图片模型</option></select><button type="button" class="soft-btn creative-model-fetch" id="creativeImageFetch">获取模型</button></div>
+      <input class="field creative-model-custom hidden" id="creativeImageModel" maxlength="150" placeholder="也可手动填写 GPT Image / Gemini 图片模型 ID" autocomplete="off"><p id="creativeImageModelStatus" class="micro muted">只有点击画布上的「开始生成」才会调用生图 API。</p>
+     </div><div class="creative-model-summary"><span id="creativeModelSummary">模型路由按当前项目保存。</span><button type="button" class="soft-btn" id="creativeSaveModels">保存模型选择</button></div>
+     <div class="creative-actions"><button type="button" class="primary-btn" id="creativeAnalyze"><svg class="icon sm"><use href="#ic-spark"/></svg> 分析当前页面</button><button type="button" class="soft-btn" id="creativeAnalyzeAll">批量完成缺失页面方案（最多 8 页）</button><span id="creativeMessage" class="creative-notice" role="status"></span></div>
+    </section>
+    <section class="creative-section"><div class="creative-section-top"><div><span class="creative-kicker">04 · ART DIRECTION</span><h3>AI 团队分析结论</h3><p>可查看每个角色的实际输出，不用相信一个没有根据的「合格分数」。</p></div></div>
+     <details class="creative-result"><summary>风格分析师 · Style DNA</summary><pre id="creativeStyleResult">尚未分析</pre></details>
+     <details class="creative-result"><summary>原型分析师 · Layout Blueprint</summary><pre id="creativeLayoutResult">尚未分析</pre></details>
+     <details class="creative-result" open><summary>AI 美术总监 · 生图方案</summary><pre id="creativeDirectorResult">尚未分析</pre></details>
+     <div class="creative-actions"><button class="primary-btn" type="button" id="creativeUsePrompt" disabled><svg class="icon sm"><use href="#ic-arrow"/></svg> 送入画布生图操作台</button><span class="micro muted">不会自动生成或扣除生图费用</span></div>
+    </section>
+    <section class="creative-section"><div class="creative-section-top"><div><span class="creative-kicker">05 · ART REVIEW</span><h3>生成后的视觉质检</h3><p>先在画布完成生图，再选择这张作品。独立视觉模型同时对照原型与风格进行审核。</p></div></div>
+      <div class="creative-actions"><select class="field" id="creativeGeneratedSelect" aria-label="要质检的生成图"></select><button type="button" class="soft-btn" id="creativeQuality" disabled><svg class="icon sm"><use href="#ic-search"/></svg> 检查生成图</button><button type="button" class="soft-btn" id="creativeUseFix" disabled>将返工建议放入生图框</button></div>
+      <pre id="creativeQualityResult" class="creative-quality-result">尚未质检</pre>
+    </section>
+   </div>
+  </div>
+ </section></div>
  <div class="modal-back hidden" id="loginModal"><div class="modal auth-modal"><div class="auth-brand"><img src="assets/hamoki-avatar-128.webp" alt="Hamoki"></div><div class="eyebrow">ACCOUNT WORKSPACE</div><h2>登录你的 Hamoki Studio 空间</h2><p class="muted">同事之间共用一个邀请码注册。每个账号拥有独立工作区与独立 API 配置，数据互不共享；暂不提供忘记密码找回，请自行保管账号信息。</p><div class="auth-switch"><button class="soft-btn active" id="showLogin">登录</button><button class="soft-btn" id="showRegister">注册</button></div><div id="loginPane" class="auth-pane"><div class="input-group"><label>用户名</label><input class="field" id="loginUser" maxlength="30" placeholder="例如：hamoki01"></div><div class="input-group"><label>密码</label><input class="field" id="loginPass" type="password" maxlength="72" placeholder="至少 6 位"></div><button class="primary-btn full" id="loginBtn">登录进入工作区 <svg class="icon"><use href="#ic-arrow"/></svg></button></div><div id="registerPane" class="auth-pane hidden"><div class="input-group"><label>邀请码</label><input class="field" id="inviteCode" maxlength="40" placeholder="请输入邀请码"></div><div class="input-group"><label>用户名</label><input class="field" id="registerUser" maxlength="30" placeholder="2-30 位字母数字"></div><div class="input-group"><label>密码</label><input class="field" id="registerPass" type="password" maxlength="72" placeholder="至少 6 位"></div><button class="primary-btn full" id="registerBtn">注册并进入工作区 <svg class="icon"><use href="#ic-arrow"/></svg></button></div><p id="loginStatus" class="micro muted">正在检查登录状态…</p><button class="auth-help-link" type="button" id="authHelp"><svg class="icon sm"><use href="#ic-help"/></svg> 第一次使用？查看帮助</button></div></div>
  <div class="modal-back hidden" id="helpModal"><div class="modal help-modal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
   <div class="modal-head"><div><span class="eyebrow">HAMOKI STUDIO GUIDE</span><h2 id="helpTitle">使用帮助</h2><p>从第一次注册到 AI 生图与画布整理，几分钟就能上手。</p></div><button class="icon-btn" type="button" data-close="helpModal" title="关闭帮助" aria-label="关闭使用帮助"><svg class="icon"><use href="#ic-close"/></svg></button></div>
@@ -162,4 +215,5 @@
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <script src="assets/app.js" defer></script>
 <script src="assets/ui-system.js" defer></script>
+<script src="assets/creative-workflow-v2.js" defer></script>
 </body></html>
