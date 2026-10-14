@@ -18,5 +18,5 @@
 - 原型缺失的页面只按文字分析，不能声称布局已还原。AI 智能拆页名称必须与原文匹配，不得虚构内容。
 - 每个账号的数据隔离，源图与 Style DNA 属于项目数据；项目备份可带走多文档页面状态并重映射素材 ID，不包含账号密钥或模型路由。
 - 模型调用仅在人工点击并确认后触发，超时、服务重启不会自动重复付费。图片模型继续复用原工作台。
-- 第三方方法参考 MIT 许可的 tnbao91/ai_asset（STYLE、TARGET、CHECK）和 game-ui-design-workflow。无 Unity、切图、图集输出。
+- 已正式引入并在运行时读取固定版本的 [tnbao91/ai_asset](https://github.com/tnbao91/ai_asset) 上游 STYLE、ASSET、CHECK、官方 Schema、风格词典及 [game-ui-design-workflow](https://github.com/guiguiyan930-source/game-ui-design-workflow) 原始设计 Skill；见 `vendor/UPSTREAM.md` 的版本、许可证和详细调用说明。STYLE 产出的 YAML 必须通过原 Schema 类型/枚举验证，不合格明确失败，不冒充已批准的风格。用户需核对颜色并手动锁定。无 Unity、切图、图集输出。
 - 测试使用独立开发分支和预览环境，正式站不变。真实策划文档与任何 API Key 不上传公开仓库。

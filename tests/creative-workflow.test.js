@@ -10,6 +10,7 @@ const {spawn}=require('node:child_process');
 const JSZip=require('jszip');
 const {parseDocx}=require('../lib/creative-docx');
 const creative=require('../lib/creative-workflow');
+const {styleOutput}=require('./fixtures/ai-asset-style.fixture');
 const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLduAAAAABJRU5ErkJggg==','base64');
 const uuid=v=>/^[a-f0-9-]{36}$/.test(v);
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
@@ -52,7 +53,7 @@ test('creative workflow has distinct stages, source-bound prompt and no speculat
  assert.match(creative.stylePrompt('周年庆'),/Style DNA/);
  assert.match(creative.layoutPrompt('7 个活动','保留槽位'),/TARGET/);
  assert.match(creative.directorPrompt('doc','style','layout','notes'),/最终生图提示词/);
- assert.match(creative.qualityPrompt('doc','style','layout'),/建议返工/);
+ assert.match(creative.qualityPrompt('doc','style','layout'),/CHECKER|TWEAK/);
  assert.match(creative.extractPrompt('设计理解\n...\n最终生图提示词：\n绘制竖屏游戏界面\n质检清单：\n...'),/绘制竖屏/);
 });
 test('workflow APIs are authenticated, project-bound, restart-persistent and do not auto-call model',async t=>{
@@ -112,8 +113,8 @@ test('agent collaboration runs visual style, layout and art direction, then qual
   const content=body.messages?.[0]?.content||'';
   const multimodal=Array.isArray(content);
   const reply=multimodal?(
-   String(content[0]?.text||'').includes('游戏 UI 美术风格')?'STYLE DNA: 深蓝金属与切角按钮':
-   String(content[0]?.text||'').includes('原型分析')?'Layout Blueprint: 保留登录奖励的所有槽位':
+   String(content[0]?.text||'').includes('原始项目 tnbao91/ai_asset')?styleOutput:
+   String(content[0]?.text||'').includes('layout_spec')?'Layout Blueprint: 保留登录奖励的所有槽位':
    '质检报告：建议：可提交人工审核'
   ):'页面清单\n登录奖励\n最终生图提示词：\n绘制周年庆签到界面，深蓝色金属切角风格，保持原型槽位。\n质检清单：检查颜色和布局';
   return res.end(JSON.stringify({choices:[{message:{content:reply}}]}));
@@ -151,6 +152,12 @@ test('agent collaboration runs visual style, layout and art direction, then qual
  assert.equal(flow.status,'review',flow.error||'quality review timed out');
  assert.match(flow.quality.report,/质检报告/);
  assert.equal(received.length,5,'two style/layout vision, art director, image generation, quality review');
+ assert.match(received[0].body.messages[0].content[0].text,/OUTPUT SKELETON/,'actual ai_asset analyzer must be sent to vision model');
+ assert.ok(received[0].body.messages[0].content[0].text.length>20000,'official STYLE rules must not be truncated by legacy 11500-character limit');
+ assert.match(received[1].body.messages[0].content[0].text,/layout_spec/,'real upstream TARGET schema must reach visual model');
+ assert.match(received[2].body.messages[0].content,/SYNTHESIZER/,'real upstream ASSET rules must reach text model');
+ assert.ok(received[2].body.messages[0].content.length>20000,'long third-party page guidance must not be truncated by ordinary chat limit');
+ assert.match(received[4].body.messages[0].content[0].text,/CHECKER/,'real upstream QA rules must reach vision model');
  assert.equal(received[0].body.messages[0].content.filter(p=>p.type==='image_url').length,1);
  assert.equal(received[1].body.messages[0].content.filter(p=>p.type==='image_url').length,1);
  assert.equal(received[4].body.messages[0].content.filter(p=>p.type==='image_url').length,3);

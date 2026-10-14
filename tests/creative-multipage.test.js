@@ -6,6 +6,7 @@ const {spawn}=require('node:child_process');
 const JSZip=require('jszip');
 const {parseDocx}=require('../lib/creative-docx');
 const pageTools=require('../lib/creative-pages');
+const {styleOutput}=require('./fixtures/ai-asset-style.fixture');
 const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLduAAAAABJRU5ErkJggg==','base64');
 const wait=n=>new Promise(r=>setTimeout(r,n));
 const port=()=>new Promise(r=>{const s=net.createServer();s.listen(0,'127.0.0.1',()=>{const x=s.address().port;s.close(()=>r(x))})});
@@ -49,7 +50,7 @@ test('multi DOCX upload keeps earlier docs and per-page plans, then backup resto
     {name:'4 倍钻石',docId:ids[0],requirements:'首次充值送四倍钻石',imageIndexes:[]},
     {name:'登录奖励详情',docId:ids[1],requirements:'每日签到分别显示奖品和领奖按钮',imageIndexes:[0]}]});
   }
-  else if(Array.isArray(c))reply=String(text).includes('STYLE 风格')?'Style DNA 深蓝金属':'Layout Blueprint 原型区域';
+  else if(Array.isArray(c))reply=String(text).includes('原始项目 tnbao91/ai_asset')?styleOutput:'Layout Blueprint 原型区域';
   else reply='最终生图提示词：\n完成正式周年庆 UI 主界面，深蓝金属设计。\n质检清单：保留完整按钮。';
   res.setHeader('Content-Type','application/json');res.end(JSON.stringify({choices:[{message:{content:reply}}]}));
  });

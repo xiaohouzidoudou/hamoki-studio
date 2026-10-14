@@ -5,6 +5,7 @@ COPY --chown=node:node package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY --chown=node:node server.js workspace.js gateway.js index.html ./
 COPY --chown=node:node lib ./lib
+COPY --chown=node:node vendor ./vendor
 COPY --chown=node:node assets ./assets
 RUN mkdir -p /app/data && chown -R node:node /app/data
 USER node

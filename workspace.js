@@ -15,6 +15,7 @@ const zlib=require('node:zlib');
 const {checkedURL,imageFromDataURL,guessMime,extension,reverse:upstreamReverse,generate:upstreamGenerate,listModels:upstreamListModels,generateText,streamText,analyzeCreativeImages}=require('./lib/upstream');
 const {parseDocx,MAX_DOCX}=require('./lib/creative-docx');
 const creative=require('./lib/creative-workflow');
+const creativeUpstream=require('./lib/creative-upstream');
 const creativePages=require('./lib/creative-pages');
 const generate=(...args)=>options.limiter.run(()=>upstreamGenerate(...args));
 const reverse=(...args)=>options.limiter.run(()=>upstreamReverse(...args));
@@ -205,7 +206,7 @@ async function creativeSplit(p){
  emptyProvider(text);const model=assertModel(cfg.model||normalizedCapability(text,'text').defaultModel);
  creativeBusy.add(p.id);f.status='running';f.error='';f.stages.document='running';touchProject(p);
  try{
-  const result=await options.limiter.run(()=>generateText(text,{model,prompt:creativePages.splitPrompt(f.documents)}));
+  const result=await options.limiter.run(()=>generateText(text,{model,prompt:creativeUpstream.screenPrompt(creativePages.splitPrompt(f.documents)),maxPromptChars:58000,maxOutputTokens:5600}));
   const pages=creativePages.parsePageResponse(result,f.documents,f.pages);
   f.pages=pages;f.activePageId=pages.some(x=>x.id===f.activePageId)?f.activePageId:pages[0].id;
   f.analysis=creativeCurrent(f)?.analysis||{};f.status='split-ready';f.stages.document='done';f.updatedAt=time();touchProject(p);
@@ -239,8 +240,12 @@ async function creativeAnalyze(p,{pageId,batch=false}={}){
  try{
   if(refs.length&&!f.styleDNA){
    f.stages.style='running';touchProject(p);
-   f.styleDNA=await options.limiter.run(()=>analyzeCreativeImages(vision,refs,vm,creative.stylePrompt(f.notes)));
-   f.stages.style='done';f.styleLocked=true;touchProject(p);
+   const original=await options.limiter.run(()=>analyzeCreativeImages(vision,refs,vm,creativeUpstream.stylePrompt(f.notes)));
+   const accepted=creativeUpstream.validateGuide(original);
+   f.styleDNA=accepted.yaml;
+   f.styleReview=accepted.review;
+   f.upstreamRules=creativeUpstream.version;
+   f.stages.style='done';f.styleLocked=false;touchProject(p); // ai_asset explicitly requires human review before style approval
   }else f.stages.style=f.styleDNA?'done':'pending';
   for(const page of selected){
    currentPage=page;f.progress.pageId=page.id;f.progress.pageName=page.name;
@@ -248,11 +253,11 @@ async function creativeAnalyze(p,{pageId,batch=false}={}){
    const context='【页面】'+page.name+'\n【来源文件】'+d.name+'\n【本页需求】'+(page.requirements||d.text.slice(0,5000));
    stage='layout';f.stages.layout=prototype?'running':'pending';page.status='analyzing';touchProject(p);
    const layout=prototype
-    ?await options.limiter.run(()=>analyzeCreativeImages(vision,[fetchMedia(prototype.file)],vm,creative.layoutPrompt(context,f.notes)))
+    ?await options.limiter.run(()=>analyzeCreativeImages(vision,[fetchMedia(prototype.file)],vm,creativeUpstream.layoutPrompt(context,f.notes)))
     :'【无布局原型】此页面没有可靠的原型图。只能依据文档文字给出设计建议；禁止声称已还原原型位置。';
    f.stages.layout=prototype?'done':'pending';page.analysis.layout=layout;touchProject(p);
    stage='director';f.stages.director='running';touchProject(p);
-   const director=await options.limiter.run(()=>generateText(text,{model:tm,prompt:creative.directorPrompt(context,f.styleDNA||'【未提供风格参考图】需等待用户提供游戏实际 UI 截图后确定最终画风。',layout,f.notes)}));
+   const director=await options.limiter.run(()=>generateText(text,{model:tm,prompt:creativeUpstream.directorPrompt(context,f.styleDNA||'【未提供风格参考图】需等待用户提供游戏实际 UI 截图后确定最终画风。',layout,f.notes),maxPromptChars:58000,maxOutputTokens:4600}));
    page.analysis={style:f.styleDNA||'',layout,director,prompt:creative.extractPrompt(director)};
    page.status='ready';page.updatedAt=time();f.progress.done++;f.stages.director='done';touchProject(p);
   }
@@ -284,7 +289,7 @@ async function creativeQuality(p,historyId){
  try{
   const context=(creativePageDoc(f,page)?.text||'').slice(0,4000);
   const prompt=reference&&prototype
-   ?creative.qualityPrompt(context,f.styleDNA,page.analysis.layout)
+   ?creativeUpstream.qualityPrompt(context,f.styleDNA,page.analysis.layout)
    :'你是独立游戏 UI 视觉质检员，图像按顺序为'+(reference?'游戏风格参考、':'')+(prototype?'策划原型、':'')+'最终生成结果。仅对实际提供的图片负责。对比风格、界面结构和文字，标明无法判断的内容。\n设计要求：'+page.requirements+'\n风格规则：'+f.styleDNA+'\n布局规则：'+page.analysis.layout;
   const report=await options.limiter.run(()=>analyzeCreativeImages(vision,photos,vm,prompt));
   page.quality={historyId,report,checkedAt:time()};
