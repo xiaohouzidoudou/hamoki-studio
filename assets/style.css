@@ -609,3 +609,14 @@ input[type=checkbox],input[type=radio],input[type=range]{accent-color:#10cc91}
 .composer-model-option:is(:hover,:focus-visible,.active,.selected){background:#254d3e!important;color:#b8ffe1!important}
 .composer-model-footer{border-color:#3a484b!important}
 .lovart-inspired-panel select option{background:#20262c!important;color:#f0f8f3!important}
+
+/* Fullscreen original image: retain source pixels, no preview thumbnail. */
+.canvas-original-modal{position:fixed;inset:0;z-index:1300;background:rgba(5,8,13,.96);padding:0;display:flex;align-items:center;justify-content:center}
+.canvas-original-modal.hidden{display:none!important}
+.canvas-original-actions{position:absolute;top:max(16px,env(safe-area-inset-top));right:max(18px,env(safe-area-inset-right));display:flex;align-items:center;gap:12px;z-index:2}
+.canvas-original-close{border:1px solid rgba(255,255,255,.3);background:#242832;color:#fff;border-radius:12px;padding:11px 17px;cursor:pointer;font-size:15px}
+.canvas-original-close:hover,.canvas-original-close:focus-visible{background:#435062;outline:2px solid #74dfbc;outline-offset:2px}
+.canvas-original-stage{width:100vw;height:100dvh;overflow:auto;display:flex;align-items:center;justify-content:center;padding:70px 18px 24px}
+.canvas-original-stage img{max-width:100%;max-height:100%;height:auto;width:auto;object-fit:contain;display:block;user-select:none}
+.canvas-original-stage img.actual-size{max-width:none;max-height:none;flex-shrink:0}
+@media(max-width:550px){.canvas-original-close{padding:11px 13px}.canvas-original-actions{gap:8px;right:12px}.canvas-original-stage{padding:72px 8px 15px}}
