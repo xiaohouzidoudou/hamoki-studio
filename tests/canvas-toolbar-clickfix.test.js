@@ -22,6 +22,6 @@ test('compact toolbar places actions outside selected art with actual measured h
  assert.match(app,/toolbar\.offsetHeight/);
  assert.match(app,/const above=y-height-gap,below=y\+n\.h\*cam\.scale\+gap/);
  assert.match(app,/selection-more-menu/);
- assert.match(app,/new Set\(\['查看原图','AI 智能拆组件','一键切图'\]\)/);
+ assert.match(app,/new Set\(\['图片对话','一键切图','查看原图'\]\)/);
  assert.match(css,/\.selection-toolbar:not\(\.bulk-selection-toolbar\)\{flex-wrap:nowrap/);
 });
