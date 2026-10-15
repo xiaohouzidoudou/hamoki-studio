@@ -625,3 +625,5 @@ input[type=checkbox],input[type=radio],input[type=range]{accent-color:#10cc91}
 
 .smart-component-warning{color:#f6b77a!important}.smart-component-card img{background-color:#fff;background-image:linear-gradient(45deg,#d8dfe5 25%,transparent 25%),linear-gradient(-45deg,#d8dfe5 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#d8dfe5 75%),linear-gradient(-45deg,transparent 75%,#d8dfe5 75%);background-size:18px 18px;background-position:0 0,0 9px,9px -9px,-9px 0}
 
+.smart-component-models{border:1px solid #42505a;padding:10px;border-radius:9px;background:#182128}.smart-component-models summary{cursor:pointer;font-size:13px}.smart-component-models label{display:flex;flex-direction:column;gap:4px;font-size:12px;margin-top:9px;color:#b7c6ca}.smart-component-models input,.smart-component-models select{max-width:100%}
+
