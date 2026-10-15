@@ -17,6 +17,7 @@ const {parseDocx,MAX_DOCX}=require('./lib/creative-docx');
 const creative=require('./lib/creative-workflow');
 const creativeUpstream=require('./lib/creative-upstream');
 const creativePages=require('./lib/creative-pages');
+const assistantMemory=require('./lib/assistant-memory');
 const {nextGeneratedPosition}=require('./lib/canvas-placement');
 const generate=(...args)=>options.limiter.run(()=>upstreamGenerate(...args));
 const reverse=(...args)=>options.limiter.run(()=>upstreamReverse(...args));
@@ -104,7 +105,7 @@ let projectDB=readData(projectsFile,{projects:[]});
 let projects=Array.isArray(projectDB.projects)?projectDB.projects:[];
 const num=(value,fallback=0,min=-200000,max=200000)=>Number.isFinite(Number(value))?Math.min(max,Math.max(min,Number(value))):fallback;
 const clampText=(value,max=10000)=>typeof value==='string'?value.slice(0,max):'';
-function makeProject(title){return {id:crypto.randomUUID(),title:clampText(title||'未命名项目',70),createdAt:time(),updatedAt:time(),revision:0,archived:false,viewport:{x:220,y:130,scale:1},nodes:[],messages:[]}}
+function makeProject(title){return {id:crypto.randomUUID(),title:clampText(title||'未命名项目',70),createdAt:time(),updatedAt:time(),revision:0,archived:false,viewport:{x:220,y:130,scale:1},nodes:[],messages:[],assistantMemory:assistantMemory.normalize(null)}}
 function saveProjects(){atomic(projectsFile,JSON.stringify({version:1,projects:projects.slice(0,100)}))}
 if(!projects.length){
  const first=makeProject('我的第一块画布');
@@ -117,7 +118,7 @@ if(!projects.length){
 function project(id){return projects.find(p=>p.id===id&&!p.archived)}
 function defaultProject(){return projects.find(p=>!p.archived)}
 function nodeView(n){return {...n,url:n.kind==='reference'?BASE+'/api/media/'+n.assetFile:null,previewUrl:n.kind==='reference'?BASE+'/api/previews/'+n.assetFile:null}}
-function projectView(p){const {removedBatches,...visible}=p;return {...visible,nodes:p.nodes.map(nodeView)}}
+function projectView(p){const {removedBatches,...visible}=p;return {...visible,assistantMemory:assistantMemory.normalize(p.assistantMemory),nodes:p.nodes.map(nodeView)}}
 function touchProject(p){p.revision=(p.revision||0)+1;p.updatedAt=time();saveProjects()}
 let interruptedCreative=false;
 for(const p of projects){
@@ -397,7 +398,7 @@ function projectBackup(p){
  const fileIds=new Set(selectedHistory.map(h=>h.file).concat(p.nodes.filter(n=>n.kind==='reference').map(n=>n.assetFile)));
  let total=0;const media=[];
  for(const id of fileIds){const img=fetchMedia(id);total+=img.bytes.length;if(total>BUNDLE_MAX)throw Object.assign(Error('此项目媒体超过32MB，请分批备份后再导入'),{status:413});media.push({file:id,mime:img.mime,data:img.bytes.toString('base64')});}
- const safeProject={title:p.title,viewport:p.viewport,nodes:p.nodes,messages:p.messages,creativeWorkflow:p.creativeWorkflow||null,generationLayout:p.generationLayout||null,aiComponentPlan:componentView(p).plan};
+ const safeProject={title:p.title,viewport:p.viewport,nodes:p.nodes,messages:p.messages,creativeWorkflow:p.creativeWorkflow||null,generationLayout:p.generationLayout||null,assistantMemory:assistantMemory.normalize(p.assistantMemory),aiComponentPlan:componentView(p).plan};
  return zlib.gzipSync(Buffer.from(JSON.stringify({kind:'hamoki-project',schema:1,exportedAt:time(),project:safeProject,history:selectedHistory,media})),{level:6});
 }
 function importProject(b){
@@ -415,6 +416,7 @@ function importProject(b){
  for(const h of data.history){if(!h||!uuidLike.test(h.id)||typeof h.file!=='string'||!buffers.has(h.file)||oldHistId.has(h.id))throw Error('历史图片关联不完整');oldHistId.set(h.id,crypto.randomUUID());}
  for(const n of data.project.nodes){if(!n||!uuidLike.test(n.id)||!['generated','reference','note'].includes(n.kind)||oldNodeId.has(n.id))throw Error('画布元素格式不正确');if(n.kind==='generated'&&!oldHistId.has(n.historyId))throw Error('缺少生成图片历史');if(n.kind==='reference'&&!buffers.has(n.assetFile))throw Error('缺少画布参考图片');oldNodeId.set(n.id,crypto.randomUUID());}
  const proj=makeProject(trim(data.project.title,70)||'导入的创作项目');
+ proj.assistantMemory=assistantMemory.normalize(data.project.assistantMemory);
  if(data.project.generationLayout&&Number.isSafeInteger(data.project.generationLayout.x)&&Number.isSafeInteger(data.project.generationLayout.y)&&Number.isSafeInteger(data.project.generationLayout.nextSlot)&&data.project.generationLayout.nextSlot>=0)proj.generationLayout=data.project.generationLayout;
  if(data.project.viewport){const v=data.project.viewport;proj.viewport={x:num(v.x,220,-500000,500000),y:num(v.y,130,-500000,500000),scale:num(v.scale,1,.18,2.8)}}
  // After all structure checks pass, persist media and remap every entity identifier.
@@ -667,7 +669,8 @@ function validateCreation(b){
  if(transparentBg&&targets.some(t=>{const p=effectiveProvider(provider(t.providerId),capability);return !p||p.mode!=='openai'||(p.imageMode||'images')!=='images'}))throw Error('透明背景当前仅允许 OpenAI Images 模式（模型仍需支持透明输出）');
  const editMode=!!source&&b.editMode!=='new';
  const prompt=editMode?('根据第一张参考原图精确编辑。除本轮明确要求改变的内容外，保持主体身份、脸部、服装结构、姿势、画面构图和风格一致。\n历史创作描述：'+source.prompt.slice(0,6500)+'\n本轮修改要求：'+instruction):instruction;
- return {capability,prompt,editInstruction:instruction,refs,referenceNodes:images,count,targets,ratio,resolution,quality,transparentBg,sourceId:source?.id||null,sourceNodeId,projectId:targetProject.id,canvasX:num(b.canvasX,180),canvasY:num(b.canvasY,170),mask:b.mask||null,maskSourceImage:b.maskSourceImage||null};
+ const scopedPrompt=assistantMemory.generationPrompt(prompt,targetProject.assistantMemory,targetProject.creativeWorkflow?.styleDNA||'',creativeCurrent(targetProject.creativeWorkflow||{})?.requirements||'');
+ return {capability,prompt:scopedPrompt,editInstruction:instruction,refs,referenceNodes:images,count,targets,ratio,resolution,quality,transparentBg,sourceId:source?.id||null,sourceNodeId,projectId:targetProject.id,canvasX:num(b.canvasX,180),canvasY:num(b.canvasY,170),mask:b.mask||null,maskSourceImage:b.maskSourceImage||null};
 }
 function submit(b){
  const valid=validateCreation(b);
@@ -1222,6 +1225,27 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
       const p=assertProject(backupMatch[1]),archive=projectBackup(p);
       res.writeHead(200,{'Content-Type':'application/octet-stream','Content-Length':archive.length,'Content-Disposition':'attachment; filename="hamoki-project-'+p.id.slice(0,8)+'.hamoki"','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});
       return res.end(archive);
+    }
+    const memoryMatch=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/memory(?:\/(rule|feedback))?$/);
+    if(memoryMatch){
+      const p=assertProject(memoryMatch[1]),kind=memoryMatch[2];
+      if(req.method==='GET'&&!kind)return respond(res,200,{memory:assistantMemory.normalize(p.assistantMemory)});
+      if(req.method==='POST'&&kind==='rule'){
+        const b=await readJSON(req);
+        p.assistantMemory=assistantMemory.learnRule(p.assistantMemory,b.text,crypto.randomUUID(),time());
+        touchProject(p);return respond(res,200,{memory:p.assistantMemory});
+      }
+      if(req.method==='DELETE'&&kind==='rule'){
+        const b=await readJSON(req);p.assistantMemory=assistantMemory.forgetRule(p.assistantMemory,b.id);
+        touchProject(p);return respond(res,200,{memory:p.assistantMemory});
+      }
+      if(req.method==='POST'&&kind==='feedback'){
+        const b=await readJSON(req),n=p.nodes.find(x=>x.id===b.nodeId&&x.kind==='generated');
+        if(!n||n.historyId!==b.historyId)throw Error('选中图片与项目不匹配');
+        p.assistantMemory=assistantMemory.mark(p.assistantMemory,b.kind,n.id,n.historyId,b.note,time());
+        touchProject(p);return respond(res,200,{memory:p.assistantMemory});
+      }
+      return fail(res,405,'记忆操作不支持');
     }
     // Bulk operations are project-scoped: asset files and generated history must belong to this account/project.
     const exportNodes=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/nodes\/export$/);
