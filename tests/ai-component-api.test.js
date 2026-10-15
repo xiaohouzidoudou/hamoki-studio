@@ -65,7 +65,14 @@ test('one real-shaped source -> AI detection -> approved batch -> independently 
  assert.equal((await req('/api/projects/'+proj+'/ai-components/generate','POST',{confirmCost:false,itemId:identified.items[1].id})).status,400);
  assert.equal((await req('/api/projects/'+proj+'/ai-components/generate','POST',{confirmCost:true,itemId:identified.items[1].id,retry:true,image:{providerId,model:'img-test'}})).status,202);
  const repeated=await until(async()=>{const v=(await req('/api/projects/'+proj+'/ai-components')).body.plan.items[1];return v.status==='done'&&v.resultId!==finished.items[1].resultId?v:null},12000);
- assert.ok(repeated.resultId);
+ assert.ok(repeated.resultId); const backup=await fetch(root+"/api/projects/"+proj+"/backup",{headers:{Cookie:cookie}});
+ assert.equal(backup.status,200);
+ const restored=await req("/api/projects/import","POST",{archive:Buffer.from(await backup.arrayBuffer()).toString("base64")});
+ assert.equal(restored.status,201,JSON.stringify(restored.body));
+ const imported=(await req("/api/projects/"+restored.body.project.id+"/ai-components")).body.plan;
+ assert.equal(imported.items.length,2);
+ assert.ok(imported.items.every(x=>x.resultId&&x.url));
+ assert.notEqual(imported.sourceId,source);
 });
 
 
