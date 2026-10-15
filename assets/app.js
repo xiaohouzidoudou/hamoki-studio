@@ -489,7 +489,7 @@ async function pointerUp(e){activePointers.delete(e.pointerId);if(!gesture)retur
    for(const n of currentProject.nodes){if(n.kind!=='note'&&n.x<hiX&&n.x+n.w>loX&&n.y<hiY&&n.y+n.h>loY)multiNodeIds.add(n.id)}
   }
   selectedNodeId=[...multiNodeIds].at(-1)||null;renderNodes();if(multiNodeIds.size>0)toast('已选择 '+multiNodeIds.size+' 张图片');return}
- const ids=g.before.map(x=>x.id),after=snapshotScene(ids);if(JSON.stringify(g.before)===JSON.stringify(after))return;
+ const ids=g.before.map(x=>x.id),after=snapshotScene(ids);if(JSON.stringify(g.before)===JSON.stringify(after)){if(g.type==='move-multi'&&canvasPreviewCandidate&&!canvasPreviewCandidate.dragged&&canvasPreviewCandidate.id===g.before[0]?.id&&Date.now()-canvasPreviewCandidate.at<900){const selected=currentProject.nodes.find(n=>n.id===canvasPreviewCandidate.id);canvasPreviewCandidate=null;if(selected)openCanvasOriginal(selected)}return}canvasPreviewCandidate=null;
  try{await persistScene(after);historyRecord(g.before,after);setSaving('已同步')}catch(err){for(const original of g.before){const n=currentProject.nodes.find(x=>x.id===original.id);if(n)Object.assign(n,original)}renderNodes();toast('画布位置保存失败：'+err.message)}
 }
 function setupBoard(){const board=$('board');board.dataset.tool=tool;board.addEventListener('contextmenu',showBoardContextMenu);board.addEventListener('auxclick',e=>{if(e.button===1){e.preventDefault();e.stopPropagation()}});board.addEventListener('pointerdown',e=>{if(e.button===1){pointerDown(e)}},true);board.addEventListener('pointerdown',e=>{if(e.button!==1)pointerDown(e)});board.addEventListener('pointermove',pointerMove);board.addEventListener('pointerup',pointerUp);board.addEventListener('pointercancel',pointerUp);
