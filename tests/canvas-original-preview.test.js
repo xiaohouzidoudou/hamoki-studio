@@ -18,7 +18,8 @@ test('full-screen modal has close, escape, backdrop and actual size',()=>{
  assert.match(css,/\.canvas-original-stage img\.actual-size/);
 });
 test('existing double-click detail and drag are preserved',()=>{
- assert.match(js,/card\.ondblclick=e=>\{e\.stopPropagation\(\);if\(h\)openViewer\(h\.id\)/);
+ assert.match(js,/function openCanvasTap\(e,gesture,candidate\)/);
+ assert.match(js,/openViewer\(n\.historyId\)/);
  assert.match(js,/function startNodeDrag\(e,n\)/);
  assert.match(js,/pointerMove\(e\)/);
 });
