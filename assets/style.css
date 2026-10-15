@@ -637,3 +637,40 @@ input[type=checkbox],input[type=radio],input[type=range]{accent-color:#10cc91}
 .selection-more-menu{position:absolute;right:0;top:calc(100% + 8px);min-width:166px;max-height:min(65vh,520px);overflow-y:auto;padding:7px;display:flex;flex-direction:column;gap:3px;background:#202630;border:1px solid #56616d;border-radius:12px;box-shadow:0 14px 38px #000a;z-index:50}
 .selection-more-menu>button{width:100%;display:flex;gap:6px;align-items:center;justify-content:flex-start;text-align:left}
 .selection-toolbar-close{font-size:16px!important;padding:6px 10px!important}
+
+/* Conversation-first default: retain specialist panels behind one disclosure. */
+.simple-studio .memory-actions #rememberRuleBtn,.simple-studio .memory-actions #approveImageBtn,.simple-studio .memory-actions #rejectImageBtn{display:none!important}
+.simple-studio .studio-config-scroll{display:block!important;min-height:0;overflow:auto;flex:1}
+.simple-studio .studio-config-scroll> :not(#studioActivity){display:none!important}
+.simple-studio #studioActivity{display:block!important;min-height:100%;border:0}
+.simple-studio #studioActivity>summary{display:none!important}
+.simple-studio #conversation{display:flex!important;flex-direction:column;min-height:100%}
+.simple-studio .composer-zone{display:flex;flex-direction:column;gap:12px;flex:1;justify-content:flex-end;min-height:0}
+.simple-studio .studio-prompt-dock{padding:18px!important}
+.memory-context{font-size:12px;color:#b5cfc7;line-height:1.6;padding:8px 10px;background:#2b3537;border-radius:9px}
+.memory-actions{display:flex;align-items:center;flex-wrap:wrap;gap:7px}
+.memory-actions button{border:1px solid #48535a;border-radius:20px;background:#283139;color:#e1e9e7;padding:8px 11px;font-size:11px;cursor:pointer}
+.memory-actions button:hover{background:#3b4850}
+.simple-studio .composer{margin-top:5px}
+.simple-studio .composer textarea{min-height:105px;font-size:14px;line-height:1.65}
+.simple-studio #studioActivity{display:block}
+
+/* Review stays attached to its generated image; not another workflow panel. */
+.assistant-review{border:1px solid #3b5650;border-radius:10px;background:rgba(34,51,48,.75);padding:10px 12px;margin:8px 0 0;font-size:11px;color:#bdcfca;line-height:1.6}
+.assistant-review strong{display:block;color:#d9f0e6;font-size:11px}
+.assistant-review p{margin:5px 0 0;white-space:pre-wrap}
+.assistant-review.needs_work{border-color:#997759;background:#3a3029;color:#f2d6bc}
+.assistant-review.uncertain{border-color:#736855;background:#302f2e}
+.review-fix-button{display:block;margin-top:9px;background:#267b63;border:1px solid #3d9b7d;color:white;border-radius:8px;padding:8px 12px;font-size:11px;cursor:pointer}
+.review-fix-button:hover{background:#328d71}
+.studio-auto-progress{margin:10px 12px 14px;padding:12px 14px;border:1px solid #2f5d50;background:rgba(19,42,35,.8);border-radius:12px;color:#d4e7df}
+.studio-auto-progress[hidden]{display:none!important}
+.studio-auto-head{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px}
+.studio-auto-head span{font-size:11px;color:#89b8a5}
+.studio-auto-steps{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.studio-auto-step{padding:5px 8px;border:1px solid #46514f;border-radius:8px;font-size:10px;color:#95a6a0}
+.studio-auto-step.done{color:#83d8b8;border-color:#387a62;background:rgba(29,77,58,.3)}
+.studio-auto-step.running{color:#f5e2a7;border-color:#8c7950;background:rgba(117,89,32,.2);animation:studio-pulse 1.4s ease-in-out infinite}
+.studio-auto-note{font-size:11px;line-height:1.6;margin:8px 0 0;white-space:pre-wrap}
+@keyframes studio-pulse{50%{opacity:.54}}
+@media(prefers-reduced-motion:reduce){.studio-auto-step.running{animation:none}}

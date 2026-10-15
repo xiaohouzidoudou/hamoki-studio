@@ -8,6 +8,7 @@ const show=id=>$(id)?.classList.remove('hidden');
 const hide=id=>$(id)?.classList.add('hidden');
 let providers=[],activeId=null,editId=null,draftProvider=false,projectList=[],currentProject=null,historyItems=[],jobs=[],paused=false;
 let composerMode='image';
+let simpleStudio=true;
 const runtimeRoutes={text:{providerId:'',model:''},vision:{providerId:'',model:''}},runtimeCatalog=new Map();
 let selectedNodeId=null,viewerId=null,sourceId=null,sourceNodeId=null,maskData=null,maskSourceId=null;
 let enhanceMode=false;
@@ -135,7 +136,7 @@ function setSaving(text='正在保存'){const t=$('saveStatus');t.innerHTML='';c
 function changeTool(t){tool=t;closeBoardContextMenu();$('board')?.setAttribute('data-tool',tool);document.querySelectorAll('[data-tool]').forEach(x=>x.classList.toggle('active',x.dataset.tool===t));$('canvasHint').textContent=t==='note'?'在画布空白处点击添加便签':t==='hand'?'左键或中键拖动平移画布':'左键框选 · 中键或空格拖动画布 · 右键菜单'}
 function setAuthMode(mode){authMode=mode;$('showLogin')?.classList.toggle('active',mode==='login');$('showRegister')?.classList.toggle('active',mode==='register');$('loginPane')?.classList.toggle('hidden',mode!=='login');$('registerPane')?.classList.toggle('hidden',mode!=='register')}
 function fillAccountHeader(){if(!$('accountTitle'))return;$('accountTitle').textContent=currentUser?.name||'我的创作空间'}
-async function init(){bindEvents();setAuthMode('login');try{const r=await api('status');if(!r.backend)throw Error('找不到服务端');demoMode=!!r.demoMode;if(!r.authenticated){show('loginModal');$('loginStatus').textContent='请输入账号密码后继续';fillAccountHeader();return}authorized=true;currentUser=r.user||null;loadQuickModelPreferences();fillAccountHeader();hide('loginModal');await boot()}catch(e){$('loginStatus').textContent=e.message;show('loginModal')}setInterval(()=>{if(!authorized||document.visibilityState==='hidden')return;const busy=jobs.some(j=>['queued','running'].includes(j.status));if(busy||Date.now()-lastIdlePoll>12000){lastIdlePoll=Date.now();refreshProjectData()}},3000);setInterval(()=>{if(authorized&&document.visibilityState!=='hidden')refreshStorage()},60000);setInterval(()=>{if(authorized&&document.visibilityState!=='hidden')updateGenerationElapsed()},1000);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&authorized){lastIdlePoll=0;drainPreviewQueue();refreshProjectData()}})}
+async function init(){bindEvents();setAuthMode('login');try{const r=await api('status');if(!r.backend)throw Error('找不到服务端');demoMode=!!r.demoMode;if(!r.authenticated){show('loginModal');$('loginStatus').textContent='请输入账号密码后继续';fillAccountHeader();return}authorized=true;currentUser=r.user||null;loadQuickModelPreferences();fillAccountHeader();hide('loginModal');await boot()}catch(e){$('loginStatus').textContent=e.message;show('loginModal')}setInterval(()=>{if(!authorized||document.visibilityState==='hidden')return;const busy=jobs.some(j=>['queued','running'].includes(j.status));if(busy||currentProject?.creativeWorkflow?.autoRun?.status==='running'||Date.now()-lastIdlePoll>12000){lastIdlePoll=Date.now();refreshProjectData()}},3000);setInterval(()=>{if(authorized&&document.visibilityState!=='hidden')refreshStorage()},60000);setInterval(()=>{if(authorized&&document.visibilityState!=='hidden')updateGenerationElapsed()},1000);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&authorized){lastIdlePoll=0;drainPreviewQueue();refreshProjectData()}})}
 async function login(){const username=$('loginUser').value.trim(),password=$('loginPass').value;try{$('loginStatus').textContent='正在登录…';const r=await api('/api/login',{method:'POST',body:{username,password}});authorized=true;currentUser=r.user||{name:username};loadQuickModelPreferences();fillAccountHeader();hide('loginModal');$('loginPass').value='';await boot()}catch(e){authorized=false;$('loginStatus').textContent=e.message}}
 async function register(){const inviteCode=$('inviteCode').value.trim(),username=$('registerUser').value.trim(),password=$('registerPass').value;try{$('loginStatus').textContent='正在创建账号…';const r=await api('/api/register',{method:'POST',body:{inviteCode,username,password}});authorized=true;currentUser=r.user||{name:username};loadQuickModelPreferences();fillAccountHeader();hide('loginModal');$('registerPass').value='';await boot()}catch(e){authorized=false;$('loginStatus').textContent=e.message}}
 async function logoutAccount(){textChatController?.abort();try{await api('/api/logout',{method:'POST',body:{}})}catch{}closeCanvasMenu();closeQuickProviderMenu();closeQuickModelMenu();quickModelPrefs.clear();quickModelFetches.clear();modelCatalogByProvider.clear();populateComposerModelSuggestions(null);authorized=false;currentUser=null;providers=[];projectList=[];currentProject=null;historyItems=[];jobs=[];diagnosticItems=[];hide('logsModal');hide('settingsModal');hide('libraryModal');for(const cap of ['text','vision'])runtimeRoutes[cap]={providerId:'',model:''};runtimeCatalog.clear();fillAccountHeader();$('connectionStatus').textContent='已退出';$('logCount').textContent='···';show('loginModal');setAuthMode('login');$('loginStatus').textContent='你已退出账号'}
@@ -162,7 +163,7 @@ async function switchProject(id){if(!id||!authorized)return;if(textChatBusy&&tex
  $('currentProjectTitle').textContent=currentProject.title;renderProjects();$('projectsPanel').classList.remove('open');
  const [h,j]=await Promise.all([api(`history?projectId=${id}`),api(`jobs?projectId=${id}`)]);historyItems=h.history||[];jobs=j.jobs||[];paused=!!j.paused;renderAll();
 }catch(e){toast('打开项目失败：'+e.message)}}
-function renderAll(){updateScene();renderNodes();renderConversation();renderContext();renderLibrary();updateStats();}
+function renderAll(){updateScene();renderNodes();renderConversation();renderContext();renderMemoryContext();renderCreativeAutoProgress();renderLibrary();updateStats();}
 function updateStats(){const n=jobs.filter(j=>['queued','running'].includes(j.status)).length;$('queueBadge').textContent=n;$('libraryCount').textContent=historyItems.length;$('pauseBtn').textContent=paused?'▶ 恢复队列':'Ⅱ 暂停队列'}
 async function refreshProjectData(){if(polling||!currentProject||!authorized)return;polling=true;const id=currentProject.id;try{
  const [h,j,r]=await Promise.all([api(`history?projectId=${id}`),api(`jobs?projectId=${id}`),api(`/api/projects/${id}`)]);
@@ -170,7 +171,7 @@ async function refreshProjectData(){if(polling||!currentProject||!authorized)ret
  historyItems=h.history||[];jobs=j.jobs||[];paused=!!j.paused;updateStats();syncGenerationActivity();
  const p=r.project;
  if(!gesture&&projectSaveBusy===0&&(p.revision??0)!==lastProjectRevision){
-   currentProject=p;lastProjectRevision=p.revision??0;renderNodes();if(!(textChatBusy&&textChatProjectId===id))renderConversation();renderProjects();setSaving('已同步');
+   currentProject=p;lastProjectRevision=p.revision??0;renderNodes();renderMemoryContext();renderCreativeAutoProgress();if(!(textChatBusy&&textChatProjectId===id))renderConversation();renderProjects();setSaving('已同步');
  }else if(newHash!==oldHash&&!gesture){renderNodes();if(!(textChatBusy&&textChatProjectId===id))renderConversation()}
  if(!$('libraryModal').classList.contains('hidden'))renderLibrary();
  }catch(e){if(!/401/.test(e.message))setSaving('连接异常')}finally{polling=false}}
@@ -234,7 +235,7 @@ function selectNode(id,additive=false){
  else{multiNodeIds.clear();if(id)multiNodeIds.add(id)}
  selectedNodeId=multiNodeIds.has(id)?id:[...multiNodeIds].at(-1)||null;
  document.querySelectorAll('.canvas-node').forEach(n=>{n.classList.toggle('selected',multiNodeIds.has(n.dataset.id));n.classList.toggle('multi-reference',referenceNodeRoles.some(r=>r.nodeId===n.dataset.id))});
- placeToolbar();updateUndoButtons();
+ placeToolbar();updateUndoButtons();renderMemoryContext();
 }
 function pickAllNodes(){if(!currentProject)return;multiNodeIds=new Set(currentProject.nodes.filter(n=>n.kind!=='note').map(n=>n.id));selectedNodeId=[...multiNodeIds].at(-1)||null;renderNodes();toast('已选中 '+multiNodeIds.size+' 张图片')}
 function selectedSceneNodes(){return(currentProject?.nodes||[]).filter(n=>multiNodeIds.has(n.id))}
@@ -651,8 +652,11 @@ if(!src)throw Error('请先添加参考图');
 const dims=await new Promise((ok,fail)=>{const im=new Image();im.onload=()=>ok([im.naturalWidth,im.naturalHeight]);im.onerror=()=>fail(Error('读取参考图尺寸失败'));im.src=src});
 return nearestSupportedAspectRatio(dims[0],dims[1]);
 }
-function generationBody(targets){if(!currentProject)throw Error('请先选择项目');const text=$('prompt').value.trim();if(!text)throw Error('请填写创作描述');if(!targets&&!checkProvider(sourceId||maskData?'edit':'image'))throw Error('请先配置对应能力的中转站');if(!targets&&!($('imageModel').value.trim()||activeProvider()?.imageModel))throw Error('请先在操作台选择图片模型');const point=currentBoardPoint(.45,.34);return {projectId:currentProject.id,prompt:text,providerId:activeId,model:($('imageModel').value.trim()||activeProvider()?.imageModel||''),ratio:$('ratio').value,resolution:$('resolution').value,quality:$('quality').value,count:Number($('amount').value),transparentBg:$('transparentBg').checked,references:referenceInputs.map(r=>r.data),referenceNodes:referenceNodeRoles.map(r=>({...r})),sourceId,sourceNodeId,mask:maskData,maskSourceImage:maskSourcePng,canvasX:Math.round(point.x),canvasY:Math.round(point.y),...(targets?{targets,count:1}:{})}}
-async function submitGeneration(targets=null){if(composerMode==='text'&&!targets)return submitTextChat();let body;try{const referenceRatio=await referenceRatioValue();body=generationBody(targets);if(referenceRatio){body.ratio=referenceRatio;toast('已按参考图选择最接近的模型比例：'+referenceRatio)}}catch(e){if(e.message!=='请先配置对应能力的中转站')toast(e.message);return}const count=targets?targets.length:body.count;if(!targets&&body.model)rememberQuickModel(body.model);const displayTargets=targets?.length?targets:[{providerId:body.providerId,model:body.model}];const details=displayTargets.map(t=>(providers.find(p=>p.id===t.providerId)?.name||'未选择服务商')+' / '+(t.model||'未选择模型')).join('\n');if(!confirm(`${demoMode?'演示提交':'真实付费请求'}：即将提交 ${count} 个任务${body.mask?'（局部蒙版）':''}\n本次实际使用：\n${details}\n比例 ${body.ratio} / 分辨率 ${body.resolution}\n${demoMode?'不会扣费':'会产生中转站费用，取消或超时也可能已计费'}。确认继续？`))return;
+function generationBody(targets){if(!currentProject)throw Error('请先选择项目');const text=$('prompt').value.trim();if(!text)throw Error('请填写创作描述');if(!targets&&!checkProvider(sourceId||maskData?'edit':'image'))throw Error('请先配置对应能力的中转站');if(!targets&&!($('imageModel').value.trim()||activeProvider()?.imageModel))throw Error('请先在操作台选择图片模型');const point=currentBoardPoint(.45,.34);const vision=runtimeSelection('vision');
+ const canAutoFix=(!targets||targets.length===1)&&Number($('amount').value)===1&&activeProvider()?.mode==='openai'&&activeProvider()?.imageMode==='images';
+ const review=simpleStudio&&!demoMode&&vision.providerId&&vision.model?{enabled:true,confirmed:true,providerId:vision.providerId,model:vision.model,autoFixMax:canAutoFix?1:0}:null;
+ return {projectId:currentProject.id,prompt:text,providerId:activeId,model:($('imageModel').value.trim()||activeProvider()?.imageModel||''),ratio:$('ratio').value,resolution:$('resolution').value,quality:$('quality').value,count:Number($('amount').value),transparentBg:$('transparentBg').checked,references:referenceInputs.map(r=>r.data),referenceNodes:referenceNodeRoles.map(r=>({...r})),sourceId,sourceNodeId,review,mask:maskData,maskSourceImage:maskSourcePng,canvasX:Math.round(point.x),canvasY:Math.round(point.y),...(targets?{targets,count:1}:{})}}
+async function submitGeneration(targets=null,planned=false,editSpec=null){if(simpleStudio&&!targets&&!planned)return assistantSend();if(composerMode==='text'&&!targets)return submitTextChat();let body;try{const referenceRatio=await referenceRatioValue();body=generationBody(targets);if(body.sourceId&&editSpec)body.editSpec=editSpec;if(referenceRatio){body.ratio=referenceRatio;toast('已按参考图选择最接近的模型比例：'+referenceRatio)}}catch(e){if(e.message!=='请先配置对应能力的中转站')toast(e.message);return}const count=targets?targets.length:body.count;if(!targets&&body.model)rememberQuickModel(body.model);const displayTargets=targets?.length?targets:[{providerId:body.providerId,model:body.model}];const details=displayTargets.map(t=>(providers.find(p=>p.id===t.providerId)?.name||'未选择服务商')+' / '+(t.model||'未选择模型')).join('\n');if(!confirm(`${demoMode?'演示提交':'真实付费请求'}：即将提交 ${count} 个任务${body.mask?'（局部蒙版）':''}\n本次实际使用：\n${details}\n比例 ${body.ratio} / 分辨率 ${body.resolution}\n${body.review?(body.review.autoFixMax?'包含一次视觉审图及最多一次自动纠偏、一次视觉复查；纠偏和复查都可能额外计费\n':'包含每张图一次视觉审图（额外计费）\n'):'未启用自动视觉审图\n'}${demoMode?'不会扣费':'会产生中转站费用，取消或超时也可能已计费'}。确认继续？`))return;
  $('generateBtn').disabled=true;try{const r=await api('jobs',{method:'POST',body});toast(`已提交 ${r.jobs.length} 个${demoMode?'演示':'真实'}任务，结果会自动落到当前画布`);hide('compareModal');referenceInputs=[];referenceNodeRoles=[];sourceId=sourceNodeId=maskData=null;maskSourcePng=null;editingPrompt=null;enhanceMode=false;$('transparentBg').checked=false;renderContext();$('prompt').value='';await refreshProjectData();if(window.innerWidth<850)$('assistantPanel').classList.remove('open')}
  catch(e){toast('生成提交失败：'+e.message)}finally{$('generateBtn').disabled=false}}
 function activeGenerationJobs(){return jobs.filter(j=>j.status==='queued'||j.status==='running')}
@@ -688,9 +692,27 @@ function syncGenerationActivity(){
  $('generationTitle').textContent=paused?'队列已暂停 · 请到任务列表恢复':running?(pending.length>1?`正在生成 ${pending.length} 张图片`:'AI 正在绘制图片'):(pending.length>1?`${pending.length} 个生成任务排队中`:'生成任务排队中');
  updateGenerationElapsed();
 }
+function renderReviewInChat(line,h){
+ const info=h?.review;if(!info)return;
+ const detail=el('div','assistant-review '+info.status);
+ if(info.status==='checking'){detail.textContent='AI 正在核对图片和项目规范…';line.append(detail);return}
+ const headline=info.status==='pass'?'AI 初审：暂未发现明显偏差':info.status==='needs_work'?'AI 初审：发现需要修改的地方':'AI 初审：结果不确定';
+ detail.append(el('strong','',headline));
+ if(info.summary)detail.append(el('p','',info.summary));
+ if(info.issues?.length)detail.append(el('p','',info.issues.join('；')));
+ if(info.autoFix?.status==='queued')detail.append(el('p','','正在按已确认的费用上限自动修复一次，无需你再次操作'));
+ else if(info.autoFix?.status==='done')detail.append(el('p','','自动修正版本已生成，请在右侧新版本查看复查结论'));
+ else if(info.autoFix?.reason)detail.append(el('p','',info.autoFix.reason));
+ if(info.status==='needs_work'&&info.correction){
+  const btn=el('button','review-fix-button','按审图意见修改');btn.type='button';
+  btn.onclick=()=>{continueFrom(h.id);$('prompt').value=info.correction;$('prompt').focus();toast('已准备修改建议；确认生图后才会产生费用')};
+  detail.append(btn);
+ }
+ line.append(detail);
+}
 function renderConversation(){const div=$('conversation'),oldBottom=div.scrollHeight-div.scrollTop-div.clientHeight<120;div.replaceChildren();const msgs=currentProject?.messages||[];
- if(!msgs.length){const welcome=el('div','assistant-welcome'),im=el('img');im.src=document.querySelector('.brand-wrap img')?.src||APP_BASE+'/assets/hamoki-avatar-128.webp';welcome.append(im,el('h3','','你好！今天想创造什么？'),el('p','','描述一个想法，或者从画布中选择一张图继续修改。我会把真实生成结果直接放到画布上。'));const chip=el('div','welcome-chip');chip.innerHTML=ico('spark');chip.append(document.createTextNode('提示：按 Ctrl + Enter 可以直接提交生图请求'));welcome.append(chip);div.append(welcome);syncGenerationActivity();return}
- for(const msg of msgs.slice(-130)){const line=el('div','chat-item '+(msg.role==='user'?'user':'assistant'));const from=el('div','chat-from'),avatar=el('span','chat-avatar'+(msg.role==='user'?' user':''));avatar.innerHTML=ico(msg.role==='user'?'pointer':'spark');from.append(avatar,document.createTextNode(msg.role==='user'?'我':msg.capability==='text'?'Hamoki · 文字回复':'Hamoki · 生成结果'));line.append(from,el('div','chat-bubble',msg.content||''));if(msg.imageId){const h=currentHistory(msg.imageId);if(h){const im=el('img','chat-result');putPreview(im,h.url,h.previewUrl);im.alt=h.prompt;im.onclick=()=>focusImage(h.id);line.append(im)}}line.append(el('div','chat-time',humanDate(msg.createdAt)));div.append(line)}syncGenerationActivity();if(oldBottom)div.scrollTop=div.scrollHeight}
+ if(!msgs.length){const welcome=el('div','assistant-welcome'),im=el('img');im.src=document.querySelector('.brand-wrap img')?.src||APP_BASE+'/assets/hamoki-avatar-128.webp';welcome.append(im,el('h3','','你好！今天想创造什么？'),el('p','','描述一个想法，或者从画布中选择一张图继续修改。我会把真实生成结果直接放到画布上。'));const chip=el('div','welcome-chip');chip.innerHTML=ico('spark');chip.append(document.createTextNode('选图后直接告诉我哪里需要修改，也可以说「以后都不要前景」'));welcome.append(chip);div.append(welcome);syncGenerationActivity();return}
+ for(const msg of msgs.slice(-130)){const line=el('div','chat-item '+(msg.role==='user'?'user':'assistant'));const from=el('div','chat-from'),avatar=el('span','chat-avatar'+(msg.role==='user'?' user':''));avatar.innerHTML=ico(msg.role==='user'?'pointer':'spark');from.append(avatar,document.createTextNode(msg.role==='user'?'我':msg.capability==='text'?'Hamoki · 文字回复':'Hamoki · 生成结果'));line.append(from,el('div','chat-bubble',msg.content||''));if(msg.imageId){const h=currentHistory(msg.imageId);if(h){const im=el('img','chat-result');putPreview(im,h.url,h.previewUrl);im.alt=h.prompt;im.onclick=()=>focusImage(h.id);line.append(im);renderReviewInChat(line,h)}}line.append(el('div','chat-time',humanDate(msg.createdAt)));div.append(line)}syncGenerationActivity();if(oldBottom)div.scrollTop=div.scrollHeight}
 function focusLatestGenerated(){
  const nodes=(currentProject?.nodes||[]).filter(n=>n.kind==='generated');
  if(!nodes.length)return toast('当前画布还没有生成作品');
@@ -891,7 +913,7 @@ function initialRuntimeModel(p,cap){
 }
 function runtimeSelection(cap){
  const r=runtimeRoutes[cap],p=providers.find(x=>x.id===r?.providerId&&x.capabilities?.[cap]?.enabled!==false);
- return {providerId:p?.id||'',model:(r?.model||'').trim(),name:p?.name||''};
+ return {providerId:p?.id||'',model:(r?.model||initialRuntimeModel(p,cap)||'').trim(),name:p?.name||''};
 }
 function updateRuntimeNotice(cap){
  const r=runtimeSelection(cap);
@@ -915,6 +937,7 @@ function renderRuntimeSelectors(){
    r.providerId=p?.id||'';
    r.model=initialRuntimeModel(p,cap)||'';
   }
+  if(!r.model)r.model=initialRuntimeModel(p,cap)||'';
   input.value=r.model;updateRuntimeNotice(cap);
  }
 }
@@ -1081,7 +1104,8 @@ function arrangeStudioLayout(){
  const more=models.querySelector('#moreSettings');if(more){more.hidden=true;more.tabIndex=-1}
  scroll.append(details);
  const activity=el('details','studio-activity');activity.id='studioActivity';
- activity.innerHTML='<summary>创作记录与对话 <svg class="icon sm"><use href="#ic-chevron"/></svg></summary>';
+ activity.innerHTML='<summary>创作记录与对话 <svg class="icon sm"><use href="#ic-chevron"/></svg></summary>';activity.open=true;
+ const autoProgress=el('div','studio-auto-progress');autoProgress.id='studioAutoProgress';autoProgress.setAttribute('role','status');autoProgress.setAttribute('aria-live','polite');activity.append(autoProgress);
  const conversation=$('conversation');if(conversation)activity.append(conversation);
  scroll.append(activity);
  panel.insertBefore(scroll,zone);
@@ -1090,6 +1114,14 @@ function arrangeStudioLayout(){
  const instruction=zone.querySelector('.composer-instruction');
  if(instruction){instruction.className='studio-prompt-hint';instruction.textContent='Ctrl + Enter 发送'}
  const button=$('generateBtn');if(button){button.classList.add('studio-send-button');button.innerHTML='<svg class="icon"><use href="#ic-arrow"/></svg><span id="sendButtonLabel">开始生成</span>'}
+ const memoryBar=el('div','memory-context');memoryBar.id='memoryContext';zone.insertBefore(memoryBar,zone.firstChild);
+ const actions=el('div','memory-actions');actions.innerHTML='<button type="button" id="rememberRuleBtn">记住这条规范</button><button type="button" id="approveImageBtn">这张可以</button><button type="button" id="rejectImageBtn">这张不对</button><button type="button" id="showStudioTools">专业工具</button>';
+ zone.insertBefore(actions,zone.querySelector('.composer'));
+ $('rememberRuleBtn').onclick=rememberCurrentRule;
+ $('approveImageBtn').onclick=()=>feedbackCurrent('approved');
+ $('rejectImageBtn').onclick=()=>feedbackCurrent('rejected');
+ $('showStudioTools').onclick=()=>{simpleStudio=!simpleStudio;setSimpleStudio()};
+ setSimpleStudio();
  // Panel type/mode controls are moved rather than cloned; all API/model event bindings still target original IDs.
  const subtitle=$('assistantDescription');if(subtitle)subtitle.textContent='让灵感变成现实，支持 AI 绘图 · 文字对话';
  renderStudioLayerChips();
@@ -1109,6 +1141,116 @@ function renderStudioLayerChips(){
   chip.append(btn,remove);host.append(chip)
  }
 }
+// Keep first-page creation on the existing multi-skill pipeline, while local
+// refinements of an already-generated image go through the editing assistant.
+function shouldStartCreativePage(prompt,project){
+ if(!project?.creativeWorkflow?.pages?.length)return false;
+ const hasGenerated=!!project.nodes?.some(x=>x.kind==='generated');
+ const newPageIntent=/(新(?:的)?页面|下一(?:个|张)?页面|另(?:一|个)页面|换(?:个|一)页面|制作.{0,16}(?:签到|礼包|活动|入口|UI|界面|页面)|按.{0,12}原型.{0,16}(?:做|制作|设计))/.test(prompt);
+ const feedback=/^(这张|这里|这个|刚才|上一张|改一下|修改|调整|不对|可以|满意|记住|以后|再|重新|继续|不要|去掉|别)/.test(prompt)
+  ||(hasGenerated&&!newPageIntent&&/(背景|按钮|边框|奖励|字体|颜色|框|位置|亮|暗|大|小|高|低|太|厚|薄|阴影|层次|其他不变|别动|保持)/.test(prompt));
+ return !feedback;
+}
+async function assistantSend(){
+ const prompt=$('prompt').value.trim();if(!prompt)return toast('请先告诉我你想做什么');
+ if(!currentProject)return toast('请先打开一个项目');
+ // Pages imported from real Word and prototypes should enter the specialist
+ // workflow directly, without a redundant paid intent-planning model call.
+ if(shouldStartCreativePage(prompt,currentProject)&&window.HamokiCreative?.prepareFromChat){
+  const send=$('generateBtn');send.disabled=true;
+  try{
+   const result=await window.HamokiCreative.prepareFromChat(prompt);
+   if(result?.handled){
+    if(result.started){$('prompt').value='';toast('专业美术工作流已启动，正在后台执行');await refreshProjectData()}
+    else toast(result.message||'无法启动专业美术工作流');
+    return;
+   }
+  }catch(e){toast('专业美术工作流未启动：'+e.message);return}
+  finally{send.disabled=false}
+ }
+ const routeFromProject=currentProject?.creativeWorkflow?.routing?.text;
+ const textRoute=routeFromProject?.providerId&&routeFromProject?.model?routeFromProject:runtimeSelection('text');
+ if(!textRoute.providerId||!textRoute.model){toast('先配置文字模型，以便理解你的要求');return}
+ const send=$('generateBtn');send.disabled=true;
+ let plan;
+ try{
+  const r=await api('assistant/plan',{method:'POST',body:{projectId:currentProject.id,prompt,selectedNodeId,providerId:textRoute.providerId,model:textRoute.model}});
+  plan=r.plan;
+ }catch(e){toast('意图分析失败，没有提交生图：'+e.message);send.disabled=false;return}
+ finally{send.disabled=false}
+ if(plan.action==='remember'){
+  if(!plan.rule)return toast('还不确定需要记住什么，请明确说明');
+  if(!confirm('将这条要求记为当前项目的长期规则？\n'+plan.rule))return;
+  try{const r=await api(projectPath('/memory/rule'),{method:'POST',body:{text:plan.rule}});currentProject.assistantMemory=r.memory;renderMemoryContext();$('prompt').value='';toast('已经记住，后续生图自动遵守')}catch(e){toast(e.message)}
+  return;
+ }
+ if(plan.action==='approve'||plan.action==='reject'){
+  if(currentNode()?.kind!=='generated'){
+   const latest=[...(currentProject?.nodes||[])].reverse().find(x=>x.kind==='generated');
+   if(latest)selectNode(latest.id);
+  }
+  await feedbackCurrent(plan.action==='approve'?'approved':'rejected');
+  if(plan.action==='approve')$('prompt').value='';
+  return;
+ }
+ if(plan.action==='image'){
+  // If this project has imported Word/prototypes, use the ORIGINAL multi-skill
+  // art workflow instead of inventing a second reference or prompt pipeline.
+  if(plan.mode==='new'&&window.HamokiCreative?.prepareFromChat){
+   const result=await window.HamokiCreative.prepareFromChat(prompt);
+   if(result?.handled){
+    if(result.started){$('prompt').value='';toast('已启动原有专业美术工作流，进度会持续显示；完成后直接在画布查看');await refreshProjectData();return}
+    if(!result.ready){toast(result.message||'项目资料尚未准备好');return}
+    sourceId=sourceNodeId=maskData=maskSourcePng=null;
+    const previous=composerMode;composerMode='image';
+    try{await submitGeneration(null,true)}finally{composerMode=previous}
+    return;
+   }
+  }
+  const selected=currentNode();const n=selected?.kind==='generated'?selected:[...(currentProject?.nodes||[])].reverse().find(x=>x.kind==='generated');
+  if(plan.mode==='edit'){
+   if(n?.kind!=='generated')return toast('当前项目还没有可以修改的图片');
+   continueFrom(n.historyId,n.id);
+   $('prompt').value=prompt;
+  }else{sourceId=null;sourceNodeId=null;maskData=null;maskSourcePng=null;renderContext()}
+  const previous=composerMode;composerMode='image';
+  try{await submitGeneration(null,true,plan.mode==='edit'?plan.edit:null)}finally{composerMode=previous}
+  return;
+ }
+ // Discussion is handled by the existing streaming text conversation, never by the image API.
+ const previous=composerMode;composerMode='text';
+ try{await submitTextChat()}finally{composerMode=previous}
+}
+function setSimpleStudio(){document.getElementById('assistantPanel')?.classList.toggle('simple-studio',simpleStudio);const b=$('showStudioTools');if(b)b.textContent=simpleStudio?'专业工具':'收起工具'}
+function renderCreativeAutoProgress(){
+ const host=$('studioAutoProgress');if(!host)return;
+ host.replaceChildren();
+ const f=currentProject?.creativeWorkflow,run=f?.autoRun;
+ if(!run){host.hidden=true;return}
+ host.hidden=false;
+ const names=['策划与原型','STYLE 风格','LAYOUT 布局','美术总监','图片生成','CHECK 质检'];
+ const stages=['prepare','style','layout','director','generation','quality'];
+ const running=run.stage==='analyze'?(f?.progress?.stage||'style'):run.stage;
+ const activeIndex=Math.max(0,stages.indexOf(running));
+ const heading=el('div','studio-auto-head');
+ heading.append(el('strong','',run.pageName||'当前页面'),el('span','',run.status==='awaiting_feedback'?'等待你的判断':run.status==='failed'?'执行已停止':run.status==='interrupted'||run.status==='uncertain'?'需检查任务': 'AI 工作流进行中'));
+ host.append(heading);
+ const progress=el('div','studio-auto-steps');
+ for(let i=0;i<names.length;i++){
+  const state=i===5&&run.review===false?'skipped':run.status==='awaiting_feedback'||(run.stage==='done')?'done':i<activeIndex?'done':i===activeIndex&&run.status==='running'?'running':'pending';
+  progress.append(el('span','studio-auto-step '+state,names[i]));
+ }
+ host.append(progress);
+ host.append(el('p','studio-auto-note',run.error||run.message||'正在准备项目资料'));
+ if(run.resultId){
+  host.append(el('p','studio-auto-note','图片已保存到当前项目画布，可以直接用中文告诉我哪里要改'));
+  const page=f?.pages?.find(x=>x.id===run.pageId),report=page?.quality?.historyId===run.resultId?page.quality.report:null;
+  if(report)host.append(el('p','studio-auto-note','CHECK 质检：'+String(report).slice(0,750)));
+ }
+}
+function renderMemoryContext(){const box=$('memoryContext');if(!box)return;const f=currentProject?.creativeWorkflow,page=f?.pages?.find(x=>x.id===f.activePageId);const count=currentProject?.assistantMemory?.rules?.length||0;const node=currentNode();const info=page?('当前页面：'+page.name+' · '+((page.layoutImageIndex??page.imageIndexes?.[0])!=null?'已关联原型':'缺少原型')+' · '+(f.styleDNA?(f.styleLocked?'风格已锁定':'风格待确认'):'风格待分析')):'自由创作 · 没有关联策划页面';box.textContent=info+(node?.kind==='generated'?' · 修改已选中作品':count?' · '+count+' 条补充规范':'')}
+async function rememberCurrentRule(){const text=$('prompt').value.trim();if(!text)return toast('先写下需要长期遵守的规范');if(!currentProject)return;try{const r=await api(projectPath('/memory/rule'),{method:'POST',body:{text}});currentProject.assistantMemory=r.memory;renderMemoryContext();$('prompt').value='';toast('已保存为项目美术规范，后续生图会自动使用')}catch(e){toast(e.message)}}
+async function feedbackCurrent(kind){const node=currentNode();if(node?.kind!=='generated')return toast('请先选中画布上的一张生成图');try{const note=kind==='rejected'?$('prompt').value.trim():'';const r=await api(projectPath('/memory/feedback'),{method:'POST',body:{nodeId:node.id,historyId:node.historyId,kind,note}});currentProject.assistantMemory=r.memory;renderMemoryContext();toast(kind==='approved'?'已确认作品':'已记录不满意反馈，不会误记成项目规则')}catch(e){toast(e.message)}}
 function setComposerMode(mode){
  composerMode=mode==='text'?'text':'image';
  $('imageModeToggle').classList.toggle('active',composerMode==='image');

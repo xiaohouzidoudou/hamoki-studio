@@ -17,6 +17,8 @@ const {parseDocx,MAX_DOCX}=require('./lib/creative-docx');
 const creative=require('./lib/creative-workflow');
 const creativeUpstream=require('./lib/creative-upstream');
 const creativePages=require('./lib/creative-pages');
+const assistantMemory=require('./lib/assistant-memory');
+const assistantReview=require('./lib/assistant-review');
 const {nextGeneratedPosition}=require('./lib/canvas-placement');
 const generate=(...args)=>options.limiter.run(()=>upstreamGenerate(...args));
 const reverse=(...args)=>options.limiter.run(()=>upstreamReverse(...args));
@@ -104,7 +106,7 @@ let projectDB=readData(projectsFile,{projects:[]});
 let projects=Array.isArray(projectDB.projects)?projectDB.projects:[];
 const num=(value,fallback=0,min=-200000,max=200000)=>Number.isFinite(Number(value))?Math.min(max,Math.max(min,Number(value))):fallback;
 const clampText=(value,max=10000)=>typeof value==='string'?value.slice(0,max):'';
-function makeProject(title){return {id:crypto.randomUUID(),title:clampText(title||'未命名项目',70),createdAt:time(),updatedAt:time(),revision:0,archived:false,viewport:{x:220,y:130,scale:1},nodes:[],messages:[]}}
+function makeProject(title){return {id:crypto.randomUUID(),title:clampText(title||'未命名项目',70),createdAt:time(),updatedAt:time(),revision:0,archived:false,viewport:{x:220,y:130,scale:1},nodes:[],messages:[],assistantMemory:assistantMemory.normalize(null)}}
 function saveProjects(){atomic(projectsFile,JSON.stringify({version:1,projects:projects.slice(0,100)}))}
 if(!projects.length){
  const first=makeProject('我的第一块画布');
@@ -117,11 +119,14 @@ if(!projects.length){
 function project(id){return projects.find(p=>p.id===id&&!p.archived)}
 function defaultProject(){return projects.find(p=>!p.archived)}
 function nodeView(n){return {...n,url:n.kind==='reference'?BASE+'/api/media/'+n.assetFile:null,previewUrl:n.kind==='reference'?BASE+'/api/previews/'+n.assetFile:null}}
-function projectView(p){const {removedBatches,...visible}=p;return {...visible,nodes:p.nodes.map(nodeView)}}
+function projectView(p){const {removedBatches,...visible}=p;return {...visible,assistantMemory:assistantMemory.normalize(p.assistantMemory),nodes:p.nodes.map(nodeView)}}
 function touchProject(p){p.revision=(p.revision||0)+1;p.updatedAt=time();saveProjects()}
 let interruptedCreative=false;
 for(const p of projects){
  const f=p.creativeWorkflow;
+ if(f?.autoRun?.status==='running'){
+  f.autoRun.status='interrupted';f.autoRun.stage='interrupted';f.autoRun.message='服务重启打断了自动流程，原来的付费任务可能继续运行；请检查队列，不会自动重复扣费';f.autoRun.updatedAt=time();interruptedCreative=true;
+ }
  if(f?.status==='running'||f?.stages&&Object.values(f.stages).includes('running')){
   f.status='failed';f.error='服务重启中断了上次分析，请检查上游账单后决定是否重新运行';
   for(const key of Object.keys(f.stages||{}))if(f.stages[key]==='running')f.stages[key]='failed';
@@ -139,7 +144,111 @@ for(const p of projects){
 }
 for(const p of projects){const plan=p.aiComponentPlan;if(plan?.status==="analyzing"){plan.status="failed";plan.error="识别任务因服务重启中断，请核对上游费用后决定是否重试";interruptedCreative=true}if(plan?.auto?.enabled){plan.auto.enabled=false;plan.auto.error="服务重启已暂停自动生图；继续之前请重新确认费用";interruptedCreative=true}}
 if(interruptedCreative)saveProjects();
+// Automatic orchestration is only a coordinator for the existing, pinned
+// creativeAnalyze -> submit -> creativeQuality engine, not a parallel art engine.
+const creativeAutoBusy=new Set();
 const creativeBusy=new Set();
+function autoRunView(f){return f.autoRun||null}
+function autoProgress(p,id,patch){
+ const f=creativeState(p);
+ if(f.autoRun?.id!==id)return false;
+ Object.assign(f.autoRun,patch,{updatedAt:time()});touchProject(p);return true;
+}
+async function creativeAutoExecute(p,id){
+ const f=creativeState(p),run=f.autoRun;
+ if(!run||run.id!==id)return;
+ const page=f.pages.find(x=>x.id===run.pageId);
+ try{
+  f.activePageId=page.id;
+  if(!page.analysis?.prompt){
+   autoProgress(p,id,{stage:'analyze',status:'running',message:'正在调用原有 ai_asset 风格分析、原型分析和美术总监技能'});
+   await creativeAnalyze(p,{pageId:page.id});
+  }
+  if(!page.analysis?.prompt)throw Error('专业美术总监没有返回可用的生成方案');
+  autoProgress(p,id,{stage:'generation',status:'running',message:'原型与风格方案已保存，正在提交一张真实生图'});
+  const settings=f.routing?.image||{};
+  const refs=f.styleNodeIds.map(nodeId=>({nodeId,role:'style'}));
+  const prototype=creativePagePicture(f,page);
+  if(!prototype?.nodeId)throw Error('页面没有可用的原型图片');
+  refs.push({nodeId:prototype.nodeId,role:'shape'});
+  const created=submit({
+   projectId:p.id,providerId:settings.providerId,model:settings.model,
+   prompt:page.analysis.prompt+'\n\n【本轮用户原始要求】\n'+run.instruction,
+   referenceNodes:refs,useProjectStyle:false,count:1,
+   ratio:run.ratio,resolution:run.resolution,quality:run.quality
+  });
+  const jobId=created.jobs[0]?.id;
+  if(!jobId)throw Error('图片任务提交失败');
+  autoProgress(p,id,{jobId,stage:'generation',message:'已提交生图任务，等待模型返回图片'});
+  const deadline=Date.now()+12*60*1000;
+  let job;
+  while(Date.now()<deadline){
+   job=jobs.find(x=>x.id===jobId&&x.projectId===p.id);
+   if(job?.status==='done'||job?.status==='failed'||job?.status==='cancelled')break;
+   await new Promise(resolve=>setTimeout(resolve,1500));
+  }
+  if(!job||!['done','failed','cancelled'].includes(job.status)){
+   autoProgress(p,id,{status:'uncertain',stage:'generation',message:'生图仍未结束，任务可能继续计费。请先查看队列，不会自动重新提交'});
+   return;
+  }
+  if(job.status!=='done')throw Error('生图任务'+job.status+'：'+String(job.error||'请查看任务记录').slice(0,200));
+  autoProgress(p,id,{resultId:job.resultId,stage:run.review?'quality':'done',message:run.review?'图片已生成，正在执行原有 CHECK 质检技能':'图片已生成，等待你的判断'});
+  if(run.review)await creativeQuality(p,job.resultId);
+  autoProgress(p,id,{status:'awaiting_feedback',stage:'done',message:'作品与分析结果已保存。请判断哪里对、哪里需要改，不会自动重复生图'});
+ }catch(e){
+  autoProgress(p,id,{status:'failed',stage:'failed',error:String(e.message||e).slice(0,380),message:'任务已停止，不会自动重试产生额外费用'});
+ }finally{creativeAutoBusy.delete(p.id)}
+}
+function creativeAutoStart(p,b){
+ const f=creativeState(p);
+ if(DEMO_MODE)throw Error('演示模式不可执行真实付费流程');
+ if(b?.confirmed!==true)throw Error('请先确认这次专业分析、生图与质检的费用');
+ if(creativeAutoBusy.has(p.id)||creativeBusy.has(p.id)||f.autoRun?.status==='running')throw Error('当前项目已有执行中的美术任务');
+ const instruction=clampText(b.instruction,2400).trim();
+ if(!instruction)throw Error('请先描述想制作的页面');
+ if(!f.documents.length||!f.pages.length)throw Error('当前项目没有 Word 策划页面，请先上传文档');
+ const page=f.pages.find(x=>x.id===(b.pageId||f.activePageId));
+ if(!page)throw Error('没有找到对应页面，请先确认一次页面');
+ const proto=creativePagePicture(f,page);
+ if(!proto?.nodeId)throw Error('「'+page.name+'」缺少真实原型图；请先上传并关联，不能凭空推断');
+ if(!f.styleNodeIds?.length){
+  // Uploaded style references are separate from Word-embedded TARGET prototypes.
+  const prototypes=new Set(f.documents.flatMap(d=>(d.images||[]).map(x=>x.nodeId)));
+  const uploaded=p.nodes.filter(n=>n.kind==='reference'&&!prototypes.has(n.id));
+  if(uploaded.length>=1&&uploaded.length<=5)f.styleNodeIds=uploaded.map(n=>n.id);
+  else throw Error(uploaded.length>5?'发现多于5张普通参考图，无法确定哪张是风格图，请选择一次':'没有找到独立于原型的风格参考图，请先上传真实美术参考图');
+ }
+ const inputs=b.routing||{};
+ f.routing=f.routing||{};
+ for(const cap of ['text','vision','image']){
+  const prior=f.routing[cap]||{},given=inputs[cap]||{};
+  if(!prior.providerId||!prior.model){
+   const id=String(given.providerId||prior.providerId||'').slice(0,70);
+   const model=String(given.model||prior.model||'').slice(0,150);
+   if(id&&!state.providers.some(x=>x.id===id))throw Error('所选'+cap+'服务商不存在');
+   if(model)assertModel(model);
+   f.routing[cap]={providerId:id,model};
+  }
+ }
+ if(f.styleNodeIds.length>5)throw Error('最多使用五张风格参考图');
+ for(const id of f.styleNodeIds)creativePictureFromNode(p,id); // Fail before billing when source missing.
+ const img=f.routing?.image||{};
+ const image=effectiveProvider(provider(img.providerId||state.activeId),'image');
+ emptyProvider(image);creativeModel(image,'image',img.model);
+ if(!page.analysis?.prompt)creativeCheckModels(f,'analyze',{pageId:page.id});
+ if(b.review!==false)creativeCheckModels(f,'quality');
+ const ratio=trim(b.ratio||'9:16',10),resolution=trim(b.resolution||'1K',5),quality=trim(b.quality||'auto',8);
+ if(!['1:1','3:2','2:3','16:9','9:16','4:3','3:4'].includes(ratio)||!['1K','2K','4K'].includes(resolution)||!['auto','low','medium','high'].includes(quality))throw Error('图片比例或分辨率无效');
+ const id=crypto.randomUUID();
+ f.activePageId=page.id;
+ f.autoRun={id,pageId:page.id,pageName:page.name,instruction,status:'running',stage:'prepare',
+  message:'已关联策划文档、原型和风格参考，准备调用专业技能',review:b.review!==false,
+  ratio,resolution,quality,startedAt:time(),updatedAt:time(),error:'',jobId:null,resultId:null};
+ creativeAutoBusy.add(p.id);touchProject(p);
+ setImmediate(()=>{void creativeAutoExecute(p,id)});
+ return {started:true,runId:id,status:'running',pageName:page.name};
+}
+
 function creativeState(p){
  const f=p.creativeWorkflow||(p.creativeWorkflow=creative.make());
  if(!Array.isArray(f.documents)){
@@ -397,7 +506,7 @@ function projectBackup(p){
  const fileIds=new Set(selectedHistory.map(h=>h.file).concat(p.nodes.filter(n=>n.kind==='reference').map(n=>n.assetFile)));
  let total=0;const media=[];
  for(const id of fileIds){const img=fetchMedia(id);total+=img.bytes.length;if(total>BUNDLE_MAX)throw Object.assign(Error('此项目媒体超过32MB，请分批备份后再导入'),{status:413});media.push({file:id,mime:img.mime,data:img.bytes.toString('base64')});}
- const safeProject={title:p.title,viewport:p.viewport,nodes:p.nodes,messages:p.messages,creativeWorkflow:p.creativeWorkflow||null,generationLayout:p.generationLayout||null,aiComponentPlan:componentView(p).plan};
+ const safeProject={title:p.title,viewport:p.viewport,nodes:p.nodes,messages:p.messages,creativeWorkflow:p.creativeWorkflow||null,generationLayout:p.generationLayout||null,assistantMemory:assistantMemory.normalize(p.assistantMemory),aiComponentPlan:componentView(p).plan};
  return zlib.gzipSync(Buffer.from(JSON.stringify({kind:'hamoki-project',schema:1,exportedAt:time(),project:safeProject,history:selectedHistory,media})),{level:6});
 }
 function importProject(b){
@@ -415,6 +524,7 @@ function importProject(b){
  for(const h of data.history){if(!h||!uuidLike.test(h.id)||typeof h.file!=='string'||!buffers.has(h.file)||oldHistId.has(h.id))throw Error('历史图片关联不完整');oldHistId.set(h.id,crypto.randomUUID());}
  for(const n of data.project.nodes){if(!n||!uuidLike.test(n.id)||!['generated','reference','note'].includes(n.kind)||oldNodeId.has(n.id))throw Error('画布元素格式不正确');if(n.kind==='generated'&&!oldHistId.has(n.historyId))throw Error('缺少生成图片历史');if(n.kind==='reference'&&!buffers.has(n.assetFile))throw Error('缺少画布参考图片');oldNodeId.set(n.id,crypto.randomUUID());}
  const proj=makeProject(trim(data.project.title,70)||'导入的创作项目');
+ proj.assistantMemory=assistantMemory.normalize(data.project.assistantMemory);
  if(data.project.generationLayout&&Number.isSafeInteger(data.project.generationLayout.x)&&Number.isSafeInteger(data.project.generationLayout.y)&&Number.isSafeInteger(data.project.generationLayout.nextSlot)&&data.project.generationLayout.nextSlot>=0)proj.generationLayout=data.project.generationLayout;
  if(data.project.viewport){const v=data.project.viewport;proj.viewport={x:num(v.x,220,-500000,500000),y:num(v.y,130,-500000,500000),scale:num(v.scale,1,.18,2.8)}}
  // After all structure checks pass, persist media and remap every entity identifier.
@@ -579,7 +689,7 @@ function storePreview(name,pic){mediaPath(name);if(!fs.existsSync(mediaPath(name
 function fetchMedia(name){const bytes=fs.readFileSync(mediaPath(name));return {mime:guessMime(bytes),bytes}}
 function sendMedia(req,res,filename,mime,cache='private, max-age=604800'){const stat=fs.statSync(filename);const tag='"'+stat.size.toString(16)+'-'+Math.round(stat.mtimeMs).toString(16)+'"';if(req.headers['if-none-match']===tag){res.writeHead(304,{'ETag':tag,'Cache-Control':cache});return res.end()}res.writeHead(200,{'Content-Type':mime,'Content-Length':stat.size,'Cache-Control':cache,'ETag':tag,'X-Content-Type-Options':'nosniff'});const stream=fs.createReadStream(filename);stream.on('error',e=>{console.error('[Hamoki media stream]',e.code||'stream');res.destroy(e)});return stream.pipe(res)}
 function publicHistory(h){return {...h,url:BASE+'/api/media/'+h.file,previewUrl:BASE+'/api/previews/'+h.file};}
-function publicJob(j){const {referenceMedia,maskMedia,maskSourceMedia,roleHints,...exposed}=j;return {...exposed,referenceRoles:roleHints||[]};}
+function publicJob(j){const {referenceMedia,maskMedia,maskSourceMedia,roleHints,review,...exposed}=j;return {...exposed,referenceRoles:roleHints||[]};}
 function pngDimensions(bytes){if(!bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))||bytes.length<24)throw Error('蒙版及蒙版原图必须为 PNG');return [bytes.readUInt32BE(16),bytes.readUInt32BE(20)]}
 function saveSourceFiles(refs,mask,maskSource){
  let size=0;const input=[];
@@ -593,6 +703,16 @@ function saveSourceFiles(refs,mask,maskSource){
 }
 function emptyProvider(p){if(DEMO_MODE&&p)return; if(!p||!p.url||!p.apiKey)throw Error('请先配置中转站地址和 API Key')}
 function jobStatusOk(j,status){
+ if(j.autoFixParentJobId&&['done','failed'].includes(status)){
+  const parent=jobs.find(x=>x.id===j.autoFixParentJobId);
+  const prev=parent&&history.find(x=>x.id===parent.resultId&&x.projectId===j.projectId);
+  if(prev?.review?.autoFix?.jobId===j.id){
+   prev.review.autoFix.status=status;
+   if(status==='failed')prev.review.autoFix.reason=String(j.error||'纠偏生成失败').slice(0,180);
+   saveHistory();
+  }
+ }
+
  if(status==="done"||status==="failed"){const p=project(j.projectId);if(p?.aiComponentPlan?.id===j.groupId&&p.aiComponentPlan.auto?.enabled)setImmediate(()=>componentAutoContinue(p))}if(j.status==='cancelled')return false;j.status=status;j.updatedAt=time();saveJobs();if(status==='failed'){const p=project(j.projectId||defaultProject()?.id);if(p){p.messages.push({id:crypto.randomUUID(),role:'error',content:'生成失败（'+j.model+'）：'+(j.error||'未知错误'),createdAt:time(),groupId:j.groupId});p.messages=p.messages.slice(-400);touchProject(p)}}return true}
 function schedule(){setImmediate(pump)}
 function pump(){
@@ -606,6 +726,76 @@ function pump(){
  }
  const future=jobs.filter(j=>j.status==='queued'&&j.nextRunAt>Date.now());
  if(future.length&&!retryTimer){const delay=Math.min(60000,Math.max(100,Math.min(...future.map(j=>j.nextRunAt))-Date.now()));retryTimer=setTimeout(schedule,delay);retryTimer.unref?.()}
+}
+function scheduleReviewedCorrection(job,entry,projectState){
+ const report=entry.review,config=job.review||{};
+ if(config.autoFixMax!==1||report?.status!=='needs_work'||!report.correction||job.autoFixDepth)return;
+ // Never spend an additional image call unless a strict upper bound was approved.
+ const active=jobs.filter(j=>['queued','running'].includes(j.status)).length;
+ const p=effectiveProvider(provider(job.providerId),'edit');
+ if(p.mode!=='openai'||p.imageMode!=='images'){
+  report.autoFix={status:'unsupported',reason:'当前图片服务商不支持经过验证的 Images Edits 自动纠偏'};
+  return;
+ }
+ if(active>=MAX_QUEUED){
+  report.autoFix={status:'skipped',reason:'队列已满，请稍后按审图意见手动修正'};
+  return;
+ }
+ const f=projectState.creativeWorkflow||{},page=(f.pages||[]).find(x=>x.id===config.pageId);
+ const instruction=[
+  '在上一张图片基础上精准修正审图发现的错误。严禁重新设计整个界面，必须保留所有已经正确的部分。',
+  '最初需求：'+String(job.editInstruction||'').slice(0,2200),
+  '必须修复：'+String(report.correction||'').slice(0,1300),
+  '请先对照原型及布局数量检查行列关系，特别注意5列6行不同于6列5行。'
+ ].join('\n');
+ const prompt=assistantMemory.generationPrompt(instruction,projectState.assistantMemory,f.styleDNA||'',page?.requirements||'');
+ const origin=projectState.nodes.find(x=>x.kind==='generated'&&x.historyId===entry.id);
+ const fix=makeJob({
+  capability:'edit',projectId:projectState.id,sourceId:entry.id,sourceNodeId:origin?.id||null,
+  editInstruction:instruction,prompt,transparentBg:job.transparentBg,ratio:job.ratio,resolution:job.resolution,
+  quality:job.quality,canvasX:job.canvasX,canvasY:job.canvasY,
+  review:{...config,autoFixMax:0}
+ },{input:(job.referenceMedia||[]).slice(),roleHints:(job.roleHints||[]).slice(),mask:null,maskSource:null},
+ job.providerId,job.model,job.groupId);
+ fix.autoFixDepth=1;fix.autoFixParentJobId=job.id;
+ jobs.unshift(fix);
+ report.autoFix={status:'queued',jobId:fix.id,limit:1};
+ job.reviewStatus='correcting';
+ saveJobs();schedule();
+}
+async function reviewGenerated(job,entry){
+ const config=job.review,projectState=project(job.projectId);
+ if(!config||!projectState||entry.projectId!==projectState.id||entry.review?.status)return;
+ entry.review={status:'checking',summary:'正在核对生成图片与已确认规范',issues:[],correction:''};
+ job.reviewStatus='checking';saveHistory();saveJobs();
+ try{
+  const pictures=[],roles=job.roleHints||[];
+  const styleFile=(job.referenceMedia||[]).find((f,i)=>roles[i]==='style');
+  if(styleFile){pictures.push(fetchMedia(styleFile))}
+  const f=projectState.creativeWorkflow||{},page=(f.pages||[]).find(x=>x.id===config.pageId);
+  const prototype=page&&creativePagePicture(f,page);
+  if(prototype?.file&&prototype.file!==styleFile)pictures.push(fetchMedia(prototype.file));
+  const source=job.sourceId&&history.find(x=>x.id===job.sourceId&&x.projectId===projectState.id);
+  if(source&&source.file!==styleFile)pictures.push(fetchMedia(source.file));
+  pictures.push(fetchMedia(entry.file));
+  const vision=effectiveProvider(provider(config.providerId),'vision');emptyProvider(vision);
+  const instructions=assistantReview.prompt({
+   rules:config.rules,requirements:config.requirements,instruction:job.editInstruction||'',
+   hasStyle:!!styleFile,hasPrototype:!!prototype?.file,hasSource:!!source&&source.file!==styleFile
+  });
+  const raw=await options.limiter.run(()=>analyzeCreativeImages(vision,pictures,config.model,instructions,{timeoutMs:165000}));
+  entry.review={...assistantReview.parse(raw),checkedAt:time()};
+  job.reviewStatus=entry.review.status;
+  try{scheduleReviewedCorrection(job,entry,projectState)}catch(e){
+   entry.review.autoFix={status:'skipped',reason:String(e.message||e).slice(0,180)};
+  }
+ }catch(e){
+  entry.review={status:'uncertain',summary:'自动审图未完成：'+String(e.message||e).slice(0,160),issues:[],correction:'',checkedAt:time()};
+  job.reviewStatus='uncertain';
+  diag({source:'review',level:'warning',action:'quality_check',message:entry.review.summary});
+ }finally{
+  saveHistory();saveJobs();touchProject(projectState);
+ }
 }
 async function execute(job){const abort=new AbortController();controllers.set(job.id,abort);const t0=Date.now();try{
   const p=effectiveProvider(provider(job.providerId),job.capability||'image');emptyProvider(p);
@@ -624,6 +814,7 @@ async function execute(job){const abort=new AbortController();controllers.set(jo
   if(job.status==='cancelled')return;
   const file=storeMedia(output),id=crypto.randomUUID();const entry={id,file,createdAt:time(),projectId:job.projectId||defaultProject()?.id,providerId:job.providerId,providerName:job.providerName,model:job.model,prompt:job.prompt,ratio:job.ratio,resolution:job.resolution,parentId:job.sourceId||null,groupId:job.groupId||null,referenceMedia:job.referenceMedia||[],masked:!!mask,transparentBg:!!job.transparentBg,editInstruction:job.editInstruction||'',roleHints:job.roleHints||[],jobId:job.id,componentTransparent:job.componentItemId?!!job.componentTransparent:null,componentItemId:job.componentItemId||null,favorite:false,durationMs:Date.now()-t0};
   history.unshift(entry);saveHistory();appendGeneratedNode(entry,job);job.resultId=id;jobStatusOk(job,'done');
+  if(job.review&&!DEMO_MODE)setImmediate(()=>{void reviewGenerated(job,entry)});
 }catch(e){if(job.status==='cancelled')return;job.error=String(e?.message||'请求失败').slice(0,380);job.durationMs=Date.now()-t0;
   diag({source:'queue',level:e.upstreamStatus===429?'warning':'error',action:'image_generation',path:'/api/jobs',method:'POST',model:job.model,status:e.upstreamStatus||undefined,message:job.error});
   if(e.upstreamStatus===429&&job.attempts<3){
@@ -631,7 +822,7 @@ async function execute(job){const abort=new AbortController();controllers.set(jo
     job.status='queued';job.nextRunAt=Date.now()+delay;job.error+='（上游429限流，'+Math.ceil(delay/1000)+' 秒后重试，最多3次）';job.updatedAt=time();saveJobs();schedule();
   }else jobStatusOk(job,'failed');
 }finally{controllers.delete(job.id)}}
-function makeJob(b,store,providerId,model,groupId){const p=effectiveProvider(provider(providerId),b.capability||'image');emptyProvider(p);return {id:crypto.randomUUID(),groupId,providerId,capability:b.capability||'image',providerName:p.name,model:assertModel(model||p.imageModel),prompt:b.prompt,editInstruction:b.editInstruction||'',roleHints:store.roleHints||[],transparentBg:!!b.transparentBg,ratio:b.ratio,resolution:b.resolution,quality:b.quality,sourceId:b.sourceId||null,referenceMedia:store.input,maskMedia:store.mask,maskSourceMedia:store.maskSource,projectId:b.projectId,sourceNodeId:b.sourceNodeId||null,canvasX:b.canvasX,canvasY:b.canvasY,batchIndex:b.batchIndex||0,createdAt:time(),updatedAt:time(),status:'queued',attempts:0,resultId:null,error:'',retryOf:b.retryOf||null}}
+function makeJob(b,store,providerId,model,groupId){const p=effectiveProvider(provider(providerId),b.capability||'image');emptyProvider(p);return {id:crypto.randomUUID(),groupId,providerId,capability:b.capability||'image',providerName:p.name,model:assertModel(model||p.imageModel),prompt:b.prompt,editInstruction:b.editInstruction||'',roleHints:store.roleHints||[],transparentBg:!!b.transparentBg,ratio:b.ratio,resolution:b.resolution,quality:b.quality,sourceId:b.sourceId||null,referenceMedia:store.input,maskMedia:store.mask,maskSourceMedia:store.maskSource,projectId:b.projectId,sourceNodeId:b.sourceNodeId||null,canvasX:b.canvasX,canvasY:b.canvasY,batchIndex:b.batchIndex||0,review:b.review||null,reviewStatus:b.review?'pending':null,createdAt:time(),updatedAt:time(),status:'queued',attempts:0,resultId:null,error:'',retryOf:b.retryOf||null}}
 const REFERENCE_ROLES={shape:'角色造型、身份及结构',color:'颜色与配色，不复制其主体',style:'绘画风格、线条和上色技巧，不复制内容',pose:'动作与构图',background:'背景与场景',general:'综合参考'};
 function validateCreation(b){
  const instruction=trim(b.prompt,16000),refs=Array.isArray(b.references)?b.references:[];
@@ -648,6 +839,34 @@ function validateCreation(b){
    else {const h=history.find(h=>h.id===node.historyId&&h.projectId===targetProject.id);if(!h)throw Error('画布图片没有对应的历史记录');file=h.file;historyId=h.id}
    return {file,role,nodeId:node.id,historyId};
  });
+ // Reuse the STYLE references analyzed for this project when editing, even before
+ // an explicit style lock. The lock remains an independent user approval flag.
+ // This is the original creativeWorkflow source of truth, NOT a second style collection.
+ const flow=targetProject.creativeWorkflow;
+ if((b.sourceId||b.mask)&&b.useProjectStyle!==false&&flow?.styleDNA&&Array.isArray(flow.styleNodeIds)){
+  for(const id of flow.styleNodeIds.slice(0,2)){
+   if(refs.length+images.length>=8)break;
+   if(images.some(x=>x.nodeId===id))continue;
+   const node=targetProject.nodes.find(x=>x.id===id&&x.kind!=='note');
+   if(node?.kind==='generated'&&node.historyId===b.sourceId)continue;
+   if(!node)continue;
+   const h=node.kind==='generated'?history.find(x=>x.id===node.historyId&&x.projectId===targetProject.id):null;
+   const file=node.kind==='reference'?node.assetFile:h?.file;
+   if(file)images.push({file,role:'style',nodeId:id,historyId:h?.id||null});
+  }
+ }
+ // Approved images are real style anchors, not only text preferences.
+ if(b.useProjectStyle!==false&&!images.some(x=>x.role==='style')&&refs.length+images.length<8){
+  const approved=assistantMemory.normalize(targetProject.assistantMemory).approved.slice().reverse();
+  for(const a of approved){
+   const node=targetProject.nodes.find(n=>n.id===a.nodeId&&n.kind==='generated'&&n.historyId===a.historyId);
+   const h=node&&history.find(x=>x.id===a.historyId&&x.projectId===targetProject.id);
+   if(h&&a.historyId!==b.sourceId&&!images.some(x=>x.nodeId===node.id)){
+    images.push({file:h.file,role:'style',nodeId:node.id,historyId:h.id});
+    break;
+   }
+  }
+ }
  const count=Number(b.count||1);
  if(!Number.isInteger(count)||count<1||count>8)throw Error('单次最多 8 张，建议先试 1 张');
  const capability=b.sourceId||b.mask?'edit':'image';
@@ -658,16 +877,30 @@ function validateCreation(b){
  if(!['1:1','3:2','2:3','16:9','9:16','4:3','3:4'].includes(ratio))throw Error('比例不支持');
  if(!['1K','2K','4K'].includes(resolution))throw Error('分辨率不支持');
  if(!['auto','low','medium','high'].includes(quality))throw Error('画质参数不支持');
- const candidate=b.sourceId||images.find(n=>n.historyId)?.historyId;
+ const candidate=b.sourceId||images.find(n=>n.historyId&&n.role!=='style')?.historyId;
  const source=candidate?history.find(h=>h.id===candidate&&h.projectId===targetProject.id):null;
  if(candidate&&!source)throw Error('找不到当前项目中的源图片');
  if(b.mask&&!source)throw Error('局部蒙版必须先选择一张已生成图片');
  if(b.mask&&targets.some(t=>{const p=effectiveProvider(provider(t.providerId),capability);return !p||p.mode!=='openai'||(p.imageMode||'images')!=='images'}))throw Error('局部蒙版需要支持 OpenAI Images Edits 的接口');
  const transparentBg=!!b.transparentBg;
  if(transparentBg&&targets.some(t=>{const p=effectiveProvider(provider(t.providerId),capability);return !p||p.mode!=='openai'||(p.imageMode||'images')!=='images'}))throw Error('透明背景当前仅允许 OpenAI Images 模式（模型仍需支持透明输出）');
+ const review=b.review?.enabled===true?(()=>{
+   if(b.review.confirmed!==true)throw Error('必须确认额外的一次视觉审图费用');
+   const rp=effectiveProvider(provider(b.review.providerId||state.activeId),'vision');emptyProvider(rp);
+   const model=creativeModel(rp,'vision',b.review.model);
+   const f=targetProject.creativeWorkflow||{},page=(f.pages||[]).find(x=>x.id===f.activePageId);
+   const autoFixMax=Number(b.review.autoFixMax||0);
+   if(!Number.isInteger(autoFixMax)||autoFixMax<0||autoFixMax>1)throw Error('自动纠偏最多允许一次');
+   if(autoFixMax&&(count!==1||targets.length!==1))throw Error('自动纠偏仅支持每次单张、单模型');
+   return {providerId:rp.id,model,pageId:page?.id||null,autoFixMax,
+     rules:assistantMemory.guide(targetProject.assistantMemory,f.styleDNA||'',page?.requirements||'').slice(0,6500),
+     requirements:String(page?.requirements||'').slice(0,2500)};
+  })():null;
  const editMode=!!source&&b.editMode!=='new';
- const prompt=editMode?('根据第一张参考原图精确编辑。除本轮明确要求改变的内容外，保持主体身份、脸部、服装结构、姿势、画面构图和风格一致。\n历史创作描述：'+source.prompt.slice(0,6500)+'\n本轮修改要求：'+instruction):instruction;
- return {capability,prompt,editInstruction:instruction,refs,referenceNodes:images,count,targets,ratio,resolution,quality,transparentBg,sourceId:source?.id||null,sourceNodeId,projectId:targetProject.id,canvasX:num(b.canvasX,180),canvasY:num(b.canvasY,170),mask:b.mask||null,maskSourceImage:b.maskSourceImage||null};
+ const styleGuide=editMode?creativeUpstream.styleFeedbackGuide(targetProject.creativeWorkflow?.styleDNA||'',b.editSpec):'';
+ const draftPrompt=editMode?('根据第一张参考原图精确编辑。除本轮明确要求改变的内容外，保持原画构图、人物身份、页面文字、按钮位置与项目风格一致。\n历史创作描述：'+(source.editInstruction||source.prompt).slice(0,1450)+'\n本轮用户中文修改要求（原文，不得擅自翻译或反转）：'+instruction+'\n'+styleGuide):instruction;
+ const prompt=assistantMemory.generationPrompt(draftPrompt,targetProject.assistantMemory,targetProject.creativeWorkflow?.styleDNA||'',(targetProject.creativeWorkflow?.pages||[]).find(x=>x.id===targetProject.creativeWorkflow?.activePageId)?.requirements||'');
+ return {capability,prompt,editInstruction:instruction,refs,referenceNodes:images,count,targets,ratio,resolution,quality,review,transparentBg,sourceId:source?.id||null,sourceNodeId,projectId:targetProject.id,canvasX:num(b.canvasX,180),canvasY:num(b.canvasY,170),mask:b.mask||null,maskSourceImage:b.maskSourceImage||null};
 }
 function submit(b){
  const valid=validateCreation(b);
@@ -1013,11 +1246,12 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
     if(route==='/api/logout'&&req.method==='POST'&&process.env.ANON_WORKSPACE==='1')return fail(res,405,'免登录工作区无需退出');
     if(route==='/api/logout'&&req.method==='POST'){sessions.delete(cookie(req));res.setHeader('Set-Cookie',`hs_session=; HttpOnly; SameSite=Strict; Path=${BASE||''}/; Max-Age=0`);return respond(res,200,{ok:true})}
     if(req.method==='GET'&&route==='/api/storage')return respond(res,200,{...storageUsage(),mode:'local',concurrency:CONCURRENCY,notice:'每个账号默认 1GB 空间，空间不足时会自动清理最旧的历史图片和浏览器预览；请定期导出重要作品。'});
-    const creativeMatch=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/creative(?:\/(document|document-remove|settings|analyze|director-retry|quality|split|page))?$/);
+    const creativeMatch=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/creative(?:\/(document|document-remove|settings|analyze|director-retry|quality|split|page|auto))?$/);
     if(creativeMatch){
       const p=assertProject(creativeMatch[1]),action=creativeMatch[2],f=creativeState(p);
       if(!action&&req.method==='GET')return respond(res,200,creativeView(p));
-      if(creativeBusy.has(p.id))return fail(res,409,'此项目的 AI 任务正在运行，请待完成后再修改');
+      if(creativeAutoBusy.has(p.id)||creativeBusy.has(p.id))return fail(res,409,'此项目的 AI 任务正在运行，请待完成后再修改');
+      if(action==='auto'&&req.method==='POST')return respond(res,202,creativeAutoStart(p,await readJSON(req)));
       if(action==='document'&&req.method==='POST'){
         const b=await readJSON(req);
         if(typeof b.name!=='string'||!b.name.toLowerCase().endsWith('.docx'))throw Error('只支持 Word .docx 文件');
@@ -1211,6 +1445,27 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
       return fail(res,405,'衍生素材接口操作不支持');
     }
     // Project, board, and conversation state are stored on the server, not localStorage.
+    if(route==='/api/assistant/plan'&&req.method==='POST'){
+      if(DEMO_MODE)return fail(res,403,'演示模式不支持 AI 意图分析');
+      const b=await readJSON(req),target=assertProject(b.projectId);
+      const prompt=clampText(b.prompt,3000).trim();
+      if(!prompt)throw Error('请先输入你的要求');
+      const pp=effectiveProvider(provider(b.providerId||state.activeId),'text');
+      emptyProvider(pp);
+      const model=assertModel(b.model||normalizedCapability(pp,'text').defaultModel);
+      const n=target.nodes.find(x=>x.id===b.selectedNodeId);
+      const hasImage=!!(n?.kind==='generated'||target.nodes.some(x=>x.kind==='generated'));
+      const workflow=creativeState(target),currentPage=creativeCurrent(workflow);
+      const context=assistantMemory.guide(target.assistantMemory,workflow.styleDNA||'',currentPage?.requirements||'')
+        +'\n现有项目资料：'+workflow.documents.length+'份策划文档；页面任务：'+workflow.pages.map(x=>x.name).slice(0,25).join('、')
+        +'\n当前页面：'+(currentPage?.name||'未关联')+'；原型：'+(creativePagePicture(workflow,currentPage)?'真实图片已关联':'缺少真实原型图')
+        +'；风格：'+(workflow.styleDNA?(workflow.styleLocked?'已锁定':'待确认'):'尚未分析')+'；美术总监方案：'+(currentPage?.analysis?.prompt?'已保存':'尚未完成')
+        +'\n当前选中已生成图片：'+(hasImage?'是':'否')+'\n最近聊天：'+target.messages.slice(-8).map(x=>x.role+': '+clampText(x.content,280)).join('\n');
+      const raw=await options.limiter.run(()=>generateText(pp,{model,prompt:assistantMemory.planningPrompt(prompt,context),maxOutputTokens:700,timeoutMs:90000}));
+      const plan=assistantMemory.parsePlan(raw);
+      if(plan.mode==='edit'&&!hasImage)return respond(res,200,{plan:{action:'chat',reply:'请先选中你要修改的图片，我会只针对它继续创作。'}});
+      return respond(res,200,{plan});
+    }
     if(route==='/api/projects'&&req.method==='GET')return respond(res,200,{projects:projects.filter(p=>!p.archived).map(p=>({id:p.id,title:p.title,createdAt:p.createdAt,updatedAt:p.updatedAt,imageCount:p.nodes.filter(n=>n.kind!=='note').length})),defaultId:defaultProject()?.id||null});
     if(route==='/api/projects'&&req.method==='POST'){
       if(projects.filter(p=>!p.archived).length>=80)throw Error('项目数量已达到上限');
@@ -1222,6 +1477,27 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
       const p=assertProject(backupMatch[1]),archive=projectBackup(p);
       res.writeHead(200,{'Content-Type':'application/octet-stream','Content-Length':archive.length,'Content-Disposition':'attachment; filename="hamoki-project-'+p.id.slice(0,8)+'.hamoki"','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});
       return res.end(archive);
+    }
+    const memoryMatch=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/memory(?:\/(rule|feedback))?$/);
+    if(memoryMatch){
+      const p=assertProject(memoryMatch[1]),kind=memoryMatch[2];
+      if(req.method==='GET'&&!kind)return respond(res,200,{memory:assistantMemory.normalize(p.assistantMemory)});
+      if(req.method==='POST'&&kind==='rule'){
+        const b=await readJSON(req);
+        p.assistantMemory=assistantMemory.learnRule(p.assistantMemory,b.text,crypto.randomUUID(),time());
+        touchProject(p);return respond(res,200,{memory:p.assistantMemory});
+      }
+      if(req.method==='DELETE'&&kind==='rule'){
+        const b=await readJSON(req);p.assistantMemory=assistantMemory.forgetRule(p.assistantMemory,b.id);
+        touchProject(p);return respond(res,200,{memory:p.assistantMemory});
+      }
+      if(req.method==='POST'&&kind==='feedback'){
+        const b=await readJSON(req),n=p.nodes.find(x=>x.id===b.nodeId&&x.kind==='generated');
+        if(!n||n.historyId!==b.historyId)throw Error('选中图片与项目不匹配');
+        p.assistantMemory=assistantMemory.mark(p.assistantMemory,b.kind,n.id,n.historyId,b.note,time());
+        touchProject(p);return respond(res,200,{memory:p.assistantMemory});
+      }
+      return fail(res,405,'记忆操作不支持');
     }
     // Bulk operations are project-scoped: asset files and generated history must belong to this account/project.
     const exportNodes=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/nodes\/export$/);

@@ -17,7 +17,10 @@ const MASTER=process.env.APP_ENCRYPTION_KEY||'';
 const HOST=process.env.HOST||'127.0.0.1';
 const PORT=Number(process.env.PORT||8028);
 const ALLOWED_HOST=(process.env.APP_ALLOWED_HOST||'').toLowerCase();
+const BASE=(process.env.APP_BASE_PATH||'').replace(/\/$/,'');
+if(BASE&&!/^\/[a-zA-Z0-9_-]+$/.test(BASE))throw Error('APP_BASE_PATH must be a single path segment');
 const COOKIE_SECURE=process.env.COOKIE_SECURE==='1';
+const COOKIE_PATH=BASE?BASE+'/':'/';
 const INVITE_CODE=(process.env.INVITE_CODE||'').trim();
 const USER_QUOTA_GB=Math.max(process.env.NODE_ENV==='test'?0.00001:0.1,Math.min(20,Number(process.env.USER_QUOTA_GB||1)||1));
 const TOTAL_QUOTA_GB=Math.max(process.env.NODE_ENV==='test'?0.00001:1,Math.min(200,Number(process.env.TOTAL_QUOTA_GB||5)||5));
@@ -88,7 +91,7 @@ const persistedSessions=readJSON(SESSIONS_FILE,{});
 const sessions=new Map(Object.entries(persistedSessions).filter(([key,value])=>/^[a-f0-9]{64}$/.test(key)&&value&&value.expire>Date.now()));
 const sessionKey=token=>crypto.createHash('sha256').update(token).digest('hex');
 function saveSessions(){atomic(SESSIONS_FILE,JSON.stringify(Object.fromEntries(sessions)))}
-function sessionCookie(token){return `hs_account=${token}; Path=/; Max-Age=${SESSION_AGE}; HttpOnly; SameSite=Strict${COOKIE_SECURE?'; Secure':''}`}
+function sessionCookie(token){return `hs_account=${token}; Path=${COOKIE_PATH}; Max-Age=${SESSION_AGE}; HttpOnly; SameSite=Strict${COOKIE_SECURE?'; Secure':''}`}
 function createSession(account){
   const token='v1.'+randomBytes(24).toString('hex');
   for(const [key,item] of sessions)if(item.expire<=Date.now())sessions.delete(key);
@@ -125,9 +128,9 @@ async function handleAuth(req,res,url){
   const ip=getIp(req);
   if(req.method==='GET'&&url.pathname==='/api/status'){
     const session=getSession(req);
-    if(!session)return sendJSON(res,200,{backend:true,authenticated:false,version:'0.6.27',accountMode:true,inviteOnly:true,demoMode:false,basePath:'',quotas:{perUserGB:USER_QUOTA_GB,totalGB:TOTAL_QUOTA_GB}});
+    if(!session)return sendJSON(res,200,{backend:true,authenticated:false,version:'0.6.27',accountMode:true,inviteOnly:true,demoMode:false,basePath:BASE,quotas:{perUserGB:USER_QUOTA_GB,totalGB:TOTAL_QUOTA_GB}});
     res.setHeader('Set-Cookie',sessionCookie(session.token));
-    return sendJSON(res,200,{backend:true,authenticated:true,version:'0.6.27',accountMode:true,inviteOnly:true,demoMode:false,basePath:'',user:accountStatus(session.account)});
+    return sendJSON(res,200,{backend:true,authenticated:true,version:'0.6.27',accountMode:true,inviteOnly:true,demoMode:false,basePath:BASE,user:accountStatus(session.account)});
   }
   if(req.method==='POST'&&url.pathname==='/api/register'){
     if(!sameOrigin(req))return fail(res,403,'禁止跨站请求');
@@ -149,7 +152,7 @@ async function handleAuth(req,res,url){
   if(req.method==='POST'&&url.pathname==='/api/logout'){
     if(!sameOrigin(req))return fail(res,403,'禁止跨站请求');
     const session=getSession(req);if(session){sessions.delete(sessionKey(session.token));saveSessions()}
-    return sendJSON(res,200,{ok:true},{'Set-Cookie':`hs_account=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict${COOKIE_SECURE?'; Secure':''}`});
+    return sendJSON(res,200,{ok:true},{'Set-Cookie':`hs_account=; Path=${COOKIE_PATH}; Max-Age=0; HttpOnly; SameSite=Strict${COOKIE_SECURE?'; Secure':''}`});
   }
   if(req.method==='GET'&&url.pathname==='/healthz')return sendJSON(res,200,{ok:true,version:'0.6.27'});
   return false;
@@ -158,7 +161,11 @@ async function handleAuth(req,res,url){
 async function handler(req,res){
   try{
     if(ALLOWED_HOST&&String(req.headers.host||'').split(':')[0].toLowerCase()!==ALLOWED_HOST)return fail(res,421,'域名不匹配');
-    const url=new URL(req.url,'http://localhost');
+    const original=new URL(req.url,'http://localhost');
+    if(BASE&&original.pathname===BASE){res.writeHead(308,{Location:BASE+'/'});return res.end()}
+    if(BASE&&!original.pathname.startsWith(BASE+'/'))return fail(res,404,'资源不存在');
+    const url=BASE?new URL(original.pathname.slice(BASE.length)+original.search,'http://localhost'):original;
+    req.url=url.pathname+url.search;
     const handled=await handleAuth(req,res,url);
     if(handled!==false)return;
     if(!url.pathname.startsWith('/api/'))return serveStatic(req,res,url.pathname);

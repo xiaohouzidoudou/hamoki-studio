@@ -358,8 +358,50 @@
    if(typeof renderContext==='function')renderContext();
   }
   hide('creativeModal');$('prompt').focus();
-  toast('已载入「'+page.name+'」创作方案与参考图，仍需你手动点击生成');
+  toast('已载入「'+page.name+'」创作方案与参考图');return true;
  }
+ // One chat entrypoint, existing workflow: real Word, prototype and approved style.
+ async function prepareFromChat(instruction){
+  if(busy)return {handled:true,ready:false,message:'AI 美术工作流正在执行，请等待当前分析完成。'};
+  const id=typeof currentProject!=='undefined'&&currentProject?.id;
+  if(!id)return {handled:true,ready:false,message:'请先打开项目'};
+  projectId=id;
+  try{await load()}catch(e){return {handled:true,ready:false,message:'读取项目资料失败：'+e.message}}
+  if(!f?.pages?.length){
+   if(/周年庆|原型|策划文档|按照之前|按之前的|已确定的项目/.test(instruction))return {handled:true,ready:false,message:'这个项目没有导入过对应策划页面、原型和风格资料，我不能假装已经看过。请先关联一次项目资料。'};
+   return {handled:false};
+  }
+  // Ignore generic Word headings such as 'UI' that are not named design pages.
+  const specific=p=>p.name?.length>=2&&!/^(UI|UX|界面|页面|设计|活动)$/.test(p.name.trim());
+  const full=f.pages.filter(p=>specific(p)&&instruction.includes(p.name));
+  const matched=full.length?full:f.pages.filter(p=>{if(!specific(p))return false;const short=p.name?.replace(/^(周年庆|活动|页面|UI|界面)+/,'').trim();return short?.length>=2&&instruction.includes(short)});
+  if(matched.length>1)return {handled:true,ready:false,message:'涉及多个页面，请明确先做哪页：'+matched.map(x=>x.name).join('、')};
+  if(matched.length===1&&matched[0].id!==f.activePageId){
+   try{const r=await api('projects/'+id+'/creative/page',{method:'POST',body:{pageId:matched[0].id}});f=r.flow;render()}
+   catch(e){return {handled:true,ready:false,message:'切换页面失败：'+e.message}}
+  }
+  const page=active();
+  if(!page)return {handled:true,ready:false,message:'请先确认要制作的策划页面'};
+  const proto=picture(page,page.layoutImageIndex??page.imageIndexes?.[0]);
+  if(!proto?.nodeId)return {handled:true,ready:false,message:'「'+page.name+'」没有关联真实原型，请先补充，不会凭空猜测布局'};
+  if(f.autoRun?.status==='running')return {handled:true,ready:false,message:'已有后台专业美术任务正在运行，进度会自动显示'};
+  const needPlan=!page.analysis?.prompt;
+  const review=true; // A single original CHECK pass; no automatic paid regeneration.
+  const extra=needPlan?('STYLE/原型分析（最多2次视觉调用）+美术总监文字方案'):('复用已保存的美术总监方案');
+  const approved=confirm('将针对「'+page.name+'」自动执行：\\n'+extra+'\\n生成1张图片 + 独立CHECK视觉质检1次。\\n会产生相应中转站费用，失败或超时也可能已扣费；不会自动反复生成。确认开始？');
+  if(!approved)return {handled:true,ready:false,message:'未确认实际模型费用，本次没有开始执行'};
+  try{
+   const r=await api('projects/'+id+'/creative/auto',{method:'POST',body:{
+    pageId:page.id,instruction,confirmed:true,review,
+    ratio:$('ratio')?.value==='reference'?'9:16':$('ratio')?.value||'9:16',
+    resolution:$('resolution')?.value||'1K',quality:$('quality')?.value||'auto',
+    routing:{text:typeof runtimeSelection==='function'?runtimeSelection('text'):{},vision:typeof runtimeSelection==='function'?runtimeSelection('vision'):{},image:{providerId:typeof activeId==='string'?activeId:'',model:$('imageModel')?.value||''}}
+   }});
+   if(r.started){if(currentProject?.id===id){currentProject.creativeWorkflow=f;currentProject.creativeWorkflow.autoRun={id:r.runId,pageId:page.id,pageName:page.name,status:'running',stage:'prepare',message:'资料已关联，后台开始专业分析'};if(typeof renderCreativeAutoProgress==='function')renderCreativeAutoProgress()}return {handled:true,started:true,pageName:page.name}}
+   return {handled:true,ready:false,message:'后台未确认开始执行'};
+  }catch(e){return {handled:true,ready:false,message:'专业工作流没有启动：'+e.message}}
+ }
+ if(typeof window!=='undefined')window.HamokiCreative={prepareFromChat};
  async function review(){
   const h=$('creativeGeneratedSelect').value;if(!h)return say('请选择一张当前项目生成作品');
   if(!confirm('将调用视觉模型审核当前页面的生成图，产生 API 费用。确定吗？'))return;
