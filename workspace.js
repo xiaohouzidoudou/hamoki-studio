@@ -137,7 +137,7 @@ for(const p of projects){
   if(['splitting','delivering'].includes(pack.status)){pack.status='failed';pack.error='服务重启中断了本地素材打包，可从原始图片重新拆分';interruptedCreative=true}
  }
 }
-for(const p of projects){const plan=p.aiComponentPlan;if(plan?.status==="analyzing"){plan.status="failed";plan.error="识别任务因服务重启中断，请核对上游费用后决定是否重试";interruptedCreative=true}}
+for(const p of projects){const plan=p.aiComponentPlan;if(plan?.status==="analyzing"){plan.status="failed";plan.error="识别任务因服务重启中断，请核对上游费用后决定是否重试";interruptedCreative=true}if(plan?.auto?.enabled){plan.auto.enabled=false;plan.auto.error="服务重启已暂停自动生图；继续之前请重新确认费用";interruptedCreative=true}}
 if(interruptedCreative)saveProjects();
 const creativeBusy=new Set();
 function creativeState(p){
@@ -583,7 +583,8 @@ function saveSourceFiles(refs,mask,maskSource){
  return {input,mask:maskFile,maskSource:maskSourceFile};
 }
 function emptyProvider(p){if(DEMO_MODE&&p)return; if(!p||!p.url||!p.apiKey)throw Error('请先配置中转站地址和 API Key')}
-function jobStatusOk(j,status){if(j.status==='cancelled')return false;j.status=status;j.updatedAt=time();saveJobs();if(status==='failed'){const p=project(j.projectId||defaultProject()?.id);if(p){p.messages.push({id:crypto.randomUUID(),role:'error',content:'生成失败（'+j.model+'）：'+(j.error||'未知错误'),createdAt:time(),groupId:j.groupId});p.messages=p.messages.slice(-400);touchProject(p)}}return true}
+function jobStatusOk(j,status){
+ if(status==="done"||status==="failed"){const p=project(j.projectId);if(p?.aiComponentPlan?.id===j.groupId&&p.aiComponentPlan.auto?.enabled)setImmediate(()=>componentAutoContinue(p))}if(j.status==='cancelled')return false;j.status=status;j.updatedAt=time();saveJobs();if(status==='failed'){const p=project(j.projectId||defaultProject()?.id);if(p){p.messages.push({id:crypto.randomUUID(),role:'error',content:'生成失败（'+j.model+'）：'+(j.error||'未知错误'),createdAt:time(),groupId:j.groupId});p.messages=p.messages.slice(-400);touchProject(p)}}return true}
 function schedule(){setImmediate(pump)}
 function pump(){
  if(paused)return;
@@ -603,10 +604,16 @@ async function execute(job){const abort=new AbortController();controllers.set(jo
   for(const f of job.referenceMedia||[])media.push(fetchMedia(f));
   const mask=job.maskMedia?fetchMedia(job.maskMedia):null;if(mask&&job.maskSourceMedia){const override=fetchMedia(job.maskSourceMedia);if(override.mime!=='image/png'||JSON.stringify(pngDimensions(override.bytes))!==JSON.stringify(pngDimensions(mask.bytes)))throw Error('局部重绘：PNG 源图与蒙版尺寸不一致');if(!media.length)throw Error('局部重绘缺少源图');media[0]=override}
   if(mask&&!(p.mode==='openai'&&(p.imageMode||'images')==='images'))throw Error('当前接口不支持蒙版局部重绘，请使用 OpenAI 图片接口');
-  const output=DEMO_MODE ? {mime:'image/webp',bytes:fs.readFileSync(path.join(ROOT,'assets/hamoki-avatar-128.webp'))} : await generate(p,job,media,mask,abort.signal,progress=>{job.upstreamId=progress.id||job.upstreamId;job.progress=Math.max(0,Math.min(100,Number(progress.progress)||0));job.updatedAt=time();saveJobs()});
+  let output=DEMO_MODE ? {mime:'image/webp',bytes:fs.readFileSync(path.join(ROOT,'assets/hamoki-avatar-128.webp'))} : await generate(p,job,media,mask,abort.signal,progress=>{job.upstreamId=progress.id||job.upstreamId;job.progress=Math.max(0,Math.min(100,Number(progress.progress)||0));job.updatedAt=time();saveJobs()});
+  if(job.componentItemId){
+   const result=require('node:child_process').spawnSync('python3',[path.join(ROOT,'lib/component-png.py')],{input:output.bytes,encoding:null,timeout:35000,maxBuffer:40*1024*1024});
+   if(result.error||result.status!==0)throw Error('组件 PNG 标准化失败：'+String(result.stderr||result.error?.message||'转换异常').slice(0,220));
+   job.componentTransparent=/TRANSPARENT=1/.test(String(result.stderr));
+   output={mime:'image/png',bytes:result.stdout};
+  }
   recordCapability(p,mask?'mask':job.transparentBg?'transparentBackground':media.length?'referenceImage':'textToImage',true,job.model,{ratio:job.ratio,resolution:job.resolution,durationMs:Date.now()-t0});
   if(job.status==='cancelled')return;
-  const file=storeMedia(output),id=crypto.randomUUID();const entry={id,file,createdAt:time(),projectId:job.projectId||defaultProject()?.id,providerId:job.providerId,providerName:job.providerName,model:job.model,prompt:job.prompt,ratio:job.ratio,resolution:job.resolution,parentId:job.sourceId||null,groupId:job.groupId||null,referenceMedia:job.referenceMedia||[],masked:!!mask,transparentBg:!!job.transparentBg,editInstruction:job.editInstruction||'',roleHints:job.roleHints||[],jobId:job.id,favorite:false,durationMs:Date.now()-t0};
+  const file=storeMedia(output),id=crypto.randomUUID();const entry={id,file,createdAt:time(),projectId:job.projectId||defaultProject()?.id,providerId:job.providerId,providerName:job.providerName,model:job.model,prompt:job.prompt,ratio:job.ratio,resolution:job.resolution,parentId:job.sourceId||null,groupId:job.groupId||null,referenceMedia:job.referenceMedia||[],masked:!!mask,transparentBg:!!job.transparentBg,editInstruction:job.editInstruction||'',roleHints:job.roleHints||[],jobId:job.id,componentTransparent:job.componentItemId?!!job.componentTransparent:null,componentItemId:job.componentItemId||null,favorite:false,durationMs:Date.now()-t0};
   history.unshift(entry);saveHistory();appendGeneratedNode(entry,job);job.resultId=id;jobStatusOk(job,'done');
 }catch(e){if(job.status==='cancelled')return;job.error=String(e?.message||'请求失败').slice(0,380);job.durationMs=Date.now()-t0;
   diag({source:'queue',level:e.upstreamStatus===429?'warning':'error',action:'image_generation',path:'/api/jobs',method:'POST',model:job.model,status:e.upstreamStatus||undefined,message:job.error});
@@ -781,7 +788,7 @@ function componentView(p){
  return {plan:{...plan,items:plan.items.map(item=>{
   const job=jobs.find(j=>j.id===item.jobId&&j.projectId===p.id);
   const result=job?.resultId&&history.find(h=>h.id===job.resultId&&h.projectId===p.id);
-  return {...item,status:job?.status||item.status,error:job?.error||"",resultId:result?.id||null,url:result?BASE+"/api/media/"+result.file:null};
+  return {...item,status:job?.status||item.status,error:job?.error||"",resultId:result?.id||null,transparentVerified:result?.componentTransparent??null,url:result?BASE+"/api/media/"+result.file:null};
  })}};
 }
 async function componentAnalyze(p,b){
@@ -791,6 +798,7 @@ async function componentAnalyze(p,b){
  const image=history.find(h=>h.id===b.historyId&&h.projectId===p.id);
  if(!image||!p.nodes.some(n=>n.kind==="generated"&&n.historyId===image.id))throw Error("请选择本项目画布上一张已生成图片");
  if(componentBusy.has(p.id)||creativeBusy.has(p.id)||derivationBusy.has(p.id))throw Object.assign(Error("当前项目已有分析任务"),{status:409});
+ if((p.aiComponentPlan?.items||[]).some(item=>{const j=jobs.find(j=>j.id===item.jobId);return j&&["queued","running"].includes(j.status)}))throw Object.assign(Error("上一张图仍有组件正在生成，请先完成或取消后再识别新图"),{status:409});
  const cfg=b.vision||p.creativeWorkflow?.routing?.vision||{};
  const vision=effectiveProvider(provider(cfg.providerId||state.activeId),"vision");emptyProvider(vision);
  const model=creativeModel(vision,"vision",cfg.model);
@@ -802,6 +810,26 @@ async function componentAnalyze(p,b){
   plan.status="ready";plan.finishedAt=time();touchProject(p);
  }catch(e){plan.status="failed";plan.error=String(e.message||e).slice(0,350);touchProject(p);throw e}
  finally{componentBusy.delete(p.id)}
+}
+function componentAutoContinue(p){
+ const plan=p.aiComponentPlan,auto=plan?.auto;if(!auto?.enabled)return;
+ try{
+  while(jobs.filter(j=>["queued","running"].includes(j.status)).length<MAX_QUEUED){
+   const item=plan.items.find(x=>!x.jobId);if(!item)break;
+   componentGenerate(p,{itemId:item.id,confirmCost:true,image:{providerId:auto.providerId,model:auto.model},resolution:auto.resolution,quality:auto.quality});
+  }
+  if(plan.items.every(x=>x.jobId)){auto.enabled=false;auto.submittedAt=time();touchProject(p)}
+ }catch(e){auto.enabled=false;auto.error=String(e.message||e).slice(0,330);touchProject(p)}
+}
+function componentGenerateAll(p,b){
+ if(DEMO_MODE)throw Error("演示模式禁止付费自动生图");
+ if(b.confirmCost!==true)throw Error("请确认将为所有待制作组件调用付费图片模型");
+ const plan=p.aiComponentPlan;if(plan?.status!=="ready")throw Error("请先识别这一张图片");
+ if(plan.auto?.enabled)throw Object.assign(Error("正在自动制作此图组件"),{status:409});
+ const pending=plan.items.filter(item=>!item.jobId);if(!pending.length)throw Error("没有待自动制作的组件，可单独重试失败项");
+ const cfg=b.image||p.creativeWorkflow?.routing?.image||{};const conf=deriveProvider(cfg,"image");
+ plan.auto={enabled:true,providerId:conf.provider.id,model:conf.model,resolution:b.resolution||"1K",quality:b.quality||"auto",approvedCount:pending.length,startedAt:time(),error:""};
+ touchProject(p);componentAutoContinue(p);return {approvedCount:pending.length,plan:componentView(p).plan};
 }
 function componentGenerate(p,b){
  if(DEMO_MODE)throw Error("演示模式不能生成付费组件");
@@ -818,6 +846,7 @@ function componentGenerate(p,b){
  const job=makeJob({capability:"image",projectId:p.id,sourceId:source.id,prompt:aiComponent.componentPrompt(item,p.creativeWorkflow?.styleDNA||""),
   transparentBg:item.category!=="background",ratio:item.category==="background"?"9:16":"1:1",resolution:b.resolution||"1K",quality:b.quality||"auto",sourceNodeId:node?.id},
   {input:[],roleHints:[],mask:null,maskSource:null},conf.provider.id,conf.model,plan.id);
+ job.componentItemId=item.id;
  jobs.unshift(job);saveJobs();item.jobId=job.id;item.status="queued";touchProject(p);schedule();
  return {job:publicJob(job)};
 }
@@ -1096,7 +1125,7 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
      const p=assertProject(packFileMatch[1]),pack=deliveryPack(p,packFileMatch[2]);
      return deliveryDownload(req,res,p,pack,packFileMatch[3],packFileMatch[4]);
     }
-    const componentRoute=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/ai-components(?:\/(analyze|generate))?$/);
+    const componentRoute=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/ai-components(?:\/(analyze|generate|generate-all))?$/);
     if(componentRoute){
      const p=assertProject(componentRoute[1]),action=componentRoute[2];
      if(!action&&req.method==="GET")return respond(res,200,componentView(p));
@@ -1105,10 +1134,14 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
       if(componentBusy.has(p.id))return fail(res,409,"正在识别组件");
       if(b.confirmCost!==true)throw Error("需确认识图费用");
       if(typeof b.historyId!=="string"||!history.some(h=>h.id===b.historyId&&h.projectId===p.id))throw Error("图片不属于当前项目");
+      const cfg=b.vision||p.creativeWorkflow?.routing?.vision||{};
+      const vp=effectiveProvider(provider(cfg.providerId||state.activeId),"vision");emptyProvider(vp);creativeModel(vp,"vision",cfg.model);
+      if((p.aiComponentPlan?.items||[]).some(item=>{const j=jobs.find(j=>j.id===item.jobId);return j&&["queued","running"].includes(j.status)}))return fail(res,409,"仍有拆解组件生成中，不能覆盖原图");
       void componentAnalyze(p,b).catch(e=>diag({source:"components",level:"error",action:"analyze",message:String(e.message||e).slice(0,350)}));
       return respond(res,202,{started:true});
      }
      if(action==="generate"&&req.method==="POST")return respond(res,202,componentGenerate(p,await readJSON(req)));
+     if(action==="generate-all"&&req.method==="POST")return respond(res,202,componentGenerateAll(p,await readJSON(req)));
      return fail(res,405,"不支持的拆件操作");
     }
     const deliveryRoute=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/delivery(?:\/(split|approve))?$/);
