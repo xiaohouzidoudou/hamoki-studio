@@ -839,10 +839,11 @@ function validateCreation(b){
    else {const h=history.find(h=>h.id===node.historyId&&h.projectId===targetProject.id);if(!h)throw Error('画布图片没有对应的历史记录');file=h.file;historyId=h.id}
    return {file,role,nodeId:node.id,historyId};
  });
- // Reuse already-confirmed style reference images when editing; users must not reselect them.
+ // Reuse the STYLE references analyzed for this project when editing, even before
+ // an explicit style lock. The lock remains an independent user approval flag.
  // This is the original creativeWorkflow source of truth, NOT a second style collection.
  const flow=targetProject.creativeWorkflow;
- if(b.useProjectStyle!==false&&flow?.styleLocked&&Array.isArray(flow.styleNodeIds)){
+ if((b.sourceId||b.mask)&&b.useProjectStyle!==false&&flow?.styleDNA&&Array.isArray(flow.styleNodeIds)){
   for(const id of flow.styleNodeIds.slice(0,2)){
    if(refs.length+images.length>=8)break;
    if(images.some(x=>x.nodeId===id))continue;
@@ -896,7 +897,7 @@ function validateCreation(b){
      requirements:String(page?.requirements||'').slice(0,2500)};
   })():null;
  const editMode=!!source&&b.editMode!=='new';
- const styleGuide=editMode?creativeUpstream.styleFeedbackGuide(targetProject.creativeWorkflow?.styleLocked?targetProject.creativeWorkflow.styleDNA:'',b.editSpec):'';
+ const styleGuide=editMode?creativeUpstream.styleFeedbackGuide(targetProject.creativeWorkflow?.styleDNA||'',b.editSpec):'';
  const draftPrompt=editMode?('根据第一张参考原图精确编辑。除本轮明确要求改变的内容外，保持原画构图、人物身份、页面文字、按钮位置与项目风格一致。\n历史创作描述：'+(source.editInstruction||source.prompt).slice(0,1450)+'\n本轮用户中文修改要求（原文，不得擅自翻译或反转）：'+instruction+'\n'+styleGuide):instruction;
  const prompt=assistantMemory.generationPrompt(draftPrompt,targetProject.assistantMemory,targetProject.creativeWorkflow?.styleDNA||'',(targetProject.creativeWorkflow?.pages||[]).find(x=>x.id===targetProject.creativeWorkflow?.activePageId)?.requirements||'');
  return {capability,prompt,editInstruction:instruction,refs,referenceNodes:images,count,targets,ratio,resolution,quality,review,transparentBg,sourceId:source?.id||null,sourceNodeId,projectId:targetProject.id,canvasX:num(b.canvasX,180),canvasY:num(b.canvasY,170),mask:b.mask||null,maskSourceImage:b.maskSourceImage||null};

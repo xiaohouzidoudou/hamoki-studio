@@ -371,8 +371,10 @@
    if(/周年庆|原型|策划文档|按照之前|按之前的|已确定的项目/.test(instruction))return {handled:true,ready:false,message:'这个项目没有导入过对应策划页面、原型和风格资料，我不能假装已经看过。请先关联一次项目资料。'};
    return {handled:false};
   }
-  const full=f.pages.filter(p=>p.name?.length>=2&&instruction.includes(p.name));
-  const matched=full.length?full:f.pages.filter(p=>{const short=p.name?.replace(/^(周年庆|活动|页面|UI|界面)+/,'').trim();return short?.length>=2&&instruction.includes(short)});
+  // Ignore generic Word headings such as 'UI' that are not named design pages.
+  const specific=p=>p.name?.length>=2&&!/^(UI|UX|界面|页面|设计|活动)$/.test(p.name.trim());
+  const full=f.pages.filter(p=>specific(p)&&instruction.includes(p.name));
+  const matched=full.length?full:f.pages.filter(p=>{if(!specific(p))return false;const short=p.name?.replace(/^(周年庆|活动|页面|UI|界面)+/,'').trim();return short?.length>=2&&instruction.includes(short)});
   if(matched.length>1)return {handled:true,ready:false,message:'涉及多个页面，请明确先做哪页：'+matched.map(x=>x.name).join('、')};
   if(matched.length===1&&matched[0].id!==f.activePageId){
    try{const r=await api('projects/'+id+'/creative/page',{method:'POST',body:{pageId:matched[0].id}});f=r.flow;render()}

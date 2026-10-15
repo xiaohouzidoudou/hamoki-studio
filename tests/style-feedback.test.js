@@ -19,7 +19,7 @@ test('Chinese directional feedback remains intact while assistant supplies bound
  const guidance=upstream.styleFeedbackGuide(yaml,plan.edit);
  assert.match(guidance,/框太平了，增加立体层次和倒角，不要改颜色/);
  assert.match(guidance,/add subtle dimensional highlights and beveled edges/);
- assert.match(guidance,/已确认的 ai_asset 官方风格术语/);
+ assert.match(guidance,/ai_asset STYLE 分析术语/);
  assert.match(guidance,/chunky rectangular UI panels/);
  assert.match(guidance,/不更新 Style DNA/);
  assert.doesNotMatch(guidance,/\$\{input/);

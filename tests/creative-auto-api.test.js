@@ -99,4 +99,25 @@ test('one approved request executes original STYLE, LAYOUT, director, one image 
  assert.equal(flow.autoRun.status,'awaiting_feedback',flow.autoRun.error);
  assert.equal(calls.filter(x=>x.path.includes('/images/')).length,2,'two user requests generate two images');
  assert.equal(calls.filter(x=>x.path.includes('/chat/completions')).length,4,'existing Style DNA, layout and director plan are reused without redundant model fees');
+ // A second-round Chinese correction must automatically reuse the analyzed STYLE
+ // even though the project has not yet explicitly locked Style DNA.
+ const h1=(await api('/api/history?projectId='+pid)).body.history[0];
+ assert.equal(flow.styleLocked,false,'analysis alone does not claim human approval');
+ const edit=await api('/api/jobs','POST',{projectId:pid,providerId:id,model:'gpt-image-1',sourceId:h1.id,
+  prompt:'背景再暗一点，按钮和奖励其他别动',ratio:'9:16',resolution:'1K',count:1,
+  editSpec:{target:'背景',change:'调暗现有背景',preserve:'保留30份奖励和黄色按钮',
+   englishVisualTerms:'darken existing background only'}});
+ assert.equal(edit.status,201,JSON.stringify(edit.body));
+ let refined;
+ for(let i=0;i<140;i++){
+  const hs=(await api('/api/history?projectId='+pid)).body.history;
+  refined=hs.find(h=>h.parentId===h1.id);
+  if(refined)break;
+  await wait(75);
+ }
+ assert.ok(refined,'second-round image should be generated using the previous image');
+ assert.match(refined.prompt,/保留30份奖励和黄色按钮/);
+ assert.match(refined.prompt,/ai_asset STYLE 分析术语/);
+ assert.match(refined.prompt,/chunky rectangular UI panels/);
+ assert.ok(calls.some(x=>x.path.includes('/images/edits')),'uses actual previous image through edit API');
 });

@@ -7,5 +7,5 @@ test('chat model selection falls back to saved provider defaults after edits wit
  assert.match(source,/model:\(r\?\.model\|\|initialRuntimeModel\(p,cap\)\|\|''\)\.trim\(\)/);
  assert.match(source,/if\(!r\.model\)r\.model=initialRuntimeModel\(p,cap\)\|\|'';/);
  assert.match(source,/const explicit=p\?\.capabilities\?\.\[cap\]\?\.defaultModel/);
- assert.match(source,/hasCreativePage&&!editFeedback&&window\.HamokiCreative\?\.prepareFromChat/);
+ assert.match(source,/shouldStartCreativePage\(prompt,currentProject\)&&window\.HamokiCreative\?\.prepareFromChat/);
 });

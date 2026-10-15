@@ -1141,14 +1141,22 @@ function renderStudioLayerChips(){
   chip.append(btn,remove);host.append(chip)
  }
 }
+// Keep first-page creation on the existing multi-skill pipeline, while local
+// refinements of an already-generated image go through the editing assistant.
+function shouldStartCreativePage(prompt,project){
+ if(!project?.creativeWorkflow?.pages?.length)return false;
+ const hasGenerated=!!project.nodes?.some(x=>x.kind==='generated');
+ const newPageIntent=/(新(?:的)?页面|下一(?:个|张)?页面|另(?:一|个)页面|换(?:个|一)页面|制作.{0,16}(?:签到|礼包|活动|入口|UI|界面|页面)|按.{0,12}原型.{0,16}(?:做|制作|设计))/.test(prompt);
+ const feedback=/^(这张|这里|这个|刚才|上一张|改一下|修改|调整|不对|可以|满意|记住|以后|再|重新|继续|不要|去掉|别)/.test(prompt)
+  ||(hasGenerated&&!newPageIntent&&/(背景|按钮|边框|奖励|字体|颜色|框|位置|亮|暗|大|小|高|低|太|厚|薄|阴影|层次|其他不变|别动|保持)/.test(prompt));
+ return !feedback;
+}
 async function assistantSend(){
  const prompt=$('prompt').value.trim();if(!prompt)return toast('请先告诉我你想做什么');
  if(!currentProject)return toast('请先打开一个项目');
  // Pages imported from real Word and prototypes should enter the specialist
  // workflow directly, without a redundant paid intent-planning model call.
- const hasCreativePage=!!currentProject?.creativeWorkflow?.pages?.length;
- const editFeedback=/^(这张|这里|这个|刚才|上一张|改一下|修改|调整|不对|可以|满意|记住|以后)/.test(prompt);
- if(hasCreativePage&&!editFeedback&&window.HamokiCreative?.prepareFromChat){
+ if(shouldStartCreativePage(prompt,currentProject)&&window.HamokiCreative?.prepareFromChat){
   const send=$('generateBtn');send.disabled=true;
   try{
    const result=await window.HamokiCreative.prepareFromChat(prompt);
@@ -1234,7 +1242,11 @@ function renderCreativeAutoProgress(){
  }
  host.append(progress);
  host.append(el('p','studio-auto-note',run.error||run.message||'正在准备项目资料'));
- if(run.resultId)host.append(el('p','studio-auto-note','图片已保存到当前项目画布，可以直接选中继续对话修改'));
+ if(run.resultId){
+  host.append(el('p','studio-auto-note','图片已保存到当前项目画布，可以直接用中文告诉我哪里要改'));
+  const page=f?.pages?.find(x=>x.id===run.pageId),report=page?.quality?.historyId===run.resultId?page.quality.report:null;
+  if(report)host.append(el('p','studio-auto-note','CHECK 质检：'+String(report).slice(0,750)));
+ }
 }
 function renderMemoryContext(){const box=$('memoryContext');if(!box)return;const f=currentProject?.creativeWorkflow,page=f?.pages?.find(x=>x.id===f.activePageId);const count=currentProject?.assistantMemory?.rules?.length||0;const node=currentNode();const info=page?('当前页面：'+page.name+' · '+((page.layoutImageIndex??page.imageIndexes?.[0])!=null?'已关联原型':'缺少原型')+' · '+(f.styleDNA?(f.styleLocked?'风格已锁定':'风格待确认'):'风格待分析')):'自由创作 · 没有关联策划页面';box.textContent=info+(node?.kind==='generated'?' · 修改已选中作品':count?' · '+count+' 条补充规范':'')}
 async function rememberCurrentRule(){const text=$('prompt').value.trim();if(!text)return toast('先写下需要长期遵守的规范');if(!currentProject)return;try{const r=await api(projectPath('/memory/rule'),{method:'POST',body:{text}});currentProject.assistantMemory=r.memory;renderMemoryContext();$('prompt').value='';toast('已保存为项目美术规范，后续生图会自动使用')}catch(e){toast(e.message)}}
