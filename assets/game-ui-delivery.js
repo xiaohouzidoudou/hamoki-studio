@@ -6,7 +6,7 @@
  const categories=[['control','按钮/控件'],['container','面板/容器'],['icon','图标'],['object','道具'],['character','角色'],['decoration','装饰'],['background','背景']];
  const states=[['default','默认'],['pressed','按下'],['selected','选中'],['disabled','禁用'],['locked','锁定'],['claimed','已领取'],['loading','加载中']];
  const slices=[['full','完整图片'],['1:1','1:1 图标'],['tile','重复平铺'],['9-slice','9-slice 九宫格']];
- let id=null,data=null,currentPackId=null,poll=null,busy=false;
+ let id=null,data=null,currentPackId=null,poll=null,busy=false,preferredImageId=null;
  function status(s){$('deliveryStatus').textContent=s||''}
  function ensureProject(){if(!id||typeof currentProject==='undefined'||currentProject?.id!==id)throw Error('当前画布项目已切换，请重新打开组件交付窗口')}
  function getPack(){return data?.packs.find(x=>x.id===currentPackId)||null}
@@ -15,7 +15,7 @@
   if(!data.sources.length){root.append(create('p','delivery-hint','当前项目没有生成作品。先在一图衍生素材中生成 UI Kit 或图标素材板。'));return}
   data.sources.forEach((src,index)=>{
    const label=create('label','delivery-source'),input=create('input'),img=create('img');
-   input.type='radio';input.name='deliveryImage';input.value=src.id;input.checked=index===0;
+   input.type='radio';input.name='deliveryImage';input.value=src.id;input.checked=preferredImageId?src.id===preferredImageId:index===0;
    img.loading='lazy';img.src=src.url;img.alt='生成素材预览';
    label.append(input,img,create('span',null,src.prompt||'已生成作品'));root.append(label);
   });
@@ -107,13 +107,19 @@
    }catch(e){status('读取进度失败：'+e.message)}
   },2200);
  }
- async function open(){
+ async function open(historyId=null){
+  preferredImageId=typeof historyId==='string'?historyId:null;
+  if(!preferredImageId&&typeof selectedSceneNodes==='function'){
+   const selected=selectedSceneNodes();
+   if(selected.length===1&&selected[0].kind==='generated')preferredImageId=selected[0].historyId;
+  }
   if(typeof currentProject==='undefined'||!currentProject)return;
   id=currentProject.id;data=null;currentPackId=null;busy=false;
   $('deliveryModal').classList.remove('hidden');status('加载中…');
   try{
    await refresh();
-   sourceUI();status('只处理已批准的素材板；原始分割不收费。');
+   if(preferredImageId&&!data.sources.some(x=>x.id===preferredImageId))preferredImageId=null;
+   sourceUI();status(preferredImageId?'已自动选中画布中的图片。此处仍是素材板快速切图，复杂游戏界面请等待 AI 智能拆图功能。':'只处理已批准的素材板；原始分割不收费。');
    if(['splitting','delivering'].includes(getPack()?.status))pollStart();
   }catch(e){status('读取组件交付失败：'+e.message)}
  }
@@ -165,7 +171,11 @@
   }catch(e){status('无法打包资源：'+e.message);$('deliveryExport').disabled=false}
   finally{busy=false}
  }
- $('openDelivery').addEventListener('click',open);
+ $('openDelivery').addEventListener('click',()=>open());
+ document.addEventListener('hamoki:open-delivery',e=>{
+  if(e.detail?.projectId!==currentProject?.id)return;
+  open(e.detail.historyId);
+ });
  $('deliveryClose').addEventListener('click',close);
  $('deliverySplit').addEventListener('click',split);
  $('deliveryExport').addEventListener('click',deliver);
