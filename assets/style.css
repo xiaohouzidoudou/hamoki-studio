@@ -674,3 +674,6 @@ input[type=checkbox],input[type=radio],input[type=range]{accent-color:#10cc91}
 .studio-auto-note{font-size:11px;line-height:1.6;margin:8px 0 0;white-space:pre-wrap}
 @keyframes studio-pulse{50%{opacity:.54}}
 @media(prefers-reduced-motion:reduce){.studio-auto-step.running{animation:none}}
+
+/* AI creative run: terminal errors stay visible in the conversation panel. */
+.studio-auto-failure{margin-top:10px;padding:12px 14px;border:1px solid #b5484d;border-left:4px solid #f1666b;border-radius:12px;background:rgba(148,39,45,.19);color:#ffe5e5;word-break:break-word}.studio-auto-failure-title{display:block;font-weight:750;color:#ffb8b8}.studio-auto-failure-detail{margin:7px 0 10px;line-height:1.55;white-space:pre-wrap}.studio-auto-failure-actions{display:flex;gap:8px;flex-wrap:wrap}.studio-auto-failure-open{border:1px solid rgba(255,179,179,.55);border-radius:9px;background:rgba(255,255,255,.06);padding:7px 12px;color:#ffeaea;font-weight:650}.studio-auto-failure-open:hover{background:rgba(255,255,255,.13)}
