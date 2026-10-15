@@ -89,7 +89,7 @@ test('one approved request executes original STYLE, LAYOUT, director, one image 
  assert.equal(generated.length,1);
  assert.ok(calls.filter(x=>x.path.includes('/images/')).length===1,'single image generation, no paid retry');
  assert.ok(calls.filter(x=>x.path.includes('/chat/completions')).length===4,'STYLE, LAYOUT, director and CHECK exactly once');
- const again=await api('/api/projects/'+pid+'/creative/auto','POST',{...request,review:false});
+ const again=await api('/api/projects/'+pid+'/creative/auto','POST',{...request,ratio:'reference',review:false});
  assert.equal(again.status,202,'another user request may reuse saved plan');
  for(let i=0;i<120;i++){
   flow=(await api('/api/projects/'+pid+'/creative')).body.flow;
@@ -97,6 +97,7 @@ test('one approved request executes original STYLE, LAYOUT, director, one image 
   await wait(65);
  }
  assert.equal(flow.autoRun.status,'awaiting_feedback',flow.autoRun.error);
+ assert.equal(flow.autoRun.ratio,'1:1','reference ratio is derived from the actual test prototype (1×1), not the canvas setting');
  assert.equal(calls.filter(x=>x.path.includes('/images/')).length,2,'two user requests generate two images');
  assert.equal(calls.filter(x=>x.path.includes('/chat/completions')).length,4,'existing Style DNA, layout and director plan are reused without redundant model fees');
  // A second-round Chinese correction must automatically reuse the analyzed STYLE

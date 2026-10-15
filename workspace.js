@@ -17,6 +17,7 @@ const {parseDocx,MAX_DOCX}=require('./lib/creative-docx');
 const creative=require('./lib/creative-workflow');
 const creativeUpstream=require('./lib/creative-upstream');
 const creativePages=require('./lib/creative-pages');
+const {referenceRatio}=require('./lib/creative-auto-ratio');
 const assistantMemory=require('./lib/assistant-memory');
 const assistantReview=require('./lib/assistant-review');
 const {nextGeneratedPosition}=require('./lib/canvas-placement');
@@ -194,7 +195,10 @@ async function creativeAutoExecute(p,id){
   if(job.status!=='done')throw Error('生图任务'+job.status+'：'+String(job.error||'请查看任务记录').slice(0,200));
   autoProgress(p,id,{resultId:job.resultId,stage:run.review?'quality':'done',message:run.review?'图片已生成，正在执行原有 CHECK 质检技能':'图片已生成，等待你的判断'});
   if(run.review)await creativeQuality(p,job.resultId);
-  autoProgress(p,id,{status:'awaiting_feedback',stage:'done',message:'作品与分析结果已保存。请判断哪里对、哪里需要改，不会自动重复生图'});
+  const report=run.review?String(page.quality?.report||''):'';
+  const found=[...report.matchAll(/\|\s*off\s*\|/gi)].length;
+  autoProgress(p,id,{status:'awaiting_feedback',stage:'done',qualityIssues:found||null,
+   message:found?'CHECK 发现 '+found+' 项与原型不符，作品已保存等待纠偏；不会自动追加付费生图':'作品与分析结果已保存。请判断哪里对、哪里需要改，不会自动重复生图'});
  }catch(e){
   autoProgress(p,id,{status:'failed',stage:'failed',error:String(e.message||e).slice(0,380),message:'任务已停止，不会自动重试产生额外费用'});
  }finally{creativeAutoBusy.delete(p.id)}
@@ -237,13 +241,15 @@ function creativeAutoStart(p,b){
  emptyProvider(image);creativeModel(image,'image',img.model);
  if(!page.analysis?.prompt)creativeCheckModels(f,'analyze',{pageId:page.id});
  if(b.review!==false)creativeCheckModels(f,'quality');
- const ratio=trim(b.ratio||'9:16',10),resolution=trim(b.resolution||'1K',5),quality=trim(b.quality||'auto',8);
+ const requestedRatio=trim(b.ratio||'reference',12);
+ const inferredRatio=requestedRatio==='reference'?referenceRatio(fetchMedia(proto.file).bytes):null;
+ const ratio=inferredRatio?.ratio||requestedRatio,resolution=trim(b.resolution||'1K',5),quality=trim(b.quality||'auto',8);
  if(!['1:1','3:2','2:3','16:9','9:16','4:3','3:4'].includes(ratio)||!['1K','2K','4K'].includes(resolution)||!['auto','low','medium','high'].includes(quality))throw Error('图片比例或分辨率无效');
  const id=crypto.randomUUID();
  f.activePageId=page.id;
  f.autoRun={id,pageId:page.id,pageName:page.name,instruction,status:'running',stage:'prepare',
   message:'已关联策划文档、原型和风格参考，准备调用专业技能',review:b.review!==false,
-  ratio,resolution,quality,startedAt:time(),updatedAt:time(),error:'',jobId:null,resultId:null};
+  ratio,prototypeDimensions:inferredRatio?inferredRatio.width+'×'+inferredRatio.height:null,resolution,quality,startedAt:time(),updatedAt:time(),error:'',jobId:null,resultId:null};
  creativeAutoBusy.add(p.id);touchProject(p);
  setImmediate(()=>{void creativeAutoExecute(p,id)});
  return {started:true,runId:id,status:'running',pageName:page.name};
