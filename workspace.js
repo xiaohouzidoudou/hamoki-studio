@@ -1329,8 +1329,12 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
       emptyProvider(pp);
       const model=assertModel(b.model||normalizedCapability(pp,'text').defaultModel);
       const n=target.nodes.find(x=>x.id===b.selectedNodeId);
-      const hasImage=!!(n&&n.kind==='generated');
-      const context=assistantMemory.guide(target.assistantMemory,target.creativeWorkflow?.styleDNA||'',(target.creativeWorkflow?.pages||[]).find(x=>x.id===target.creativeWorkflow?.activePageId)?.requirements||'')
+      const hasImage=!!(n?.kind==='generated'||target.nodes.some(x=>x.kind==='generated'));
+      const workflow=creativeState(target),currentPage=creativeCurrent(workflow);
+      const context=assistantMemory.guide(target.assistantMemory,workflow.styleDNA||'',currentPage?.requirements||'')
+        +'\n现有项目资料：'+workflow.documents.length+'份策划文档；页面任务：'+workflow.pages.map(x=>x.name).slice(0,25).join('、')
+        +'\n当前页面：'+(currentPage?.name||'未关联')+'；原型：'+(creativePagePicture(workflow,currentPage)?'真实图片已关联':'缺少真实原型图')
+        +'；风格：'+(workflow.styleDNA?(workflow.styleLocked?'已锁定':'待确认'):'尚未分析')+'；美术总监方案：'+(currentPage?.analysis?.prompt?'已保存':'尚未完成')
         +'\n当前选中已生成图片：'+(hasImage?'是':'否')+'\n最近聊天：'+target.messages.slice(-8).map(x=>x.role+': '+clampText(x.content,280)).join('\n');
       const raw=await options.limiter.run(()=>generateText(pp,{model,prompt:assistantMemory.planningPrompt(prompt,context),maxOutputTokens:700,timeoutMs:90000}));
       const plan=assistantMemory.parsePlan(raw);

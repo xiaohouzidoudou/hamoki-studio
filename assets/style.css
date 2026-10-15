@@ -639,6 +639,7 @@ input[type=checkbox],input[type=radio],input[type=range]{accent-color:#10cc91}
 .selection-toolbar-close{font-size:16px!important;padding:6px 10px!important}
 
 /* Conversation-first default: retain specialist panels behind one disclosure. */
+.simple-studio .memory-actions #rememberRuleBtn,.simple-studio .memory-actions #approveImageBtn,.simple-studio .memory-actions #rejectImageBtn{display:none!important}
 .simple-studio .studio-config-scroll{display:block!important;min-height:0;overflow:auto;flex:1}
 .simple-studio .studio-config-scroll> :not(#studioActivity){display:none!important}
 .simple-studio #studioActivity{display:block!important;min-height:100%;border:0}

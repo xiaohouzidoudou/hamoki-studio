@@ -171,7 +171,7 @@ async function refreshProjectData(){if(polling||!currentProject||!authorized)ret
  historyItems=h.history||[];jobs=j.jobs||[];paused=!!j.paused;updateStats();syncGenerationActivity();
  const p=r.project;
  if(!gesture&&projectSaveBusy===0&&(p.revision??0)!==lastProjectRevision){
-   currentProject=p;lastProjectRevision=p.revision??0;renderNodes();if(!(textChatBusy&&textChatProjectId===id))renderConversation();renderProjects();setSaving('已同步');
+   currentProject=p;lastProjectRevision=p.revision??0;renderNodes();renderMemoryContext();if(!(textChatBusy&&textChatProjectId===id))renderConversation();renderProjects();setSaving('已同步');
  }else if(newHash!==oldHash&&!gesture){renderNodes();if(!(textChatBusy&&textChatProjectId===id))renderConversation()}
  if(!$('libraryModal').classList.contains('hidden'))renderLibrary();
  }catch(e){if(!/401/.test(e.message))setSaving('连接异常')}finally{polling=false}}
@@ -1142,7 +1142,8 @@ function renderStudioLayerChips(){
 async function assistantSend(){
  const prompt=$('prompt').value.trim();if(!prompt)return toast('请先告诉我你想做什么');
  if(!currentProject)return toast('请先打开一个项目');
- const textRoute=runtimeSelection('text');
+ const routeFromProject=currentProject?.creativeWorkflow?.routing?.text;
+ const textRoute=routeFromProject?.providerId&&routeFromProject?.model?routeFromProject:runtimeSelection('text');
  if(!textRoute.providerId||!textRoute.model){toast('先配置文字模型，以便理解你的要求');return}
  const send=$('generateBtn');send.disabled=true;
  let plan;
@@ -1158,15 +1159,30 @@ async function assistantSend(){
   return;
  }
  if(plan.action==='approve'||plan.action==='reject'){
-  if(currentNode()?.kind!=='generated')return toast('请先在画布中选择对应图片');
+  if(currentNode()?.kind!=='generated'){
+   const latest=[...(currentProject?.nodes||[])].reverse().find(x=>x.kind==='generated');
+   if(latest)selectNode(latest.id);
+  }
   await feedbackCurrent(plan.action==='approve'?'approved':'rejected');
   if(plan.action==='approve')$('prompt').value='';
   return;
  }
  if(plan.action==='image'){
-  const n=currentNode();
+  // If this project has imported Word/prototypes, use the ORIGINAL multi-skill
+  // art workflow instead of inventing a second reference or prompt pipeline.
+  if(plan.mode==='new'&&window.HamokiCreative?.prepareFromChat){
+   const result=await window.HamokiCreative.prepareFromChat(prompt);
+   if(result?.handled){
+    if(!result.ready){toast(result.message||'项目资料尚未准备好');return}
+    sourceId=sourceNodeId=maskData=maskSourcePng=null;
+    const previous=composerMode;composerMode='image';
+    try{await submitGeneration(null,true)}finally{composerMode=previous}
+    return;
+   }
+  }
+  const selected=currentNode();const n=selected?.kind==='generated'?selected:[...(currentProject?.nodes||[])].reverse().find(x=>x.kind==='generated');
   if(plan.mode==='edit'){
-   if(n?.kind!=='generated')return toast('请先选中需要修改的图片');
+   if(n?.kind!=='generated')return toast('当前项目还没有可以修改的图片');
    continueFrom(n.historyId,n.id);
    $('prompt').value=prompt;
   }else{sourceId=null;sourceNodeId=null;maskData=null;maskSourcePng=null;renderContext()}
@@ -1179,7 +1195,7 @@ async function assistantSend(){
  try{await submitTextChat()}finally{composerMode=previous}
 }
 function setSimpleStudio(){document.getElementById('assistantPanel')?.classList.toggle('simple-studio',simpleStudio);const b=$('showStudioTools');if(b)b.textContent=simpleStudio?'专业工具':'收起工具'}
-function renderMemoryContext(){const box=$('memoryContext');if(!box)return;const count=currentProject?.assistantMemory?.rules?.length||0;const node=currentNode();box.textContent=(count?'已记住 '+count+' 条项目规范':'当前项目还没有已确认规范')+(node?' · 已选中图片，可直接描述修改':' · 描述想做的图片即可开始')}
+function renderMemoryContext(){const box=$('memoryContext');if(!box)return;const f=currentProject?.creativeWorkflow,page=f?.pages?.find(x=>x.id===f.activePageId);const count=currentProject?.assistantMemory?.rules?.length||0;const node=currentNode();const info=page?('当前页面：'+page.name+' · '+((page.layoutImageIndex??page.imageIndexes?.[0])!=null?'已关联原型':'缺少原型')+' · '+(f.styleDNA?(f.styleLocked?'风格已锁定':'风格待确认'):'风格待分析')):'自由创作 · 没有关联策划页面';box.textContent=info+(node?.kind==='generated'?' · 修改已选中作品':count?' · '+count+' 条补充规范':'')}
 async function rememberCurrentRule(){const text=$('prompt').value.trim();if(!text)return toast('先写下需要长期遵守的规范');if(!currentProject)return;try{const r=await api(projectPath('/memory/rule'),{method:'POST',body:{text}});currentProject.assistantMemory=r.memory;renderMemoryContext();$('prompt').value='';toast('已保存为项目美术规范，后续生图会自动使用')}catch(e){toast(e.message)}}
 async function feedbackCurrent(kind){const node=currentNode();if(node?.kind!=='generated')return toast('请先选中画布上的一张生成图');try{const note=kind==='rejected'?$('prompt').value.trim():'';const r=await api(projectPath('/memory/feedback'),{method:'POST',body:{nodeId:node.id,historyId:node.historyId,kind,note}});currentProject.assistantMemory=r.memory;renderMemoryContext();toast(kind==='approved'?'已确认作品':'已记录不满意反馈，不会误记成项目规则')}catch(e){toast(e.message)}}
 function setComposerMode(mode){
