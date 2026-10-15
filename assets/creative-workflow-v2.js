@@ -155,7 +155,23 @@
   $('creativeStyleStatus').textContent=f?.styleDNA?'风格已建立，可跨页面复用。':'尚无 Style DNA，生成风格会不稳定。';
   $('creativeStyleLock').textContent=f?.styleLocked?'风格已锁定 · 可点击解除':'锁定当前风格';
   const rows=(typeof historyItems!=='undefined'?historyItems:[]).filter(h=>h.projectId===projectId);
-  pick('creativeGeneratedSelect',rows.length?rows.slice(0,80).map((h,i)=>({value:h.id,label:(h.model||'作品')+' · '+(h.createdAt||'').slice(0,16)+' · #'+(i+1)})):[{value:'',label:'当前项目暂无生成图'}],page?.quality?.historyId||rows[0]?.id||'');
+  const gallery=$('creativeQualityGallery'),previous=$('creativeGeneratedSelect').value;
+  const chosen=[previous,page?.quality?.historyId,(typeof selectedSceneNodes==='function'&&selectedSceneNodes().length===1?selectedSceneNodes()[0]?.historyId:null),rows[0]?.id].find(x=>rows.some(h=>h.id===x))||'';
+  pick('creativeGeneratedSelect',rows.length?rows.slice(0,80).map((h,i)=>({value:h.id,label:(h.model||'作品')+' · '+(h.createdAt||'').slice(0,16)+' · #'+(i+1)})):[{value:'',label:'当前项目暂无生成图'}],chosen);
+  gallery.replaceChildren();
+  if(!rows.length)gallery.append(el('p','micro muted','当前项目暂无生成图，请先在画布完成生图。'));
+  for(const h of rows.slice(0,80)){
+   const card=el('button','creative-quality-card'+(h.id===chosen?' is-selected':''));card.type='button';card.dataset.historyId=h.id;card.setAttribute('aria-pressed',String(h.id===chosen));
+   const image=el('img');image.loading='lazy';image.alt='待质检作品预览';image.src=h.previewUrl||h.url;
+   image.onerror=()=>{if(image.src!==new URL(h.url,location.href).href)image.src=h.url};
+   const label=el('span','creative-quality-card-name',(h.prompt||h.model||'生成作品').slice(0,65));
+   const meta=el('small',null,(h.model||'AI 生图')+' · '+(h.createdAt||'').slice(0,16).replace('T',' '));
+   card.append(image,label,meta);
+   card.onclick=()=>{ $('creativeGeneratedSelect').value=h.id;
+    gallery.querySelectorAll('.creative-quality-card').forEach(b=>{const selected=b.dataset.historyId===h.id;b.classList.toggle('is-selected',selected);b.setAttribute('aria-pressed',String(selected))});
+   };
+   gallery.append(card);
+  }
   $('creativeQuality').disabled=!analysis.director||!rows.length||busy;
   $('creativeUseFix').disabled=!page?.quality?.report||busy;
  }
