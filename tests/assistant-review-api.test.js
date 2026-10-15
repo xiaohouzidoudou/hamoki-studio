@@ -45,9 +45,9 @@ test('approved project image becomes style reference, and explicit review record
  const provider=(await api('/api/providers','POST',{name:'mock-upstream',url:'http://127.0.0.1:'+mock.address().port+'/v1',
    mode:'openai',imageMode:'images',apiKey:'local-fixture',imageModel:'gpt-image-1',visionModel:'gpt-4o-mini'})).body.provider;
  assert.ok(provider.id);
- const make=()=>api('/api/jobs','POST',{projectId:project,providerId:provider.id,model:'gpt-image-1',prompt:'绘制周年庆活动界面',
+ const make=(autoFixMax=0)=>api('/api/jobs','POST',{projectId:project,providerId:provider.id,model:'gpt-image-1',prompt:'绘制周年庆活动界面',
    ratio:'1:1',resolution:'1K',quality:'auto',count:1,
-   review:{enabled:true,confirmed:true,providerId:provider.id,model:'gpt-4o-mini'}});
+   review:{enabled:true,confirmed:true,providerId:provider.id,model:'gpt-4o-mini',autoFixMax}});
  const first=await make();assert.equal(first.status,201,JSON.stringify(first.body));
  const h1=await until(async()=>{const x=(await api('/api/history?projectId='+project)).body.history[0];return x?.review?.status==='needs_work'?x:null});
  assert.match(h1.review.correction,/只调整/);
@@ -63,4 +63,17 @@ test('approved project image becomes style reference, and explicit review record
  assert.equal(requests.filter(x=>x.path.includes('/chat/completions')).length,2,'one review per paid image');
  assert.equal(requests.filter(x=>x.path.includes('/images/')).length,2,'no automatic paid correction was triggered');
  assert.ok(requests.some(x=>x.path.includes('/images/edits')),'approved style image sent to image model');
+ // Simulate a paid correction budget of exactly one. The mock reviewer rejects
+ // BOTH generations so the second result must not trigger a third billable call.
+ const third=await make(1);assert.equal(third.status,201);
+ const fixed=await until(async()=>{
+  const recent=(await api('/api/history?projectId='+project)).body.history;
+  const child=recent.find(x=>x.parentId&&x.review?.status==='needs_work');
+  return child&&recent.find(x=>x.id===child.parentId)?.review?.autoFix?.status==='done'?child:null;
+ });
+ assert.ok(fixed.parentId,'the one correction must be linked to its previous version');
+ assert.equal(requests.filter(x=>x.path.includes('/images/')).length,4,'exactly three requested images and one auto correction');
+ assert.equal(requests.filter(x=>x.path.includes('/chat/completions')).length,4,'review exactly once per image');
+ const allJobs=(await api('/api/jobs')).body.jobs;
+ assert.equal(allJobs.filter(x=>x.autoFixDepth===1).length,1,'auto correction cannot recursively spend quota');
 });

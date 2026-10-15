@@ -596,6 +596,16 @@ function saveSourceFiles(refs,mask,maskSource){
 }
 function emptyProvider(p){if(DEMO_MODE&&p)return; if(!p||!p.url||!p.apiKey)throw Error('请先配置中转站地址和 API Key')}
 function jobStatusOk(j,status){
+ if(j.autoFixParentJobId&&['done','failed'].includes(status)){
+  const parent=jobs.find(x=>x.id===j.autoFixParentJobId);
+  const prev=parent&&history.find(x=>x.id===parent.resultId&&x.projectId===j.projectId);
+  if(prev?.review?.autoFix?.jobId===j.id){
+   prev.review.autoFix.status=status;
+   if(status==='failed')prev.review.autoFix.reason=String(j.error||'纠偏生成失败').slice(0,180);
+   saveHistory();
+  }
+ }
+
  if(status==="done"||status==="failed"){const p=project(j.projectId);if(p?.aiComponentPlan?.id===j.groupId&&p.aiComponentPlan.auto?.enabled)setImmediate(()=>componentAutoContinue(p))}if(j.status==='cancelled')return false;j.status=status;j.updatedAt=time();saveJobs();if(status==='failed'){const p=project(j.projectId||defaultProject()?.id);if(p){p.messages.push({id:crypto.randomUUID(),role:'error',content:'生成失败（'+j.model+'）：'+(j.error||'未知错误'),createdAt:time(),groupId:j.groupId});p.messages=p.messages.slice(-400);touchProject(p)}}return true}
 function schedule(){setImmediate(pump)}
 function pump(){
@@ -609,6 +619,42 @@ function pump(){
  }
  const future=jobs.filter(j=>j.status==='queued'&&j.nextRunAt>Date.now());
  if(future.length&&!retryTimer){const delay=Math.min(60000,Math.max(100,Math.min(...future.map(j=>j.nextRunAt))-Date.now()));retryTimer=setTimeout(schedule,delay);retryTimer.unref?.()}
+}
+function scheduleReviewedCorrection(job,entry,projectState){
+ const report=entry.review,config=job.review||{};
+ if(config.autoFixMax!==1||report?.status!=='needs_work'||!report.correction||job.autoFixDepth)return;
+ // Never spend an additional image call unless a strict upper bound was approved.
+ const active=jobs.filter(j=>['queued','running'].includes(j.status)).length;
+ const p=effectiveProvider(provider(job.providerId),'edit');
+ if(p.mode!=='openai'||p.imageMode!=='images'){
+  report.autoFix={status:'unsupported',reason:'当前图片服务商不支持经过验证的 Images Edits 自动纠偏'};
+  return;
+ }
+ if(active>=MAX_QUEUED){
+  report.autoFix={status:'skipped',reason:'队列已满，请稍后按审图意见手动修正'};
+  return;
+ }
+ const f=projectState.creativeWorkflow||{},page=(f.pages||[]).find(x=>x.id===config.pageId);
+ const instruction=[
+  '在上一张图片基础上精准修正审图发现的错误。严禁重新设计整个界面，必须保留所有已经正确的部分。',
+  '最初需求：'+String(job.editInstruction||'').slice(0,2200),
+  '必须修复：'+String(report.correction||'').slice(0,1300),
+  '请先对照原型及布局数量检查行列关系，特别注意5列6行不同于6列5行。'
+ ].join('\n');
+ const prompt=assistantMemory.generationPrompt(instruction,projectState.assistantMemory,f.styleDNA||'',page?.requirements||'');
+ const origin=projectState.nodes.find(x=>x.kind==='generated'&&x.historyId===entry.id);
+ const fix=makeJob({
+  capability:'edit',projectId:projectState.id,sourceId:entry.id,sourceNodeId:origin?.id||null,
+  editInstruction:instruction,prompt,transparentBg:job.transparentBg,ratio:job.ratio,resolution:job.resolution,
+  quality:job.quality,canvasX:job.canvasX,canvasY:job.canvasY,
+  review:{...config,autoFixMax:0}
+ },{input:(job.referenceMedia||[]).slice(),roleHints:(job.roleHints||[]).slice(),mask:null,maskSource:null},
+ job.providerId,job.model,job.groupId);
+ fix.autoFixDepth=1;fix.autoFixParentJobId=job.id;
+ jobs.unshift(fix);
+ report.autoFix={status:'queued',jobId:fix.id,limit:1};
+ job.reviewStatus='correcting';
+ saveJobs();schedule();
 }
 async function reviewGenerated(job,entry){
  const config=job.review,projectState=project(job.projectId);
@@ -627,12 +673,15 @@ async function reviewGenerated(job,entry){
   pictures.push(fetchMedia(entry.file));
   const vision=effectiveProvider(provider(config.providerId),'vision');emptyProvider(vision);
   const instructions=assistantReview.prompt({
-   rules:config.rules,requirements:config.requirements,
+   rules:config.rules,requirements:config.requirements,instruction:job.editInstruction||'',
    hasStyle:!!styleFile,hasPrototype:!!prototype?.file,hasSource:!!source&&source.file!==styleFile
   });
   const raw=await options.limiter.run(()=>analyzeCreativeImages(vision,pictures,config.model,instructions,{timeoutMs:165000}));
   entry.review={...assistantReview.parse(raw),checkedAt:time()};
   job.reviewStatus=entry.review.status;
+  try{scheduleReviewedCorrection(job,entry,projectState)}catch(e){
+   entry.review.autoFix={status:'skipped',reason:String(e.message||e).slice(0,180)};
+  }
  }catch(e){
   entry.review={status:'uncertain',summary:'自动审图未完成：'+String(e.message||e).slice(0,160),issues:[],correction:'',checkedAt:time()};
   job.reviewStatus='uncertain';
@@ -717,12 +766,15 @@ function validateCreation(b){
    const rp=effectiveProvider(provider(b.review.providerId||state.activeId),'vision');emptyProvider(rp);
    const model=creativeModel(rp,'vision',b.review.model);
    const f=targetProject.creativeWorkflow||{},page=(f.pages||[]).find(x=>x.id===f.activePageId);
-   return {providerId:rp.id,model,pageId:page?.id||null,
+   const autoFixMax=Number(b.review.autoFixMax||0);
+   if(!Number.isInteger(autoFixMax)||autoFixMax<0||autoFixMax>1)throw Error('自动纠偏最多允许一次');
+   if(autoFixMax&&(count!==1||targets.length!==1))throw Error('自动纠偏仅支持每次单张、单模型');
+   return {providerId:rp.id,model,pageId:page?.id||null,autoFixMax,
      rules:assistantMemory.guide(targetProject.assistantMemory,f.styleDNA||'',page?.requirements||'').slice(0,6500),
      requirements:String(page?.requirements||'').slice(0,2500)};
   })():null;
  const editMode=!!source&&b.editMode!=='new';
- const draftPrompt=editMode?('根据第一张参考原图精确编辑。除本轮明确要求改变的内容外，保持主体身份、脸部、服装结构、姿势、画面构图和风格一致。\n历史创作描述：'+source.prompt.slice(0,6500)+'\n本轮修改要求：'+instruction):instruction;
+ const draftPrompt=editMode?('根据第一张参考原图精确编辑。除本轮明确要求改变的内容外，保持主体身份、脸部、服装结构、姿势、画面构图和风格一致。\n历史创作描述：'+(source.editInstruction||source.prompt).slice(0,2400)+'\n本轮修改要求：'+instruction):instruction;
  const prompt=assistantMemory.generationPrompt(draftPrompt,targetProject.assistantMemory,targetProject.creativeWorkflow?.styleDNA||'',(targetProject.creativeWorkflow?.pages||[]).find(x=>x.id===targetProject.creativeWorkflow?.activePageId)?.requirements||'');
  return {capability,prompt,editInstruction:instruction,refs,referenceNodes:images,count,targets,ratio,resolution,quality,review,transparentBg,sourceId:source?.id||null,sourceNodeId,projectId:targetProject.id,canvasX:num(b.canvasX,180),canvasY:num(b.canvasY,170),mask:b.mask||null,maskSourceImage:b.maskSourceImage||null};
 }
