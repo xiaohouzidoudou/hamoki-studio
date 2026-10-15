@@ -9,11 +9,13 @@ const server=fs.readFileSync(path.join(root,'workspace.js'),'utf8');
 test('chat creation delegates to existing Word prototype and Style DNA workflow, not a second planner',()=>{
  assert.match(app,/window\.HamokiCreative\.prepareFromChat\(prompt\)/);
  assert.match(flow,/window\.HamokiCreative=\{prepareFromChat\}/);
- assert.match(flow,/await run\('analyze'\)/);
- assert.match(flow,/await canvasPrompt\(/);
- assert.match(flow,/if\(!proto\?\.nodeId\)return/);
- assert.match(flow,/!f\.styleDNA&&!?\(f\.styleNodeIds\|\|\[\]\)\.length/);
- assert.match(flow,/role:'style'/);
+ assert.ok(flow.includes("creative/auto"),'chat calls server coordinator');
+ assert.ok(flow.includes('if(!proto?.nodeId)return'),'prototype must be real');
+ assert.ok(server.includes('async function creativeAutoExecute('));
+ assert.ok(server.includes('await creativeAnalyze(p,'));
+ assert.ok(server.includes('await creativeQuality(p,'));
+ assert.ok(server.includes("creativeAutoStart(p,await readJSON(req))"));
+  assert.match(flow,/role:'style'/);
  assert.match(flow,/role:'shape'/);
  assert.match(server,/creativePagePicture\(workflow,currentPage\)/);
 });

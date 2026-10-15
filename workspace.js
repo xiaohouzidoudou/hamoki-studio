@@ -124,6 +124,9 @@ function touchProject(p){p.revision=(p.revision||0)+1;p.updatedAt=time();savePro
 let interruptedCreative=false;
 for(const p of projects){
  const f=p.creativeWorkflow;
+ if(f?.autoRun?.status==='running'){
+  f.autoRun.status='interrupted';f.autoRun.stage='interrupted';f.autoRun.message='服务重启打断了自动流程，原来的付费任务可能继续运行；请检查队列，不会自动重复扣费';f.autoRun.updatedAt=time();interruptedCreative=true;
+ }
  if(f?.status==='running'||f?.stages&&Object.values(f.stages).includes('running')){
   f.status='failed';f.error='服务重启中断了上次分析，请检查上游账单后决定是否重新运行';
   for(const key of Object.keys(f.stages||{}))if(f.stages[key]==='running')f.stages[key]='failed';
@@ -141,7 +144,111 @@ for(const p of projects){
 }
 for(const p of projects){const plan=p.aiComponentPlan;if(plan?.status==="analyzing"){plan.status="failed";plan.error="识别任务因服务重启中断，请核对上游费用后决定是否重试";interruptedCreative=true}if(plan?.auto?.enabled){plan.auto.enabled=false;plan.auto.error="服务重启已暂停自动生图；继续之前请重新确认费用";interruptedCreative=true}}
 if(interruptedCreative)saveProjects();
+// Automatic orchestration is only a coordinator for the existing, pinned
+// creativeAnalyze -> submit -> creativeQuality engine, not a parallel art engine.
+const creativeAutoBusy=new Set();
 const creativeBusy=new Set();
+function autoRunView(f){return f.autoRun||null}
+function autoProgress(p,id,patch){
+ const f=creativeState(p);
+ if(f.autoRun?.id!==id)return false;
+ Object.assign(f.autoRun,patch,{updatedAt:time()});touchProject(p);return true;
+}
+async function creativeAutoExecute(p,id){
+ const f=creativeState(p),run=f.autoRun;
+ if(!run||run.id!==id)return;
+ const page=f.pages.find(x=>x.id===run.pageId);
+ try{
+  f.activePageId=page.id;
+  if(!page.analysis?.prompt){
+   autoProgress(p,id,{stage:'analyze',status:'running',message:'正在调用原有 ai_asset 风格分析、原型分析和美术总监技能'});
+   await creativeAnalyze(p,{pageId:page.id});
+  }
+  if(!page.analysis?.prompt)throw Error('专业美术总监没有返回可用的生成方案');
+  autoProgress(p,id,{stage:'generation',status:'running',message:'原型与风格方案已保存，正在提交一张真实生图'});
+  const settings=f.routing?.image||{};
+  const refs=f.styleNodeIds.map(nodeId=>({nodeId,role:'style'}));
+  const prototype=creativePagePicture(f,page);
+  if(!prototype?.nodeId)throw Error('页面没有可用的原型图片');
+  refs.push({nodeId:prototype.nodeId,role:'shape'});
+  const created=submit({
+   projectId:p.id,providerId:settings.providerId,model:settings.model,
+   prompt:page.analysis.prompt+'\n\n【本轮用户原始要求】\n'+run.instruction,
+   referenceNodes:refs,useProjectStyle:false,count:1,
+   ratio:run.ratio,resolution:run.resolution,quality:run.quality
+  });
+  const jobId=created.jobs[0]?.id;
+  if(!jobId)throw Error('图片任务提交失败');
+  autoProgress(p,id,{jobId,stage:'generation',message:'已提交生图任务，等待模型返回图片'});
+  const deadline=Date.now()+12*60*1000;
+  let job;
+  while(Date.now()<deadline){
+   job=jobs.find(x=>x.id===jobId&&x.projectId===p.id);
+   if(job?.status==='done'||job?.status==='failed'||job?.status==='cancelled')break;
+   await new Promise(resolve=>setTimeout(resolve,1500));
+  }
+  if(!job||!['done','failed','cancelled'].includes(job.status)){
+   autoProgress(p,id,{status:'uncertain',stage:'generation',message:'生图仍未结束，任务可能继续计费。请先查看队列，不会自动重新提交'});
+   return;
+  }
+  if(job.status!=='done')throw Error('生图任务'+job.status+'：'+String(job.error||'请查看任务记录').slice(0,200));
+  autoProgress(p,id,{resultId:job.resultId,stage:run.review?'quality':'done',message:run.review?'图片已生成，正在执行原有 CHECK 质检技能':'图片已生成，等待你的判断'});
+  if(run.review)await creativeQuality(p,job.resultId);
+  autoProgress(p,id,{status:'awaiting_feedback',stage:'done',message:'作品与分析结果已保存。请判断哪里对、哪里需要改，不会自动重复生图'});
+ }catch(e){
+  autoProgress(p,id,{status:'failed',stage:'failed',error:String(e.message||e).slice(0,380),message:'任务已停止，不会自动重试产生额外费用'});
+ }finally{creativeAutoBusy.delete(p.id)}
+}
+function creativeAutoStart(p,b){
+ const f=creativeState(p);
+ if(DEMO_MODE)throw Error('演示模式不可执行真实付费流程');
+ if(b?.confirmed!==true)throw Error('请先确认这次专业分析、生图与质检的费用');
+ if(creativeAutoBusy.has(p.id)||creativeBusy.has(p.id)||f.autoRun?.status==='running')throw Error('当前项目已有执行中的美术任务');
+ const instruction=clampText(b.instruction,2400).trim();
+ if(!instruction)throw Error('请先描述想制作的页面');
+ if(!f.documents.length||!f.pages.length)throw Error('当前项目没有 Word 策划页面，请先上传文档');
+ const page=f.pages.find(x=>x.id===(b.pageId||f.activePageId));
+ if(!page)throw Error('没有找到对应页面，请先确认一次页面');
+ const proto=creativePagePicture(f,page);
+ if(!proto?.nodeId)throw Error('「'+page.name+'」缺少真实原型图；请先上传并关联，不能凭空推断');
+ if(!f.styleNodeIds?.length){
+  // Uploaded style references are separate from Word-embedded TARGET prototypes.
+  const prototypes=new Set(f.documents.flatMap(d=>(d.images||[]).map(x=>x.nodeId)));
+  const uploaded=p.nodes.filter(n=>n.kind==='reference'&&!prototypes.has(n.id));
+  if(uploaded.length>=1&&uploaded.length<=5)f.styleNodeIds=uploaded.map(n=>n.id);
+  else throw Error(uploaded.length>5?'发现多于5张普通参考图，无法确定哪张是风格图，请选择一次':'没有找到独立于原型的风格参考图，请先上传真实美术参考图');
+ }
+ const inputs=b.routing||{};
+ f.routing=f.routing||{};
+ for(const cap of ['text','vision','image']){
+  const prior=f.routing[cap]||{},given=inputs[cap]||{};
+  if(!prior.providerId||!prior.model){
+   const id=String(given.providerId||prior.providerId||'').slice(0,70);
+   const model=String(given.model||prior.model||'').slice(0,150);
+   if(id&&!state.providers.some(x=>x.id===id))throw Error('所选'+cap+'服务商不存在');
+   if(model)assertModel(model);
+   f.routing[cap]={providerId:id,model};
+  }
+ }
+ if(f.styleNodeIds.length>5)throw Error('最多使用五张风格参考图');
+ for(const id of f.styleNodeIds)creativePictureFromNode(p,id); // Fail before billing when source missing.
+ const img=f.routing?.image||{};
+ const image=effectiveProvider(provider(img.providerId||state.activeId),'image');
+ emptyProvider(image);creativeModel(image,'image',img.model);
+ if(!page.analysis?.prompt)creativeCheckModels(f,'analyze',{pageId:page.id});
+ if(b.review!==false)creativeCheckModels(f,'quality');
+ const ratio=trim(b.ratio||'9:16',10),resolution=trim(b.resolution||'1K',5),quality=trim(b.quality||'auto',8);
+ if(!['1:1','3:2','2:3','16:9','9:16','4:3','3:4'].includes(ratio)||!['1K','2K','4K'].includes(resolution)||!['auto','low','medium','high'].includes(quality))throw Error('图片比例或分辨率无效');
+ const id=crypto.randomUUID();
+ f.activePageId=page.id;
+ f.autoRun={id,pageId:page.id,pageName:page.name,instruction,status:'running',stage:'prepare',
+  message:'已关联策划文档、原型和风格参考，准备调用专业技能',review:b.review!==false,
+  ratio,resolution,quality,startedAt:time(),updatedAt:time(),error:'',jobId:null,resultId:null};
+ creativeAutoBusy.add(p.id);touchProject(p);
+ setImmediate(()=>{void creativeAutoExecute(p,id)});
+ return {started:true,runId:id,status:'running',pageName:page.name};
+}
+
 function creativeState(p){
  const f=p.creativeWorkflow||(p.creativeWorkflow=creative.make());
  if(!Array.isArray(f.documents)){
@@ -1138,11 +1245,12 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
     if(route==='/api/logout'&&req.method==='POST'&&process.env.ANON_WORKSPACE==='1')return fail(res,405,'免登录工作区无需退出');
     if(route==='/api/logout'&&req.method==='POST'){sessions.delete(cookie(req));res.setHeader('Set-Cookie',`hs_session=; HttpOnly; SameSite=Strict; Path=${BASE||''}/; Max-Age=0`);return respond(res,200,{ok:true})}
     if(req.method==='GET'&&route==='/api/storage')return respond(res,200,{...storageUsage(),mode:'local',concurrency:CONCURRENCY,notice:'每个账号默认 1GB 空间，空间不足时会自动清理最旧的历史图片和浏览器预览；请定期导出重要作品。'});
-    const creativeMatch=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/creative(?:\/(document|document-remove|settings|analyze|director-retry|quality|split|page))?$/);
+    const creativeMatch=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/creative(?:\/(document|document-remove|settings|analyze|director-retry|quality|split|page|auto))?$/);
     if(creativeMatch){
       const p=assertProject(creativeMatch[1]),action=creativeMatch[2],f=creativeState(p);
       if(!action&&req.method==='GET')return respond(res,200,creativeView(p));
-      if(creativeBusy.has(p.id))return fail(res,409,'此项目的 AI 任务正在运行，请待完成后再修改');
+      if(creativeAutoBusy.has(p.id)||creativeBusy.has(p.id))return fail(res,409,'此项目的 AI 任务正在运行，请待完成后再修改');
+      if(action==='auto'&&req.method==='POST')return respond(res,202,creativeAutoStart(p,await readJSON(req)));
       if(action==='document'&&req.method==='POST'){
         const b=await readJSON(req);
         if(typeof b.name!=='string'||!b.name.toLowerCase().endsWith('.docx'))throw Error('只支持 Word .docx 文件');

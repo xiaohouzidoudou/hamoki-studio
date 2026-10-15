@@ -379,23 +379,25 @@
    catch(e){return {handled:true,ready:false,message:'切换页面失败：'+e.message}}
   }
   const page=active();
-  if(!page)return {handled:true,ready:false,message:'请先确认当前页面任务'};
+  if(!page)return {handled:true,ready:false,message:'请先确认要制作的策划页面'};
   const proto=picture(page,page.layoutImageIndex??page.imageIndexes?.[0]);
-  if(!proto?.nodeId)return {handled:true,ready:false,message:'「'+page.name+'」尚未关联真实原型图。请在项目资料中补充或确认原型，不能凭空猜测布局。'};
-  if(!f.styleDNA&&!(f.styleNodeIds||[]).length)return {handled:true,ready:false,message:'项目尚未设置真实美术风格参考图，请先关联一次，后续页面自动复用。'};
-  if(!page.analysis?.prompt){
-   await run('analyze');
-   if(projectId!==id)return {handled:true,ready:false,message:'分析期间项目已切换，请重新发送'};
-   if(!active()?.analysis?.prompt)return {handled:true,ready:false,message:'当前页面原型分析或美术方案尚未完成：'+(f.error||'请核对分析结果与费用确认状态')};
-  }
-  if(f.styleDNA&&!f.styleLocked){
-   if(!confirm('将项目 Style DNA 锁定用于后续页面吗？'))return {handled:true,ready:false,message:'风格尚未确认，没有提交生图。'};
-   try{const r=await api('projects/'+id+'/creative/settings',{method:'POST',body:{...settings(),styleLocked:true}});f=r.flow;render()}
-   catch(e){return {handled:true,ready:false,message:'风格锁定失败：'+e.message}}
-  }
-  const prepared=await canvasPrompt('\n\n【本轮用户要求，已确认部分保持不变】\n'+instruction);
-  if(currentProject?.id===id){currentProject.creativeWorkflow=f;if(typeof renderMemoryContext==='function')renderMemoryContext()}
-  return prepared?{handled:true,ready:true,pageName:page.name}:{handled:true,ready:false,message:'现有美术工作流无法准备当前页生图，请检查项目模型与参考图'};
+  if(!proto?.nodeId)return {handled:true,ready:false,message:'「'+page.name+'」没有关联真实原型，请先补充，不会凭空猜测布局'};
+  if(f.autoRun?.status==='running')return {handled:true,ready:false,message:'已有后台专业美术任务正在运行，进度会自动显示'};
+  const needPlan=!page.analysis?.prompt;
+  const review=true; // A single original CHECK pass; no automatic paid regeneration.
+  const extra=needPlan?('STYLE/原型分析（最多2次视觉调用）+美术总监文字方案'):('复用已保存的美术总监方案');
+  const approved=confirm('将针对「'+page.name+'」自动执行：\\n'+extra+'\\n生成1张图片 + 独立CHECK视觉质检1次。\\n会产生相应中转站费用，失败或超时也可能已扣费；不会自动反复生成。确认开始？');
+  if(!approved)return {handled:true,ready:false,message:'未确认实际模型费用，本次没有开始执行'};
+  try{
+   const r=await api('projects/'+id+'/creative/auto',{method:'POST',body:{
+    pageId:page.id,instruction,confirmed:true,review,
+    ratio:$('ratio')?.value==='reference'?'9:16':$('ratio')?.value||'9:16',
+    resolution:$('resolution')?.value||'1K',quality:$('quality')?.value||'auto',
+    routing:{text:typeof runtimeSelection==='function'?runtimeSelection('text'):{},vision:typeof runtimeSelection==='function'?runtimeSelection('vision'):{},image:{providerId:typeof activeId==='string'?activeId:'',model:$('imageModel')?.value||''}}
+   }});
+   if(r.started){if(currentProject?.id===id){currentProject.creativeWorkflow=f;currentProject.creativeWorkflow.autoRun={id:r.runId,pageId:page.id,pageName:page.name,status:'running',stage:'prepare',message:'资料已关联，后台开始专业分析'};if(typeof renderCreativeAutoProgress==='function')renderCreativeAutoProgress()}return {handled:true,started:true,pageName:page.name}}
+   return {handled:true,ready:false,message:'后台未确认开始执行'};
+  }catch(e){return {handled:true,ready:false,message:'专业工作流没有启动：'+e.message}}
  }
  if(typeof window!=='undefined')window.HamokiCreative={prepareFromChat};
  async function review(){

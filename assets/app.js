@@ -136,7 +136,7 @@ function setSaving(text='正在保存'){const t=$('saveStatus');t.innerHTML='';c
 function changeTool(t){tool=t;closeBoardContextMenu();$('board')?.setAttribute('data-tool',tool);document.querySelectorAll('[data-tool]').forEach(x=>x.classList.toggle('active',x.dataset.tool===t));$('canvasHint').textContent=t==='note'?'在画布空白处点击添加便签':t==='hand'?'左键或中键拖动平移画布':'左键框选 · 中键或空格拖动画布 · 右键菜单'}
 function setAuthMode(mode){authMode=mode;$('showLogin')?.classList.toggle('active',mode==='login');$('showRegister')?.classList.toggle('active',mode==='register');$('loginPane')?.classList.toggle('hidden',mode!=='login');$('registerPane')?.classList.toggle('hidden',mode!=='register')}
 function fillAccountHeader(){if(!$('accountTitle'))return;$('accountTitle').textContent=currentUser?.name||'我的创作空间'}
-async function init(){bindEvents();setAuthMode('login');try{const r=await api('status');if(!r.backend)throw Error('找不到服务端');demoMode=!!r.demoMode;if(!r.authenticated){show('loginModal');$('loginStatus').textContent='请输入账号密码后继续';fillAccountHeader();return}authorized=true;currentUser=r.user||null;loadQuickModelPreferences();fillAccountHeader();hide('loginModal');await boot()}catch(e){$('loginStatus').textContent=e.message;show('loginModal')}setInterval(()=>{if(!authorized||document.visibilityState==='hidden')return;const busy=jobs.some(j=>['queued','running'].includes(j.status));if(busy||Date.now()-lastIdlePoll>12000){lastIdlePoll=Date.now();refreshProjectData()}},3000);setInterval(()=>{if(authorized&&document.visibilityState!=='hidden')refreshStorage()},60000);setInterval(()=>{if(authorized&&document.visibilityState!=='hidden')updateGenerationElapsed()},1000);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&authorized){lastIdlePoll=0;drainPreviewQueue();refreshProjectData()}})}
+async function init(){bindEvents();setAuthMode('login');try{const r=await api('status');if(!r.backend)throw Error('找不到服务端');demoMode=!!r.demoMode;if(!r.authenticated){show('loginModal');$('loginStatus').textContent='请输入账号密码后继续';fillAccountHeader();return}authorized=true;currentUser=r.user||null;loadQuickModelPreferences();fillAccountHeader();hide('loginModal');await boot()}catch(e){$('loginStatus').textContent=e.message;show('loginModal')}setInterval(()=>{if(!authorized||document.visibilityState==='hidden')return;const busy=jobs.some(j=>['queued','running'].includes(j.status));if(busy||currentProject?.creativeWorkflow?.autoRun?.status==='running'||Date.now()-lastIdlePoll>12000){lastIdlePoll=Date.now();refreshProjectData()}},3000);setInterval(()=>{if(authorized&&document.visibilityState!=='hidden')refreshStorage()},60000);setInterval(()=>{if(authorized&&document.visibilityState!=='hidden')updateGenerationElapsed()},1000);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&authorized){lastIdlePoll=0;drainPreviewQueue();refreshProjectData()}})}
 async function login(){const username=$('loginUser').value.trim(),password=$('loginPass').value;try{$('loginStatus').textContent='正在登录…';const r=await api('/api/login',{method:'POST',body:{username,password}});authorized=true;currentUser=r.user||{name:username};loadQuickModelPreferences();fillAccountHeader();hide('loginModal');$('loginPass').value='';await boot()}catch(e){authorized=false;$('loginStatus').textContent=e.message}}
 async function register(){const inviteCode=$('inviteCode').value.trim(),username=$('registerUser').value.trim(),password=$('registerPass').value;try{$('loginStatus').textContent='正在创建账号…';const r=await api('/api/register',{method:'POST',body:{inviteCode,username,password}});authorized=true;currentUser=r.user||{name:username};loadQuickModelPreferences();fillAccountHeader();hide('loginModal');$('registerPass').value='';await boot()}catch(e){authorized=false;$('loginStatus').textContent=e.message}}
 async function logoutAccount(){textChatController?.abort();try{await api('/api/logout',{method:'POST',body:{}})}catch{}closeCanvasMenu();closeQuickProviderMenu();closeQuickModelMenu();quickModelPrefs.clear();quickModelFetches.clear();modelCatalogByProvider.clear();populateComposerModelSuggestions(null);authorized=false;currentUser=null;providers=[];projectList=[];currentProject=null;historyItems=[];jobs=[];diagnosticItems=[];hide('logsModal');hide('settingsModal');hide('libraryModal');for(const cap of ['text','vision'])runtimeRoutes[cap]={providerId:'',model:''};runtimeCatalog.clear();fillAccountHeader();$('connectionStatus').textContent='已退出';$('logCount').textContent='···';show('loginModal');setAuthMode('login');$('loginStatus').textContent='你已退出账号'}
@@ -163,7 +163,7 @@ async function switchProject(id){if(!id||!authorized)return;if(textChatBusy&&tex
  $('currentProjectTitle').textContent=currentProject.title;renderProjects();$('projectsPanel').classList.remove('open');
  const [h,j]=await Promise.all([api(`history?projectId=${id}`),api(`jobs?projectId=${id}`)]);historyItems=h.history||[];jobs=j.jobs||[];paused=!!j.paused;renderAll();
 }catch(e){toast('打开项目失败：'+e.message)}}
-function renderAll(){updateScene();renderNodes();renderConversation();renderContext();renderMemoryContext();renderLibrary();updateStats();}
+function renderAll(){updateScene();renderNodes();renderConversation();renderContext();renderMemoryContext();renderCreativeAutoProgress();renderLibrary();updateStats();}
 function updateStats(){const n=jobs.filter(j=>['queued','running'].includes(j.status)).length;$('queueBadge').textContent=n;$('libraryCount').textContent=historyItems.length;$('pauseBtn').textContent=paused?'▶ 恢复队列':'Ⅱ 暂停队列'}
 async function refreshProjectData(){if(polling||!currentProject||!authorized)return;polling=true;const id=currentProject.id;try{
  const [h,j,r]=await Promise.all([api(`history?projectId=${id}`),api(`jobs?projectId=${id}`),api(`/api/projects/${id}`)]);
@@ -171,7 +171,7 @@ async function refreshProjectData(){if(polling||!currentProject||!authorized)ret
  historyItems=h.history||[];jobs=j.jobs||[];paused=!!j.paused;updateStats();syncGenerationActivity();
  const p=r.project;
  if(!gesture&&projectSaveBusy===0&&(p.revision??0)!==lastProjectRevision){
-   currentProject=p;lastProjectRevision=p.revision??0;renderNodes();renderMemoryContext();if(!(textChatBusy&&textChatProjectId===id))renderConversation();renderProjects();setSaving('已同步');
+   currentProject=p;lastProjectRevision=p.revision??0;renderNodes();renderMemoryContext();renderCreativeAutoProgress();if(!(textChatBusy&&textChatProjectId===id))renderConversation();renderProjects();setSaving('已同步');
  }else if(newHash!==oldHash&&!gesture){renderNodes();if(!(textChatBusy&&textChatProjectId===id))renderConversation()}
  if(!$('libraryModal').classList.contains('hidden'))renderLibrary();
  }catch(e){if(!/401/.test(e.message))setSaving('连接异常')}finally{polling=false}}
@@ -1104,6 +1104,7 @@ function arrangeStudioLayout(){
  scroll.append(details);
  const activity=el('details','studio-activity');activity.id='studioActivity';
  activity.innerHTML='<summary>创作记录与对话 <svg class="icon sm"><use href="#ic-chevron"/></svg></summary>';activity.open=true;
+ const autoProgress=el('div','studio-auto-progress');autoProgress.id='studioAutoProgress';autoProgress.setAttribute('role','status');autoProgress.setAttribute('aria-live','polite');activity.append(autoProgress);
  const conversation=$('conversation');if(conversation)activity.append(conversation);
  scroll.append(activity);
  panel.insertBefore(scroll,zone);
@@ -1173,6 +1174,7 @@ async function assistantSend(){
   if(plan.mode==='new'&&window.HamokiCreative?.prepareFromChat){
    const result=await window.HamokiCreative.prepareFromChat(prompt);
    if(result?.handled){
+    if(result.started){$('prompt').value='';toast('已启动原有专业美术工作流，进度会持续显示；完成后直接在画布查看');await refreshProjectData();return}
     if(!result.ready){toast(result.message||'项目资料尚未准备好');return}
     sourceId=sourceNodeId=maskData=maskSourcePng=null;
     const previous=composerMode;composerMode='image';
@@ -1195,6 +1197,28 @@ async function assistantSend(){
  try{await submitTextChat()}finally{composerMode=previous}
 }
 function setSimpleStudio(){document.getElementById('assistantPanel')?.classList.toggle('simple-studio',simpleStudio);const b=$('showStudioTools');if(b)b.textContent=simpleStudio?'专业工具':'收起工具'}
+function renderCreativeAutoProgress(){
+ const host=$('studioAutoProgress');if(!host)return;
+ host.replaceChildren();
+ const f=currentProject?.creativeWorkflow,run=f?.autoRun;
+ if(!run){host.hidden=true;return}
+ host.hidden=false;
+ const names=['策划与原型','STYLE 风格','LAYOUT 布局','美术总监','图片生成','CHECK 质检'];
+ const stages=['prepare','style','layout','director','generation','quality'];
+ const running=run.stage==='analyze'?(f?.progress?.stage||'style'):run.stage;
+ const activeIndex=Math.max(0,stages.indexOf(running));
+ const heading=el('div','studio-auto-head');
+ heading.append(el('strong','',run.pageName||'当前页面'),el('span','',run.status==='awaiting_feedback'?'等待你的判断':run.status==='failed'?'执行已停止':run.status==='interrupted'||run.status==='uncertain'?'需检查任务': 'AI 工作流进行中'));
+ host.append(heading);
+ const progress=el('div','studio-auto-steps');
+ for(let i=0;i<names.length;i++){
+  const state=i===5&&run.review===false?'skipped':run.status==='awaiting_feedback'||(run.stage==='done')?'done':i<activeIndex?'done':i===activeIndex&&run.status==='running'?'running':'pending';
+  progress.append(el('span','studio-auto-step '+state,names[i]));
+ }
+ host.append(progress);
+ host.append(el('p','studio-auto-note',run.error||run.message||'正在准备项目资料'));
+ if(run.resultId)host.append(el('p','studio-auto-note','图片已保存到当前项目画布，可以直接选中继续对话修改'));
+}
 function renderMemoryContext(){const box=$('memoryContext');if(!box)return;const f=currentProject?.creativeWorkflow,page=f?.pages?.find(x=>x.id===f.activePageId);const count=currentProject?.assistantMemory?.rules?.length||0;const node=currentNode();const info=page?('当前页面：'+page.name+' · '+((page.layoutImageIndex??page.imageIndexes?.[0])!=null?'已关联原型':'缺少原型')+' · '+(f.styleDNA?(f.styleLocked?'风格已锁定':'风格待确认'):'风格待分析')):'自由创作 · 没有关联策划页面';box.textContent=info+(node?.kind==='generated'?' · 修改已选中作品':count?' · '+count+' 条补充规范':'')}
 async function rememberCurrentRule(){const text=$('prompt').value.trim();if(!text)return toast('先写下需要长期遵守的规范');if(!currentProject)return;try{const r=await api(projectPath('/memory/rule'),{method:'POST',body:{text}});currentProject.assistantMemory=r.memory;renderMemoryContext();$('prompt').value='';toast('已保存为项目美术规范，后续生图会自动使用')}catch(e){toast(e.message)}}
 async function feedbackCurrent(kind){const node=currentNode();if(node?.kind!=='generated')return toast('请先选中画布上的一张生成图');try{const note=kind==='rejected'?$('prompt').value.trim():'';const r=await api(projectPath('/memory/feedback'),{method:'POST',body:{nodeId:node.id,historyId:node.historyId,kind,note}});currentProject.assistantMemory=r.memory;renderMemoryContext();toast(kind==='approved'?'已确认作品':'已记录不满意反馈，不会误记成项目规则')}catch(e){toast(e.message)}}
