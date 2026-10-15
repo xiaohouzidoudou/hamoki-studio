@@ -637,3 +637,15 @@ input[type=checkbox],input[type=radio],input[type=range]{accent-color:#10cc91}
 .selection-more-menu{position:absolute;right:0;top:calc(100% + 8px);min-width:166px;max-height:min(65vh,520px);overflow-y:auto;padding:7px;display:flex;flex-direction:column;gap:3px;background:#202630;border:1px solid #56616d;border-radius:12px;box-shadow:0 14px 38px #000a;z-index:50}
 .selection-more-menu>button{width:100%;display:flex;gap:6px;align-items:center;justify-content:flex-start;text-align:left}
 .selection-toolbar-close{font-size:16px!important;padding:6px 10px!important}
+
+/* Conversation-first default: retain specialist panels behind one disclosure. */
+.simple-studio .studio-config-scroll{display:none!important}
+.simple-studio .composer-zone{display:flex;flex-direction:column;gap:12px;flex:1;justify-content:flex-end;min-height:0}
+.simple-studio .studio-prompt-dock{padding:18px!important}
+.memory-context{font-size:12px;color:#b5cfc7;line-height:1.6;padding:8px 10px;background:#2b3537;border-radius:9px}
+.memory-actions{display:flex;align-items:center;flex-wrap:wrap;gap:7px}
+.memory-actions button{border:1px solid #48535a;border-radius:20px;background:#283139;color:#e1e9e7;padding:8px 11px;font-size:11px;cursor:pointer}
+.memory-actions button:hover{background:#3b4850}
+.simple-studio .composer{margin-top:5px}
+.simple-studio .composer textarea{min-height:105px;font-size:14px;line-height:1.65}
+.simple-studio #studioActivity{display:block}
