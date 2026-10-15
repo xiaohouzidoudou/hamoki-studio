@@ -1222,6 +1222,7 @@ async function assistantSend(){
  try{await submitTextChat()}finally{composerMode=previous}
 }
 function setSimpleStudio(){document.getElementById('assistantPanel')?.classList.toggle('simple-studio',simpleStudio);const b=$('showStudioTools');if(b)b.textContent=simpleStudio?'专业工具':'收起工具'}
+let lastCreativeFailureAlertKey='';
 function renderCreativeAutoProgress(){
  const host=$('studioAutoProgress');if(!host)return;
  host.replaceChildren();
@@ -1241,7 +1242,45 @@ function renderCreativeAutoProgress(){
   progress.append(el('span','studio-auto-step '+state,names[i]));
  }
  host.append(progress);
- host.append(el('p','studio-auto-note',run.error||run.message||'正在准备项目资料'));
+ if(run.status==='running'){
+  const visual=el('div','creative-live-visual');
+  const orbit=el('div','creative-live-orbit');
+  orbit.setAttribute('aria-hidden','true');
+  orbit.append(el('span','creative-live-ring'),el('span','creative-live-core'));
+  const detail=el('div','creative-live-copy');
+  const stageText=run.stage==='generation'?'图片模型正在绘制':run.stage==='quality'?'正在检查生成图片':run.stage==='director'?'正在准备美术设计方案':run.stage==='layout'?'正在分析 UI 原型':run.stage==='style'?'正在分析项目风格':'正在整理项目资料';
+  detail.append(el('strong','',stageText),el('small','',run.message||'任务已提交，等待后台返回实际进展'));
+  const started=Date.parse(run.startedAt||run.createdAt||'');
+  if(Number.isFinite(started)&&started>0){
+   const seconds=Math.max(0,Math.floor((Date.now()-started)/1000));
+   detail.append(el('small','creative-live-elapsed','已等待 '+Math.floor(seconds/60)+' 分 '+String(seconds%60).padStart(2,'0')+' 秒'));
+  }
+  visual.append(orbit,detail);host.append(visual);
+  if(run.stage==='generation'){
+   const placeholder=el('div','creative-image-placeholder');
+   placeholder.setAttribute('role','status');
+   placeholder.append(el('div','creative-image-shimmer'),el('span','creative-image-label','图片生成中 · 完成后自动出现在画布'));
+   host.append(placeholder);
+  }
+ }
+ const failed=['failed','interrupted','uncertain'].includes(run.status);
+ if(failed){
+  const failureKey=[currentProject?.id||'',run.id||run.startedAt||'',run.status,String(run.error||run.message||'')].join('|');
+  const alert=el('section','studio-auto-failure');
+  alert.setAttribute('role','alert');
+  alert.setAttribute('aria-live','assertive');
+  alert.append(el('strong','studio-auto-failure-title',run.status==='failed'?'创作失败 · 已停止': '任务状态异常 · 请检查'));
+  alert.append(el('p','studio-auto-failure-detail',run.error||run.message||'后台任务未能正常完成。请打开 AI 美术工作流查看失败步骤。'));
+  const actions=el('div','studio-auto-failure-actions');
+  const inspect=el('button','studio-auto-failure-open','查看失败步骤');
+  inspect.type='button';
+  inspect.addEventListener('click',()=>$('openCreativeWorkflow')?.click());
+  actions.append(inspect);alert.append(actions);host.append(alert);
+  if(lastCreativeFailureAlertKey!==failureKey){
+   lastCreativeFailureAlertKey=failureKey;
+   toast('AI 美术工作流'+(run.status==='failed'?'失败':'出现异常')+'：'+String(run.error||run.message||'请检查失败步骤').slice(0,140));
+  }
+ }else host.append(el('p','studio-auto-note',run.message||'正在准备项目资料'));
  if(run.resultId){
   host.append(el('p','studio-auto-note','图片已保存到当前项目画布，可以直接用中文告诉我哪里要改'));
   const page=f?.pages?.find(x=>x.id===run.pageId),report=page?.quality?.historyId===run.resultId?page.quality.report:null;
