@@ -639,7 +639,11 @@ input[type=checkbox],input[type=radio],input[type=range]{accent-color:#10cc91}
 .selection-toolbar-close{font-size:16px!important;padding:6px 10px!important}
 
 /* Conversation-first default: retain specialist panels behind one disclosure. */
-.simple-studio .studio-config-scroll{display:none!important}
+.simple-studio .studio-config-scroll{display:block!important;min-height:0;overflow:auto;flex:1}
+.simple-studio .studio-config-scroll> :not(#studioActivity){display:none!important}
+.simple-studio #studioActivity{display:block!important;min-height:100%;border:0}
+.simple-studio #studioActivity>summary{display:none!important}
+.simple-studio #conversation{display:flex!important;flex-direction:column;min-height:100%}
 .simple-studio .composer-zone{display:flex;flex-direction:column;gap:12px;flex:1;justify-content:flex-end;min-height:0}
 .simple-studio .studio-prompt-dock{padding:18px!important}
 .memory-context{font-size:12px;color:#b5cfc7;line-height:1.6;padding:8px 10px;background:#2b3537;border-radius:9px}
