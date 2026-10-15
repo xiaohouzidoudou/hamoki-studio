@@ -732,6 +732,21 @@ function validateCreation(b){
    else {const h=history.find(h=>h.id===node.historyId&&h.projectId===targetProject.id);if(!h)throw Error('画布图片没有对应的历史记录');file=h.file;historyId=h.id}
    return {file,role,nodeId:node.id,historyId};
  });
+ // Reuse already-confirmed style reference images when editing; users must not reselect them.
+ // This is the original creativeWorkflow source of truth, NOT a second style collection.
+ const flow=targetProject.creativeWorkflow;
+ if(b.useProjectStyle!==false&&flow?.styleLocked&&Array.isArray(flow.styleNodeIds)){
+  for(const id of flow.styleNodeIds.slice(0,2)){
+   if(refs.length+images.length>=8)break;
+   if(images.some(x=>x.nodeId===id))continue;
+   const node=targetProject.nodes.find(x=>x.id===id&&x.kind!=='note');
+   if(node?.kind==='generated'&&node.historyId===b.sourceId)continue;
+   if(!node)continue;
+   const h=node.kind==='generated'?history.find(x=>x.id===node.historyId&&x.projectId===targetProject.id):null;
+   const file=node.kind==='reference'?node.assetFile:h?.file;
+   if(file)images.push({file,role:'style',nodeId:id,historyId:h?.id||null});
+  }
+ }
  // Approved images are real style anchors, not only text preferences.
  if(b.useProjectStyle!==false&&!images.some(x=>x.role==='style')&&refs.length+images.length<8){
   const approved=assistantMemory.normalize(targetProject.assistantMemory).approved.slice().reverse();
@@ -774,7 +789,8 @@ function validateCreation(b){
      requirements:String(page?.requirements||'').slice(0,2500)};
   })():null;
  const editMode=!!source&&b.editMode!=='new';
- const draftPrompt=editMode?('根据第一张参考原图精确编辑。除本轮明确要求改变的内容外，保持主体身份、脸部、服装结构、姿势、画面构图和风格一致。\n历史创作描述：'+(source.editInstruction||source.prompt).slice(0,2400)+'\n本轮修改要求：'+instruction):instruction;
+ const styleGuide=editMode?creativeUpstream.styleFeedbackGuide(targetProject.creativeWorkflow?.styleLocked?targetProject.creativeWorkflow.styleDNA:'',b.editSpec):'';
+ const draftPrompt=editMode?('根据第一张参考原图精确编辑。除本轮明确要求改变的内容外，保持原画构图、人物身份、页面文字、按钮位置与项目风格一致。\n历史创作描述：'+(source.editInstruction||source.prompt).slice(0,1450)+'\n本轮用户中文修改要求（原文，不得擅自翻译或反转）：'+instruction+'\n'+styleGuide):instruction;
  const prompt=assistantMemory.generationPrompt(draftPrompt,targetProject.assistantMemory,targetProject.creativeWorkflow?.styleDNA||'',(targetProject.creativeWorkflow?.pages||[]).find(x=>x.id===targetProject.creativeWorkflow?.activePageId)?.requirements||'');
  return {capability,prompt,editInstruction:instruction,refs,referenceNodes:images,count,targets,ratio,resolution,quality,review,transparentBg,sourceId:source?.id||null,sourceNodeId,projectId:targetProject.id,canvasX:num(b.canvasX,180),canvasY:num(b.canvasY,170),mask:b.mask||null,maskSourceImage:b.maskSourceImage||null};
 }

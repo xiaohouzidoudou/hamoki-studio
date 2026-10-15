@@ -76,4 +76,20 @@ test('approved project image becomes style reference, and explicit review record
  assert.equal(requests.filter(x=>x.path.includes('/chat/completions')).length,4,'review exactly once per image');
  const allJobs=(await api('/api/jobs')).body.jobs;
  assert.equal(allJobs.filter(x=>x.autoFixDepth===1).length,1,'auto correction cannot recursively spend quota');
+ const note='奖励框太平了，增加一点厚度和立体光影，颜色和布局保持不变';
+ const edit=await api('/api/jobs','POST',{projectId:project,providerId:provider.id,model:'gpt-image-1',sourceId:h2.id,
+  prompt:note,editSpec:{target:'奖励框',change:'增加厚度与倒角光影',preserve:'现有颜色、布局与其他内容',
+  englishVisualTerms:'add subtle beveled depth to existing reward panel, preserve palette'},
+  ratio:'1:1',resolution:'1K',count:1});
+ assert.equal(edit.status,201,JSON.stringify(edit.body));
+ const result=await until(async()=>{
+  const h=(await api('/api/history?projectId='+project)).body.history[0];
+  return h&&h.parentId===h2.id?h:null;
+ });
+ assert.equal(result.editInstruction,note);
+ assert.match(result.prompt,/奖励框太平了/);
+ assert.match(result.prompt,/增加厚度与倒角光影/);
+ assert.match(result.prompt,/add subtle beveled depth/);
+ assert.match(result.prompt,/不更新 Style DNA/);
+ assert.ok(requests.filter(x=>x.path.includes('/images/edits')).length>=2,'image edit sends actual source image');
 });
