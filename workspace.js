@@ -137,6 +137,7 @@ for(const p of projects){
   if(['splitting','delivering'].includes(pack.status)){pack.status='failed';pack.error='服务重启中断了本地素材打包，可从原始图片重新拆分';interruptedCreative=true}
  }
 }
+for(const p of projects){const plan=p.aiComponentPlan;if(plan?.status==="analyzing"){plan.status="failed";plan.error="识别任务因服务重启中断，请核对上游费用后决定是否重试";interruptedCreative=true}}
 if(interruptedCreative)saveProjects();
 const creativeBusy=new Set();
 function creativeState(p){
@@ -667,6 +668,7 @@ function submit(b){
  proj.messages.push({id:crypto.randomUUID(),role:'user',content:valid.editInstruction,createdAt:time(),groupId,sourceId:valid.sourceId,referenceRoles:valid.referenceNodes.map(n=>({nodeId:n.nodeId,role:n.role})),providerIds:valid.targets.map(t=>t.providerId)});
  proj.messages=proj.messages.slice(-400);touchProject(proj);schedule();return {jobs:created.map(publicJob),groupId};
 }
+const aiComponent=require('./lib/ai-component-plan');
 const derivedAssets=require('./lib/asset-derivation');
 const derivationBusy=new Set();
 function derivationState(p){
@@ -773,6 +775,52 @@ function submitDerivation(p,body){
  return {groupId,jobs:created.map(publicJob)};
 }
 
+const componentBusy=new Set();
+function componentView(p){
+ const plan=p.aiComponentPlan;if(!plan)return {plan:null};
+ return {plan:{...plan,items:plan.items.map(item=>{
+  const job=jobs.find(j=>j.id===item.jobId&&j.projectId===p.id);
+  const result=job?.resultId&&history.find(h=>h.id===job.resultId&&h.projectId===p.id);
+  return {...item,status:job?.status||item.status,error:job?.error||"",resultId:result?.id||null,url:result?BASE+"/api/media/"+result.file:null};
+ })}};
+}
+async function componentAnalyze(p,b){
+ if(DEMO_MODE)throw Error("演示模式不能调用付费模型");
+ if(b.confirmCost!==true)throw Error("必须先确认识图费用");
+ if(typeof b.historyId!=="string")throw Error("每次只能选择一张图片");
+ const image=history.find(h=>h.id===b.historyId&&h.projectId===p.id);
+ if(!image||!p.nodes.some(n=>n.kind==="generated"&&n.historyId===image.id))throw Error("请选择本项目画布上一张已生成图片");
+ if(componentBusy.has(p.id)||creativeBusy.has(p.id)||derivationBusy.has(p.id))throw Object.assign(Error("当前项目已有分析任务"),{status:409});
+ const cfg=b.vision||p.creativeWorkflow?.routing?.vision||{};
+ const vision=effectiveProvider(provider(cfg.providerId||state.activeId),"vision");emptyProvider(vision);
+ const model=creativeModel(vision,"vision",cfg.model);
+ const plan={id:crypto.randomUUID(),sourceId:image.id,status:"analyzing",items:[],createdAt:time(),error:""};
+ componentBusy.add(p.id);p.aiComponentPlan=plan;touchProject(p);
+ try{
+  const raw=await options.limiter.run(()=>analyzeCreativeImages(vision,[fetchMedia(image.file)],model,aiComponent.analysisPrompt(p.creativeWorkflow?.styleDNA||""),{timeoutMs:165000}));
+  plan.items=aiComponent.parseInventory(raw).map(x=>({...x,id:crypto.randomUUID(),jobId:null}));
+  plan.status="ready";plan.finishedAt=time();touchProject(p);
+ }catch(e){plan.status="failed";plan.error=String(e.message||e).slice(0,350);touchProject(p);throw e}
+ finally{componentBusy.delete(p.id)}
+}
+function componentGenerate(p,b){
+ if(DEMO_MODE)throw Error("演示模式不能生成付费组件");
+ if(b.confirmCost!==true)throw Error("必须确认组件生成费用");
+ const plan=p.aiComponentPlan;if(plan?.status!=="ready")throw Error("请先完成 AI 组件识别");
+ const item=plan.items.find(x=>x.id===b.itemId);if(!item)throw Error("组件不存在");
+ const old=jobs.find(j=>j.id===item.jobId&&j.projectId===p.id);
+ if(old&&["queued","running"].includes(old.status))throw Object.assign(Error("组件生成中，请勿重复提交"),{status:409});
+ if(old?.status==="done"&&b.retry!==true)throw Error("需要明确确认重新生成");
+ if(jobs.filter(j=>["queued","running"].includes(j.status)).length>=MAX_QUEUED)throw Error("队列已满");
+ const source=history.find(h=>h.id===plan.sourceId&&h.projectId===p.id);if(!source)throw Error("原图不存在");
+ const config=b.image||p.creativeWorkflow?.routing?.image||{};const conf=deriveProvider(config,"image");
+ const node=p.nodes.find(n=>n.kind==="generated"&&n.historyId===source.id);
+ const job=makeJob({capability:"image",projectId:p.id,sourceId:source.id,prompt:aiComponent.componentPrompt(item,p.creativeWorkflow?.styleDNA||""),
+  transparentBg:item.category!=="background",ratio:item.category==="background"?"9:16":"1:1",resolution:b.resolution||"1K",quality:b.quality||"auto",sourceNodeId:node?.id},
+  {input:[],roleHints:[],mask:null,maskSource:null},conf.provider.id,conf.model,plan.id);
+ jobs.unshift(job);saveJobs();item.jobId=job.id;item.status="queued";touchProject(p);schedule();
+ return {job:publicJob(job)};
+}
 // Pinned upstream sprite splitting / atlas delivery integration. Each workspace
 // writes only inside its own DATA_DIR, never into public/static paths.
 const {execFile}=require('node:child_process');
@@ -1047,6 +1095,21 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
     if(packFileMatch&&req.method==='GET'){
      const p=assertProject(packFileMatch[1]),pack=deliveryPack(p,packFileMatch[2]);
      return deliveryDownload(req,res,p,pack,packFileMatch[3],packFileMatch[4]);
+    }
+    const componentRoute=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/ai-components(?:\/(analyze|generate))?$/);
+    if(componentRoute){
+     const p=assertProject(componentRoute[1]),action=componentRoute[2];
+     if(!action&&req.method==="GET")return respond(res,200,componentView(p));
+     if(action==="analyze"&&req.method==="POST"){
+      const b=await readJSON(req);
+      if(componentBusy.has(p.id))return fail(res,409,"正在识别组件");
+      if(b.confirmCost!==true)throw Error("需确认识图费用");
+      if(typeof b.historyId!=="string"||!history.some(h=>h.id===b.historyId&&h.projectId===p.id))throw Error("图片不属于当前项目");
+      void componentAnalyze(p,b).catch(e=>diag({source:"components",level:"error",action:"analyze",message:String(e.message||e).slice(0,350)}));
+      return respond(res,202,{started:true});
+     }
+     if(action==="generate"&&req.method==="POST")return respond(res,202,componentGenerate(p,await readJSON(req)));
+     return fail(res,405,"不支持的拆件操作");
     }
     const deliveryRoute=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/delivery(?:\/(split|approve))?$/);
     if(deliveryRoute){
@@ -1331,3 +1394,4 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
 
 return {handler,storageUsage};
 };
+
