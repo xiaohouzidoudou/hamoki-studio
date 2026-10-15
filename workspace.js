@@ -17,6 +17,7 @@ const {parseDocx,MAX_DOCX}=require('./lib/creative-docx');
 const creative=require('./lib/creative-workflow');
 const creativeUpstream=require('./lib/creative-upstream');
 const creativePages=require('./lib/creative-pages');
+const {nextGeneratedPosition}=require('./lib/canvas-placement');
 const generate=(...args)=>options.limiter.run(()=>upstreamGenerate(...args));
 const reverse=(...args)=>options.limiter.run(()=>upstreamReverse(...args));
 const listModels=(...args)=>options.limiter.run(()=>upstreamListModels(...args));
@@ -382,11 +383,8 @@ async function creativeQuality(p,historyId){
 }
 function appendGeneratedNode(h,j){const p=project(j.projectId||defaultProject()?.id);if(!p)return;
  const parent=p.nodes.find(n=>n.historyId===h.parentId)||p.nodes.find(n=>n.id===j.sourceNodeId);
- const relatives=p.nodes.filter(n=>n.parentNodeId===(parent?.id||'!'));
- const i=num(j.batchIndex,0,0,15);
- const x=parent?parent.x+parent.w+140:num(j.canvasX,150)+ (i%4)*330;
- const y=parent?parent.y+(relatives.length*320):num(j.canvasY,170)+Math.floor(i/4)*355;
- p.nodes.push({id:crypto.randomUUID(),kind:'generated',historyId:h.id,parentNodeId:parent?.id||null,x,y,w:288,h:288,createdAt:time()});
+ const {x,y,w,h:height}=nextGeneratedPosition(p);
+ p.nodes.push({id:crypto.randomUUID(),kind:'generated',historyId:h.id,parentNodeId:parent?.id||null,x,y,w,h:height,createdAt:time()});
  p.messages.push({id:crypto.randomUUID(),role:'result',content:'已生成作品',createdAt:time(),groupId:j.groupId,imageId:h.id});
  p.messages=p.messages.slice(-400);p.nodes=p.nodes.slice(-1800);touchProject(p);
 }
@@ -398,7 +396,7 @@ function projectBackup(p){
  const fileIds=new Set(selectedHistory.map(h=>h.file).concat(p.nodes.filter(n=>n.kind==='reference').map(n=>n.assetFile)));
  let total=0;const media=[];
  for(const id of fileIds){const img=fetchMedia(id);total+=img.bytes.length;if(total>BUNDLE_MAX)throw Object.assign(Error('此项目媒体超过32MB，请分批备份后再导入'),{status:413});media.push({file:id,mime:img.mime,data:img.bytes.toString('base64')});}
- const safeProject={title:p.title,viewport:p.viewport,nodes:p.nodes,messages:p.messages,creativeWorkflow:p.creativeWorkflow||null};
+ const safeProject={title:p.title,viewport:p.viewport,nodes:p.nodes,messages:p.messages,creativeWorkflow:p.creativeWorkflow||null,generationLayout:p.generationLayout||null};
  return zlib.gzipSync(Buffer.from(JSON.stringify({kind:'hamoki-project',schema:1,exportedAt:time(),project:safeProject,history:selectedHistory,media})),{level:6});
 }
 function importProject(b){
@@ -416,6 +414,7 @@ function importProject(b){
  for(const h of data.history){if(!h||!uuidLike.test(h.id)||typeof h.file!=='string'||!buffers.has(h.file)||oldHistId.has(h.id))throw Error('历史图片关联不完整');oldHistId.set(h.id,crypto.randomUUID());}
  for(const n of data.project.nodes){if(!n||!uuidLike.test(n.id)||!['generated','reference','note'].includes(n.kind)||oldNodeId.has(n.id))throw Error('画布元素格式不正确');if(n.kind==='generated'&&!oldHistId.has(n.historyId))throw Error('缺少生成图片历史');if(n.kind==='reference'&&!buffers.has(n.assetFile))throw Error('缺少画布参考图片');oldNodeId.set(n.id,crypto.randomUUID());}
  const proj=makeProject(trim(data.project.title,70)||'导入的创作项目');
+ if(data.project.generationLayout&&Number.isSafeInteger(data.project.generationLayout.x)&&Number.isSafeInteger(data.project.generationLayout.y)&&Number.isSafeInteger(data.project.generationLayout.nextSlot)&&data.project.generationLayout.nextSlot>=0)proj.generationLayout=data.project.generationLayout;
  if(data.project.viewport){const v=data.project.viewport;proj.viewport={x:num(v.x,220,-500000,500000),y:num(v.y,130,-500000,500000),scale:num(v.scale,1,.18,2.8)}}
  // After all structure checks pass, persist media and remap every entity identifier.
  const mediaIds=new Map();for(const [old,img] of buffers)mediaIds.set(old,storeMedia(img));
