@@ -669,7 +669,7 @@ function validateCreation(b){
  if(transparentBg&&targets.some(t=>{const p=effectiveProvider(provider(t.providerId),capability);return !p||p.mode!=='openai'||(p.imageMode||'images')!=='images'}))throw Error('透明背景当前仅允许 OpenAI Images 模式（模型仍需支持透明输出）');
  const editMode=!!source&&b.editMode!=='new';
  const prompt=editMode?('根据第一张参考原图精确编辑。除本轮明确要求改变的内容外，保持主体身份、脸部、服装结构、姿势、画面构图和风格一致。\n历史创作描述：'+source.prompt.slice(0,6500)+'\n本轮修改要求：'+instruction):instruction;
- const scopedPrompt=assistantMemory.generationPrompt(prompt,targetProject.assistantMemory,targetProject.creativeWorkflow?.styleDNA||'',creativeCurrent(targetProject.creativeWorkflow||{})?.requirements||'');
+ const scopedPrompt=assistantMemory.generationPrompt(prompt,targetProject.assistantMemory,targetProject.creativeWorkflow?.styleDNA||'',(targetProject.creativeWorkflow?.pages||[]).find(x=>x.id===targetProject.creativeWorkflow?.activePageId)?.requirements||'');
  return {capability,prompt:scopedPrompt,editInstruction:instruction,refs,referenceNodes:images,count,targets,ratio,resolution,quality,transparentBg,sourceId:source?.id||null,sourceNodeId,projectId:targetProject.id,canvasX:num(b.canvasX,180),canvasY:num(b.canvasY,170),mask:b.mask||null,maskSourceImage:b.maskSourceImage||null};
 }
 function submit(b){
