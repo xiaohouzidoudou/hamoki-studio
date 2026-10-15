@@ -3,6 +3,10 @@ const {test}=require('node:test'),assert=require('node:assert/strict');
 const {spawn}=require('node:child_process'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),http=require('node:http'),net=require('node:net');
 const pause=n=>new Promise(r=>setTimeout(r,n));
 async function port(){const s=net.createServer();await new Promise(r=>s.listen(0,'127.0.0.1',r));const p=s.address().port;await new Promise(r=>s.close(r));return p}
+test('Docker health check honors the deployed base path',()=>{
+ const dockerfile=fs.readFileSync(path.join(__dirname,'../Dockerfile'),'utf8');
+ assert.ok(dockerfile.includes("(process.env.APP_BASE_PATH||'')+'/healthz'"));
+});
 test('account gateway supports authenticated /studio/ preview without leaking APIs at root',async t=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hamoki-prefix-'));
  const p=await port();
