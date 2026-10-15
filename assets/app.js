@@ -376,6 +376,7 @@ function showBoardContextMenu(e){
  if(nodes.length){
   if(single&&h)item('查看原图',()=>openViewer(h.id));
   if(single&&h)item('继续修改这张图',()=>continueFrom(h.id,single.id));
+  if(single&&h)item('一键切图',openSelectedImageCut);
   if(single)item('本地编辑图片',()=>openLocalImageEditor(single));
   item('批量下载原图 ZIP',downloadSelectedImages);
   item('作为综合参考图',addSelectedReferences);
@@ -402,6 +403,15 @@ function showBoardContextMenu(e){
  menu.style.left=clamp(e.clientX,8,Math.max(8,innerWidth-width-8))+'px';
  menu.style.top=clamp(e.clientY,8,Math.max(8,innerHeight-height-8))+'px';
 }
+function openSelectedImageCut(){
+ const selected=selectedSceneNodes();
+ if(selected.length!==1||selected[0].kind!=='generated'||!selected[0].historyId){
+  toast('请先选中一张已生成的图片，再使用一键切图');return;
+ }
+ document.dispatchEvent(new CustomEvent('hamoki:open-delivery',{detail:{
+  projectId:currentProject.id,historyId:selected[0].historyId
+ }}));
+}
 function placeToolbar(){
  const toolbar=$('selectionToolbar'),images=selectedSceneNodes().filter(n=>n.kind!=='note'),n=currentNode();
  toolbar.classList.toggle('bulk-selection-toolbar',images.length>1);
@@ -421,7 +431,7 @@ function placeToolbar(){
  }
  const choices=n.kind==='note'?[['edit','编辑',()=>editNote(n,document.querySelector('.canvas-node[data-id="'+n.id+'"]'))],['trash','移除',()=>removeNode(n),true]]:
  n.kind==='reference'?[['edit','本地编辑',()=>openLocalImageEditor(n)],['plus','设为参考',()=>toggleReferenceNode(n.id,'general')],['wand','图片反推',()=>reverseNode(n)],['download','下载',downloadSelectedImages],['trash','移除',()=>removeNode(n),true]]:
- [['edit','本地编辑',()=>openLocalImageEditor(n)],['wand','继续修改',()=>continueFrom(n.historyId,n.id)],['refresh','重生成',()=>regenerateFrom(n.historyId,n.id)],['edit','局部重绘',()=>openMask(n.historyId)],['spark','高清增强',()=>enhanceFrom(n.historyId,n.id)],['image','去背景',()=>removeBackground(n.historyId,n.id)],['copy','设为参考',()=>toggleReferenceNode(n.id,'general')],['zoom','反推',()=>reverseNode(n)],['download','下载',()=>{location.href=APP_BASE+'/api/download/'+n.historyId}],['trash','移除',()=>removeNode(n),true]];
+ [['image','一键切图',openSelectedImageCut],['edit','本地编辑',()=>openLocalImageEditor(n)],['wand','继续修改',()=>continueFrom(n.historyId,n.id)],['refresh','重生成',()=>regenerateFrom(n.historyId,n.id)],['edit','局部重绘',()=>openMask(n.historyId)],['spark','高清增强',()=>enhanceFrom(n.historyId,n.id)],['image','去背景',()=>removeBackground(n.historyId,n.id)],['copy','设为参考',()=>toggleReferenceNode(n.id,'general')],['zoom','反推',()=>reverseNode(n)],['download','下载',()=>{location.href=APP_BASE+'/api/download/'+n.historyId}],['trash','移除',()=>removeNode(n),true]];
  for(const [icon,label,action,danger] of choices){const b=el('button',danger?'destructive':'');b.innerHTML=ico(icon);b.append(document.createTextNode(label));b.onclick=action;toolbar.append(b)}
  const board=$('board').getBoundingClientRect(),left=cam.x+n.x*cam.scale,top=cam.y+n.y*cam.scale-48;
  show('selectionToolbar');toolbar.style.left=clamp(left,10,Math.max(10,board.width-toolbar.offsetWidth-10))+'px';
