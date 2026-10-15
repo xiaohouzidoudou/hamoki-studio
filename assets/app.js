@@ -913,7 +913,7 @@ function initialRuntimeModel(p,cap){
 }
 function runtimeSelection(cap){
  const r=runtimeRoutes[cap],p=providers.find(x=>x.id===r?.providerId&&x.capabilities?.[cap]?.enabled!==false);
- return {providerId:p?.id||'',model:(r?.model||'').trim(),name:p?.name||''};
+ return {providerId:p?.id||'',model:(r?.model||initialRuntimeModel(p,cap)||'').trim(),name:p?.name||''};
 }
 function updateRuntimeNotice(cap){
  const r=runtimeSelection(cap);
@@ -937,6 +937,7 @@ function renderRuntimeSelectors(){
    r.providerId=p?.id||'';
    r.model=initialRuntimeModel(p,cap)||'';
   }
+  if(!r.model)r.model=initialRuntimeModel(p,cap)||'';
   input.value=r.model;updateRuntimeNotice(cap);
  }
 }
