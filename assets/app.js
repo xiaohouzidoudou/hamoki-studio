@@ -231,6 +231,7 @@ function renderLinks(){const svg=$('linkLayer');svg.replaceChildren();if(!curren
  const bounds=worldViewBounds();for(const n of nodes){if(!n.parentNodeId)continue;const p=nById.get(n.parentNodeId);if(!p||(!nodeVisible(n,bounds)&&!nodeVisible(p,bounds)))continue;const x1=p.x+p.w,y1=p.y+p.h*.46,x2=n.x,y2=n.y+n.h*.46,dx=Math.max(65,Math.abs(x2-x1)*.5);const line=document.createElementNS('http://www.w3.org/2000/svg','path');line.setAttribute('class','version-link');line.setAttribute('d',`M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`);svg.appendChild(line)}
  svg.style.display=$('versionToggle').classList.contains('disabled-links')?'none':'block';}
 function selectNode(id,additive=false){
+ if(inlineChatNodeId&&inlineChatNodeId!==id)closeInlineChat();
  if(additive){if(multiNodeIds.has(id))multiNodeIds.delete(id);else if(id)multiNodeIds.add(id)}
  else{multiNodeIds.clear();if(id)multiNodeIds.add(id)}
  selectedNodeId=multiNodeIds.has(id)?id:[...multiNodeIds].at(-1)||null;
@@ -513,6 +514,7 @@ function openSelectedImageCut(){
  }}));
 }
 function placeToolbar(){
+ positionInlineChat();
  const toolbar=$('selectionToolbar'),images=selectedSceneNodes().filter(n=>n.kind!=='note'),n=currentNode();
  toolbar.classList.toggle('bulk-selection-toolbar',images.length>1);
  if(!n||(!images.length&&n.kind!=='note')){hide('selectionToolbar');return}
@@ -531,7 +533,7 @@ function placeToolbar(){
  }
  const choices=n.kind==='note'?[['edit','编辑',()=>editNote(n,document.querySelector('.canvas-node[data-id="'+n.id+'"]'))],['trash','移除',()=>removeNode(n),true]]:
  n.kind==='reference'?[['edit','本地编辑',()=>openLocalImageEditor(n)],['plus','设为参考',()=>toggleReferenceNode(n.id,'general')],['wand','图片反推',()=>reverseNode(n)],['download','下载',downloadSelectedImages],['trash','移除',()=>removeNode(n),true]]:
- [['spark','AI 智能拆组件',()=>openSmartComponents(n.historyId)],['image','一键切图',openSelectedImageCut],['edit','本地编辑',()=>openLocalImageEditor(n)],['wand','继续修改',()=>continueFrom(n.historyId,n.id)],['refresh','重生成',()=>regenerateFrom(n.historyId,n.id)],['edit','局部重绘',()=>openMask(n.historyId)],['spark','高清增强',()=>enhanceFrom(n.historyId,n.id)],['image','去背景',()=>removeBackground(n.historyId,n.id)],['copy','设为参考',()=>toggleReferenceNode(n.id,'general')],['zoom','反推',()=>reverseNode(n)],['download','下载',()=>{location.href=APP_BASE+'/api/download/'+n.historyId}],['trash','移除',()=>removeNode(n),true]];
+ [['spark','AI 智能拆组件',()=>openSmartComponents(n.historyId)],['image','一键切图',openSelectedImageCut],['edit','本地编辑',()=>openLocalImageEditor(n)],['wand','图片对话',()=>openInlineChat(n)],['wand','继续修改',()=>continueFrom(n.historyId,n.id)],['refresh','重生成',()=>regenerateFrom(n.historyId,n.id)],['edit','局部重绘',()=>openMask(n.historyId)],['spark','高清增强',()=>enhanceFrom(n.historyId,n.id)],['image','去背景',()=>removeBackground(n.historyId,n.id)],['copy','设为参考',()=>toggleReferenceNode(n.id,'general')],['zoom','反推',()=>reverseNode(n)],['download','下载',()=>{location.href=APP_BASE+'/api/download/'+n.historyId}],['trash','移除',()=>removeNode(n),true]];
  if(n.kind!=='note')choices.unshift(['zoom','查看原图',()=>openCanvasOriginal(n)]);
  const primary=n.kind==='note'?new Set(['编辑']):n.kind==='reference'?new Set(['查看原图','本地编辑','设为参考']):new Set(['查看原图','AI 智能拆组件','一键切图']);
  const extras=el('div','selection-more-menu');extras.setAttribute('role','group');extras.setAttribute('aria-label','更多图片操作');
@@ -623,6 +625,11 @@ function continueFrom(id,nodeId){
  $('transparentBg').checked=false;$('prompt').value='';$('prompt').placeholder='正在修改上一版本：例如「换成红色头发，其他部分不变」';
  renderContext();$('prompt').focus();if(innerWidth<850)$('assistantPanel').classList.add('open');toast('已把原图设为编辑参考；继续使用你当前选择的服务商、模型与参数');
 }
+let inlineChatNodeId=null;
+function closeInlineChat(){inlineChatNodeId=null;hide('canvasInlineChat')}
+function positionInlineChat(){const panel=$('canvasInlineChat');if(!inlineChatNodeId||panel.classList.contains('hidden'))return;const n=currentProject?.nodes?.find(x=>x.id===inlineChatNodeId);if(!n){closeInlineChat();return}const board=$('board');panel.style.left=clamp(cam.x+n.x*cam.scale,12,Math.max(12,board.clientWidth-panel.offsetWidth-12))+'px';panel.style.top=clamp(cam.y+(n.y+n.h)*cam.scale+12,12,Math.max(12,board.clientHeight-panel.offsetHeight-12))+'px'}
+function openInlineChat(n){if(!n||n.kind!=='generated'||!currentHistory(n.historyId))return toast('请先选中已生成图片');inlineChatNodeId=n.id;$('canvasInlinePrompt').value='';show('canvasInlineChat');positionInlineChat();$('canvasInlinePrompt').focus()}
+async function submitInlineChat(){const n=currentProject?.nodes?.find(x=>x.id===inlineChatNodeId),text=$('canvasInlinePrompt').value.trim();if(!n||n.kind!=='generated')return toast('原图已不可用');if(!text)return toast('请描述修改内容');const prev=$('prompt').value,mode=composerMode;sourceId=n.historyId;sourceNodeId=n.id;maskData=maskSourcePng=null;enhanceMode=false;$('prompt').value=text;composerMode='image';renderContext();$('canvasInlineSend').disabled=true;try{await submitGeneration(null,true);if(!$('prompt').value.trim()){closeInlineChat();$('prompt').value=prev}}finally{composerMode=mode;$('canvasInlineSend').disabled=false}}
 function regenerateFrom(id,nodeId){continueFrom(id,nodeId);$('prompt').value='保持原图的角色造型和整体构图，重新生成一个细节更精致的版本。';toast('重新生成已准备好，点击发送后才会调用模型并计费')}
 function enhanceFrom(id,nodeId){continueFrom(id,nodeId);enhanceMode=true;$('resolution').value='4K';$('quality').value='high';$('prompt').value='尽量保持原图主体、色彩、构图完全一致。强化线条清晰度、材质细节及光影层次，输出当前模型可支持的最高细节版本。';toast('已准备 AI 高清重绘，实际尺寸和效果取决于模型；不会无提示扣费')}
 function removeBackground(id,nodeId){const p=activeProvider();if(!p||p.mode!=='openai'||p.imageMode!=='images')return toast('透明去背景需要支持透明输出的 OpenAI Images 模型');continueFrom(id,nodeId);$('transparentBg').checked=true;$('prompt').value='只保留原图的主体，移除背景和杂物，背景透明，尽量保留发丝、饰品边缘等细节。';toast('已准备 AI 去背景，生成图可能有细节变化；确认后才会收费')}
@@ -1501,6 +1508,7 @@ function bindEvents(){
  $('referenceFiles').onchange=async e=>{await addFiles(e.target.files);e.target.value='';if(window.__reverseAfterUpload&&referenceInputs.length){window.__reverseAfterUpload=false;reverseImage=referenceInputs[0].data;openReverse()}};
  $('emptyNote').onclick=()=>createNote(currentBoardPoint(.35,.32));document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>changeTool(b.dataset.tool));$('latestGenerated').onclick=focusLatestGenerated;$('fitCanvas').onclick=fitCanvas;$('zoomOut').onclick=()=>zoomAt(.8,$('board').clientWidth/2,$('board').clientHeight/2);$('zoomIn').onclick=()=>zoomAt(1.25,$('board').clientWidth/2,$('board').clientHeight/2);
  $('versionToggle').onclick=()=>{$('versionToggle').classList.toggle('disabled-links');renderLinks();toast($('versionToggle').classList.contains('disabled-links')?'版本连接线已隐藏':'版本连接线已显示')};
+ $('canvasInlineChat').addEventListener('pointerdown',e=>e.stopPropagation());$('canvasInlineChat').addEventListener('wheel',e=>e.stopPropagation());$('canvasInlineClose').onclick=closeInlineChat;$('canvasInlineSend').onclick=submitInlineChat;$('canvasInlinePrompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();submitInlineChat()}if(e.key==='Escape')closeInlineChat()});
  $('generateBtn').onclick=()=>submitGeneration();$('compareOpen').onclick=showCompare;$('submitCompare').onclick=submitCompare;$('moreSettings').onclick=()=>$('advanced').classList.toggle('hidden');
  $('skillsToggle').onclick=()=>{const open=$('skillsMenu').classList.contains('hidden');$('skillsMenu').classList.toggle('hidden',!open);$('skillsToggle').setAttribute('aria-expanded',String(open))};
  document.querySelectorAll('[data-skill]').forEach(b=>b.onclick=()=>applySkill(b.dataset.skill));
