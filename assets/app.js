@@ -426,10 +426,28 @@ function showBoardContextMenu(e){
  menu.style.top=clamp(e.clientY,8,Math.max(8,innerHeight-height-8))+'px';
 }
 let smartComponentTimer=null,smartComponentSource=null,smartComponentPlan=null;
+function smartComponentRoute(cap){
+ const type=cap==="vision"?"Vision":"Image",providerId=$("smart"+type+"Provider").value,model=$("smart"+type+"Model").value.trim();
+ return {providerId,model};
+}
+function populateSmartComponentModels(){
+ const creativeRouting=currentProject?.creativeWorkflow?.routing||{};
+ for(const cap of ["vision","image"]){
+  const key=cap==="vision"?"Vision":"Image",select=$("smart"+key+"Provider"),input=$("smart"+key+"Model");
+  select.replaceChildren();for(const p of providers){const option=el("option");option.value=p.id;option.textContent=p.name;select.append(option)}
+  const saved=creativeRouting[cap]||{};
+  const runtime=cap==="vision"?runtimeRoutes.vision:{providerId:activeId,model:$("imageModel").value.trim()};
+  const pid=saved.providerId||runtime.providerId||activeId;
+  if(providers.some(p=>p.id===pid))select.value=pid;
+  const chosen=providers.find(p=>p.id===select.value);
+  input.value=saved.model||runtime.model||(cap==="vision"?chosen?.visionModel:chosen?.imageModel)||"";
+  select.onchange=()=>{const provider=providers.find(p=>p.id===select.value);input.value=cap==="vision"?(provider?.visionModel||""):(provider?.imageModel||"")};
+ }
+}
 async function openSmartComponents(historyId){
  if(!currentProject||!historyId)return toast("请选中一张已生成图片");
  if(!currentProject.nodes.some(n=>n.kind==="generated"&&n.historyId===historyId))return toast("只能拆当前画布上的生成图");
- smartComponentSource=historyId;show("smartComponentModal");
+ smartComponentSource=historyId;show("smartComponentModal");populateSmartComponentModels();
  $("smartComponentSource").src=currentHistory(historyId)?.url||"";
  await refreshSmartComponents();
  if(smartComponentTimer)clearInterval(smartComponentTimer);
@@ -450,7 +468,7 @@ async function refreshSmartComponents(){
   const busy=item.status==="queued"||item.status==="running";
   const button=el("button","soft-btn",busy?"生成中...":item.status==="done"?"重新生成":item.status==="failed"?"重试此组件":"生成此组件");button.type="button";button.disabled=busy;
   button.onclick=async()=>{if(!confirm("生成「"+item.name+"」会调用图片模型并可能产生费用。继续？"))return;
-   button.disabled=true;try{await api(projectPath("/ai-components/generate"),{method:"POST",body:{itemId:item.id,confirmCost:true,retry:item.status==="done"}});await refreshSmartComponents()}catch(e){toast(e.message);button.disabled=false}};
+   button.disabled=true;try{await api(projectPath("/ai-components/generate"),{method:"POST",body:{itemId:item.id,confirmCost:true,retry:item.status==="done",image:smartComponentRoute("image")}});await refreshSmartComponents()}catch(e){toast(e.message);button.disabled=false}};
   info.append(button);card.append(info);items.append(card);
  }
 }
@@ -459,7 +477,7 @@ async function generateAllSmartComponents(){
  const todo=plan.items.filter(x=>!x.jobId).length;if(!todo)return toast("没有等待制作的组件");
  if(!confirm("即将自动逐个制作 "+todo+" 个组件。每个组件会单独调用付费图片模型，可能产生 "+todo+" 次费用，模型可能失败或重绘变形。确定开始吗？"))return;
  const button=$("smartComponentGenerateAll");button.disabled=true;
- try{await api(projectPath("/ai-components/generate-all"),{method:"POST",body:{confirmCost:true}});await refreshSmartComponents()}catch(e){toast(e.message);button.disabled=false}
+ try{await api(projectPath("/ai-components/generate-all"),{method:"POST",body:{confirmCost:true,image:smartComponentRoute("image")}});await refreshSmartComponents()}catch(e){toast(e.message);button.disabled=false}
 }
 function downloadSmartComponents(){
  const plan=smartComponentPlan;if(!plan||plan.sourceId!==smartComponentSource)return;
@@ -472,7 +490,7 @@ async function runSmartComponentAnalysis(){
  if(!smartComponentSource)return;
  if(!confirm("AI 将识别这张游戏 UI 中的组件，可能产生模型费用。确认继续？"))return;
  const button=$("smartComponentAnalyze");button.disabled=true;
- try{await api(projectPath("/ai-components/analyze"),{method:"POST",body:{historyId:smartComponentSource,confirmCost:true}});await refreshSmartComponents()}catch(e){toast(e.message)}finally{button.disabled=false}
+ try{await api(projectPath("/ai-components/analyze"),{method:"POST",body:{historyId:smartComponentSource,confirmCost:true,vision:smartComponentRoute("vision")}});await refreshSmartComponents()}catch(e){toast(e.message)}finally{button.disabled=false}
 }
 function openSelectedImageCut(){
  const selected=selectedSceneNodes();
