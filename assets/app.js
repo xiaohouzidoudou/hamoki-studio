@@ -560,6 +560,12 @@ function syncGenerationActivity(){
 function renderConversation(){const div=$('conversation'),oldBottom=div.scrollHeight-div.scrollTop-div.clientHeight<120;div.replaceChildren();const msgs=currentProject?.messages||[];
  if(!msgs.length){const welcome=el('div','assistant-welcome'),im=el('img');im.src=document.querySelector('.brand-wrap img')?.src||APP_BASE+'/assets/hamoki-avatar-128.webp';welcome.append(im,el('h3','','你好！今天想创造什么？'),el('p','','描述一个想法，或者从画布中选择一张图继续修改。我会把真实生成结果直接放到画布上。'));const chip=el('div','welcome-chip');chip.innerHTML=ico('spark');chip.append(document.createTextNode('提示：按 Ctrl + Enter 可以直接提交生图请求'));welcome.append(chip);div.append(welcome);syncGenerationActivity();return}
  for(const msg of msgs.slice(-130)){const line=el('div','chat-item '+(msg.role==='user'?'user':'assistant'));const from=el('div','chat-from'),avatar=el('span','chat-avatar'+(msg.role==='user'?' user':''));avatar.innerHTML=ico(msg.role==='user'?'pointer':'spark');from.append(avatar,document.createTextNode(msg.role==='user'?'我':msg.capability==='text'?'Hamoki · 文字回复':'Hamoki · 生成结果'));line.append(from,el('div','chat-bubble',msg.content||''));if(msg.imageId){const h=currentHistory(msg.imageId);if(h){const im=el('img','chat-result');putPreview(im,h.url,h.previewUrl);im.alt=h.prompt;im.onclick=()=>focusImage(h.id);line.append(im)}}line.append(el('div','chat-time',humanDate(msg.createdAt)));div.append(line)}syncGenerationActivity();if(oldBottom)div.scrollTop=div.scrollHeight}
+function focusLatestGenerated(){
+ const nodes=(currentProject?.nodes||[]).filter(n=>n.kind==='generated');
+ if(!nodes.length)return toast('当前画布还没有生成作品');
+ const last=nodes.reduce((a,b)=>Date.parse(a.createdAt||0)>=Date.parse(b.createdAt||0)?a:b);
+ focusImage(last.historyId);
+}
 function focusImage(imageId){const n=currentProject?.nodes?.find(n=>n.historyId===imageId);if(!n)return openViewer(imageId);selectNode(n.id);const rect=$('board').getBoundingClientRect();changeCamera({x:rect.width*.5-(n.x+n.w*.5)*cam.scale,y:rect.height*.5-(n.y+n.h*.5)*cam.scale,scale:cam.scale});if(innerWidth<850)$('assistantPanel').classList.remove('open')}
 const skillPrompts={
  views:'请基于参考角色制作统一的三视图设计稿：正面、侧面、背面并排展示。保持面貌、发型、服装结构、配色和装饰完全一致，纯色干净背景。',
@@ -1166,7 +1172,7 @@ function bindEvents(){arrangeStudioLayout();setupBoard();$('imageModeToggle').on
  $('emptyUpload').onclick=()=>$('canvasFiles').click();$('uploadCanvas').onclick=()=>$('canvasFiles').click();$('canvasFiles').onchange=async e=>{await uploadToCanvas(e.target.files,currentBoardPoint(.3,.25));e.target.value=''};
  $('attachRef').onclick=()=>$('referenceFiles').click();$('reverseUpload').onclick=reverseFromReferences;
  $('referenceFiles').onchange=async e=>{await addFiles(e.target.files);e.target.value='';if(window.__reverseAfterUpload&&referenceInputs.length){window.__reverseAfterUpload=false;reverseImage=referenceInputs[0].data;openReverse()}};
- $('emptyNote').onclick=()=>createNote(currentBoardPoint(.35,.32));document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>changeTool(b.dataset.tool));$('fitCanvas').onclick=fitCanvas;$('zoomOut').onclick=()=>zoomAt(.8,$('board').clientWidth/2,$('board').clientHeight/2);$('zoomIn').onclick=()=>zoomAt(1.25,$('board').clientWidth/2,$('board').clientHeight/2);
+ $('emptyNote').onclick=()=>createNote(currentBoardPoint(.35,.32));document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>changeTool(b.dataset.tool));$('latestGenerated').onclick=focusLatestGenerated;$('fitCanvas').onclick=fitCanvas;$('zoomOut').onclick=()=>zoomAt(.8,$('board').clientWidth/2,$('board').clientHeight/2);$('zoomIn').onclick=()=>zoomAt(1.25,$('board').clientWidth/2,$('board').clientHeight/2);
  $('versionToggle').onclick=()=>{$('versionToggle').classList.toggle('disabled-links');renderLinks();toast($('versionToggle').classList.contains('disabled-links')?'版本连接线已隐藏':'版本连接线已显示')};
  $('generateBtn').onclick=()=>submitGeneration();$('compareOpen').onclick=showCompare;$('submitCompare').onclick=submitCompare;$('moreSettings').onclick=()=>$('advanced').classList.toggle('hidden');
  $('skillsToggle').onclick=()=>{const open=$('skillsMenu').classList.contains('hidden');$('skillsMenu').classList.toggle('hidden',!open);$('skillsToggle').setAttribute('aria-expanded',String(open))};
