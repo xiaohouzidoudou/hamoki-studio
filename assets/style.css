@@ -653,3 +653,12 @@ input[type=checkbox],input[type=radio],input[type=range]{accent-color:#10cc91}
 .simple-studio .composer{margin-top:5px}
 .simple-studio .composer textarea{min-height:105px;font-size:14px;line-height:1.65}
 .simple-studio #studioActivity{display:block}
+
+/* Review stays attached to its generated image; not another workflow panel. */
+.assistant-review{border:1px solid #3b5650;border-radius:10px;background:rgba(34,51,48,.75);padding:10px 12px;margin:8px 0 0;font-size:11px;color:#bdcfca;line-height:1.6}
+.assistant-review strong{display:block;color:#d9f0e6;font-size:11px}
+.assistant-review p{margin:5px 0 0;white-space:pre-wrap}
+.assistant-review.needs_work{border-color:#997759;background:#3a3029;color:#f2d6bc}
+.assistant-review.uncertain{border-color:#736855;background:#302f2e}
+.review-fix-button{display:block;margin-top:9px;background:#267b63;border:1px solid #3d9b7d;color:white;border-radius:8px;padding:8px 12px;font-size:11px;cursor:pointer}
+.review-fix-button:hover{background:#328d71}

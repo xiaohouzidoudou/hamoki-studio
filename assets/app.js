@@ -652,8 +652,10 @@ if(!src)throw Error('请先添加参考图');
 const dims=await new Promise((ok,fail)=>{const im=new Image();im.onload=()=>ok([im.naturalWidth,im.naturalHeight]);im.onerror=()=>fail(Error('读取参考图尺寸失败'));im.src=src});
 return nearestSupportedAspectRatio(dims[0],dims[1]);
 }
-function generationBody(targets){if(!currentProject)throw Error('请先选择项目');const text=$('prompt').value.trim();if(!text)throw Error('请填写创作描述');if(!targets&&!checkProvider(sourceId||maskData?'edit':'image'))throw Error('请先配置对应能力的中转站');if(!targets&&!($('imageModel').value.trim()||activeProvider()?.imageModel))throw Error('请先在操作台选择图片模型');const point=currentBoardPoint(.45,.34);return {projectId:currentProject.id,prompt:text,providerId:activeId,model:($('imageModel').value.trim()||activeProvider()?.imageModel||''),ratio:$('ratio').value,resolution:$('resolution').value,quality:$('quality').value,count:Number($('amount').value),transparentBg:$('transparentBg').checked,references:referenceInputs.map(r=>r.data),referenceNodes:referenceNodeRoles.map(r=>({...r})),sourceId,sourceNodeId,mask:maskData,maskSourceImage:maskSourcePng,canvasX:Math.round(point.x),canvasY:Math.round(point.y),...(targets?{targets,count:1}:{})}}
-async function submitGeneration(targets=null){if(composerMode==='text'&&!targets)return submitTextChat();let body;try{const referenceRatio=await referenceRatioValue();body=generationBody(targets);if(referenceRatio){body.ratio=referenceRatio;toast('已按参考图选择最接近的模型比例：'+referenceRatio)}}catch(e){if(e.message!=='请先配置对应能力的中转站')toast(e.message);return}const count=targets?targets.length:body.count;if(!targets&&body.model)rememberQuickModel(body.model);const displayTargets=targets?.length?targets:[{providerId:body.providerId,model:body.model}];const details=displayTargets.map(t=>(providers.find(p=>p.id===t.providerId)?.name||'未选择服务商')+' / '+(t.model||'未选择模型')).join('\n');if(!confirm(`${demoMode?'演示提交':'真实付费请求'}：即将提交 ${count} 个任务${body.mask?'（局部蒙版）':''}\n本次实际使用：\n${details}\n比例 ${body.ratio} / 分辨率 ${body.resolution}\n${demoMode?'不会扣费':'会产生中转站费用，取消或超时也可能已计费'}。确认继续？`))return;
+function generationBody(targets){if(!currentProject)throw Error('请先选择项目');const text=$('prompt').value.trim();if(!text)throw Error('请填写创作描述');if(!targets&&!checkProvider(sourceId||maskData?'edit':'image'))throw Error('请先配置对应能力的中转站');if(!targets&&!($('imageModel').value.trim()||activeProvider()?.imageModel))throw Error('请先在操作台选择图片模型');const point=currentBoardPoint(.45,.34);const vision=runtimeSelection('vision');
+ const review=simpleStudio&&!demoMode&&vision.providerId&&vision.model?{enabled:true,confirmed:true,providerId:vision.providerId,model:vision.model}:null;
+ return {projectId:currentProject.id,prompt:text,providerId:activeId,model:($('imageModel').value.trim()||activeProvider()?.imageModel||''),ratio:$('ratio').value,resolution:$('resolution').value,quality:$('quality').value,count:Number($('amount').value),transparentBg:$('transparentBg').checked,references:referenceInputs.map(r=>r.data),referenceNodes:referenceNodeRoles.map(r=>({...r})),sourceId,sourceNodeId,review,mask:maskData,maskSourceImage:maskSourcePng,canvasX:Math.round(point.x),canvasY:Math.round(point.y),...(targets?{targets,count:1}:{})}}
+async function submitGeneration(targets=null,planned=false){if(simpleStudio&&!targets&&!planned)return assistantSend();if(composerMode==='text'&&!targets)return submitTextChat();let body;try{const referenceRatio=await referenceRatioValue();body=generationBody(targets);if(referenceRatio){body.ratio=referenceRatio;toast('已按参考图选择最接近的模型比例：'+referenceRatio)}}catch(e){if(e.message!=='请先配置对应能力的中转站')toast(e.message);return}const count=targets?targets.length:body.count;if(!targets&&body.model)rememberQuickModel(body.model);const displayTargets=targets?.length?targets:[{providerId:body.providerId,model:body.model}];const details=displayTargets.map(t=>(providers.find(p=>p.id===t.providerId)?.name||'未选择服务商')+' / '+(t.model||'未选择模型')).join('\n');if(!confirm(`${demoMode?'演示提交':'真实付费请求'}：即将提交 ${count} 个任务${body.mask?'（局部蒙版）':''}\n本次实际使用：\n${details}\n比例 ${body.ratio} / 分辨率 ${body.resolution}\n${body.review?'包括每张图一次独立视觉审图（文字/视觉模型会额外计费）\n':'未启用自动视觉审图\n'}${demoMode?'不会扣费':'会产生中转站费用，取消或超时也可能已计费'}。确认继续？`))return;
  $('generateBtn').disabled=true;try{const r=await api('jobs',{method:'POST',body});toast(`已提交 ${r.jobs.length} 个${demoMode?'演示':'真实'}任务，结果会自动落到当前画布`);hide('compareModal');referenceInputs=[];referenceNodeRoles=[];sourceId=sourceNodeId=maskData=null;maskSourcePng=null;editingPrompt=null;enhanceMode=false;$('transparentBg').checked=false;renderContext();$('prompt').value='';await refreshProjectData();if(window.innerWidth<850)$('assistantPanel').classList.remove('open')}
  catch(e){toast('生成提交失败：'+e.message)}finally{$('generateBtn').disabled=false}}
 function activeGenerationJobs(){return jobs.filter(j=>j.status==='queued'||j.status==='running')}
@@ -689,9 +691,24 @@ function syncGenerationActivity(){
  $('generationTitle').textContent=paused?'队列已暂停 · 请到任务列表恢复':running?(pending.length>1?`正在生成 ${pending.length} 张图片`:'AI 正在绘制图片'):(pending.length>1?`${pending.length} 个生成任务排队中`:'生成任务排队中');
  updateGenerationElapsed();
 }
+function renderReviewInChat(line,h){
+ const info=h?.review;if(!info)return;
+ const detail=el('div','assistant-review '+info.status);
+ if(info.status==='checking'){detail.textContent='AI 正在核对图片和项目规范…';line.append(detail);return}
+ const headline=info.status==='pass'?'AI 初审：暂未发现明显偏差':info.status==='needs_work'?'AI 初审：发现需要修改的地方':'AI 初审：结果不确定';
+ detail.append(el('strong','',headline));
+ if(info.summary)detail.append(el('p','',info.summary));
+ if(info.issues?.length)detail.append(el('p','',info.issues.join('；')));
+ if(info.status==='needs_work'&&info.correction){
+  const btn=el('button','review-fix-button','按审图意见修改');btn.type='button';
+  btn.onclick=()=>{continueFrom(h.id);$('prompt').value=info.correction;$('prompt').focus();toast('已准备修改建议；确认生图后才会产生费用')};
+  detail.append(btn);
+ }
+ line.append(detail);
+}
 function renderConversation(){const div=$('conversation'),oldBottom=div.scrollHeight-div.scrollTop-div.clientHeight<120;div.replaceChildren();const msgs=currentProject?.messages||[];
- if(!msgs.length){const welcome=el('div','assistant-welcome'),im=el('img');im.src=document.querySelector('.brand-wrap img')?.src||APP_BASE+'/assets/hamoki-avatar-128.webp';welcome.append(im,el('h3','','你好！今天想创造什么？'),el('p','','描述一个想法，或者从画布中选择一张图继续修改。我会把真实生成结果直接放到画布上。'));const chip=el('div','welcome-chip');chip.innerHTML=ico('spark');chip.append(document.createTextNode('提示：按 Ctrl + Enter 可以直接提交生图请求'));welcome.append(chip);div.append(welcome);syncGenerationActivity();return}
- for(const msg of msgs.slice(-130)){const line=el('div','chat-item '+(msg.role==='user'?'user':'assistant'));const from=el('div','chat-from'),avatar=el('span','chat-avatar'+(msg.role==='user'?' user':''));avatar.innerHTML=ico(msg.role==='user'?'pointer':'spark');from.append(avatar,document.createTextNode(msg.role==='user'?'我':msg.capability==='text'?'Hamoki · 文字回复':'Hamoki · 生成结果'));line.append(from,el('div','chat-bubble',msg.content||''));if(msg.imageId){const h=currentHistory(msg.imageId);if(h){const im=el('img','chat-result');putPreview(im,h.url,h.previewUrl);im.alt=h.prompt;im.onclick=()=>focusImage(h.id);line.append(im)}}line.append(el('div','chat-time',humanDate(msg.createdAt)));div.append(line)}syncGenerationActivity();if(oldBottom)div.scrollTop=div.scrollHeight}
+ if(!msgs.length){const welcome=el('div','assistant-welcome'),im=el('img');im.src=document.querySelector('.brand-wrap img')?.src||APP_BASE+'/assets/hamoki-avatar-128.webp';welcome.append(im,el('h3','','你好！今天想创造什么？'),el('p','','描述一个想法，或者从画布中选择一张图继续修改。我会把真实生成结果直接放到画布上。'));const chip=el('div','welcome-chip');chip.innerHTML=ico('spark');chip.append(document.createTextNode('选图后直接告诉我哪里需要修改，也可以说「以后都不要前景」'));welcome.append(chip);div.append(welcome);syncGenerationActivity();return}
+ for(const msg of msgs.slice(-130)){const line=el('div','chat-item '+(msg.role==='user'?'user':'assistant'));const from=el('div','chat-from'),avatar=el('span','chat-avatar'+(msg.role==='user'?' user':''));avatar.innerHTML=ico(msg.role==='user'?'pointer':'spark');from.append(avatar,document.createTextNode(msg.role==='user'?'我':msg.capability==='text'?'Hamoki · 文字回复':'Hamoki · 生成结果'));line.append(from,el('div','chat-bubble',msg.content||''));if(msg.imageId){const h=currentHistory(msg.imageId);if(h){const im=el('img','chat-result');putPreview(im,h.url,h.previewUrl);im.alt=h.prompt;im.onclick=()=>focusImage(h.id);line.append(im);renderReviewInChat(line,h)}}line.append(el('div','chat-time',humanDate(msg.createdAt)));div.append(line)}syncGenerationActivity();if(oldBottom)div.scrollTop=div.scrollHeight}
 function focusLatestGenerated(){
  const nodes=(currentProject?.nodes||[]).filter(n=>n.kind==='generated');
  if(!nodes.length)return toast('当前画布还没有生成作品');
@@ -1082,7 +1099,7 @@ function arrangeStudioLayout(){
  const more=models.querySelector('#moreSettings');if(more){more.hidden=true;more.tabIndex=-1}
  scroll.append(details);
  const activity=el('details','studio-activity');activity.id='studioActivity';
- activity.innerHTML='<summary>创作记录与对话 <svg class="icon sm"><use href="#ic-chevron"/></svg></summary>';
+ activity.innerHTML='<summary>创作记录与对话 <svg class="icon sm"><use href="#ic-chevron"/></svg></summary>';activity.open=true;
  const conversation=$('conversation');if(conversation)activity.append(conversation);
  scroll.append(activity);
  panel.insertBefore(scroll,zone);
@@ -1117,6 +1134,45 @@ function renderStudioLayerChips(){
   const remove=el('button','studio-layer-remove','×');remove.type='button';remove.title='从画布移除（需确认）';remove.onclick=()=>removeNode(n);
   chip.append(btn,remove);host.append(chip)
  }
+}
+async function assistantSend(){
+ const prompt=$('prompt').value.trim();if(!prompt)return toast('请先告诉我你想做什么');
+ if(!currentProject)return toast('请先打开一个项目');
+ const textRoute=runtimeSelection('text');
+ if(!textRoute.providerId||!textRoute.model){toast('先配置文字模型，以便理解你的要求');return}
+ const send=$('generateBtn');send.disabled=true;
+ let plan;
+ try{
+  const r=await api('assistant/plan',{method:'POST',body:{projectId:currentProject.id,prompt,selectedNodeId,providerId:textRoute.providerId,model:textRoute.model}});
+  plan=r.plan;
+ }catch(e){toast('意图分析失败，没有提交生图：'+e.message);send.disabled=false;return}
+ finally{send.disabled=false}
+ if(plan.action==='remember'){
+  if(!plan.rule)return toast('还不确定需要记住什么，请明确说明');
+  if(!confirm('将这条要求记为当前项目的长期规则？\n'+plan.rule))return;
+  try{const r=await api(projectPath('/memory/rule'),{method:'POST',body:{text:plan.rule}});currentProject.assistantMemory=r.memory;renderMemoryContext();$('prompt').value='';toast('已经记住，后续生图自动遵守')}catch(e){toast(e.message)}
+  return;
+ }
+ if(plan.action==='approve'||plan.action==='reject'){
+  if(currentNode()?.kind!=='generated')return toast('请先在画布中选择对应图片');
+  await feedbackCurrent(plan.action==='approve'?'approved':'rejected');
+  if(plan.action==='approve')$('prompt').value='';
+  return;
+ }
+ if(plan.action==='image'){
+  const n=currentNode();
+  if(plan.mode==='edit'){
+   if(n?.kind!=='generated')return toast('请先选中需要修改的图片');
+   continueFrom(n.historyId,n.id);
+   $('prompt').value=prompt;
+  }else{sourceId=null;sourceNodeId=null;maskData=null;maskSourcePng=null;renderContext()}
+  const previous=composerMode;composerMode='image';
+  try{await submitGeneration(null,true)}finally{composerMode=previous}
+  return;
+ }
+ // Discussion is handled by the existing streaming text conversation, never by the image API.
+ const previous=composerMode;composerMode='text';
+ try{await submitTextChat()}finally{composerMode=previous}
 }
 function setSimpleStudio(){document.getElementById('assistantPanel')?.classList.toggle('simple-studio',simpleStudio);const b=$('showStudioTools');if(b)b.textContent=simpleStudio?'专业工具':'收起工具'}
 function renderMemoryContext(){const box=$('memoryContext');if(!box)return;const count=currentProject?.assistantMemory?.rules?.length||0;const node=currentNode();box.textContent=(count?'已记住 '+count+' 条项目规范':'当前项目还没有已确认规范')+(node?' · 已选中图片，可直接描述修改':' · 描述想做的图片即可开始')}
