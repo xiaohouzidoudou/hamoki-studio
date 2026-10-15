@@ -425,7 +425,7 @@ function showBoardContextMenu(e){
  menu.style.left=clamp(e.clientX,8,Math.max(8,innerWidth-width-8))+'px';
  menu.style.top=clamp(e.clientY,8,Math.max(8,innerHeight-height-8))+'px';
 }
-let smartComponentTimer=null,smartComponentSource=null;
+let smartComponentTimer=null,smartComponentSource=null,smartComponentPlan=null;
 async function openSmartComponents(historyId){
  if(!currentProject||!historyId)return toast("请选中一张已生成图片");
  if(!currentProject.nodes.some(n=>n.kind==="generated"&&n.historyId===historyId))return toast("只能拆当前画布上的生成图");
@@ -436,19 +436,36 @@ async function openSmartComponents(historyId){
  smartComponentTimer=setInterval(()=>{if(!$("smartComponentModal").classList.contains("hidden"))refreshSmartComponents().catch(()=>{});},4000);
 }
 async function refreshSmartComponents(){
- const data=await api(projectPath("/ai-components")),plan=data.plan,items=$("smartComponentItems");items.replaceChildren();
- if(!plan){$("smartComponentHint").textContent="点击 AI 识别这张图，自动列出可拆出的组件。";return}
+ const data=await api(projectPath("/ai-components")),plan=data.plan,items=$("smartComponentItems");smartComponentPlan=plan;items.replaceChildren();
+ if(!plan){$("smartComponentHint").textContent="点击 AI 识别这张图，自动列出可拆出的组件。";$("smartComponentGenerateAll").disabled=true;$("smartComponentDownload").disabled=true;return}
  if(plan.sourceId!==smartComponentSource){$("smartComponentHint").textContent="保存的是另一张图的拆解结果，可以重新分析当前图片。";return}
- $("smartComponentHint").textContent=plan.status==="analyzing"?"正在识别组件...":plan.status==="failed"?"识别失败："+plan.error:"已找到 "+plan.items.length+" 个组件";
+ const done=plan.items.filter(x=>x.status==="done").length;const unstarted=plan.items.filter(x=>!x.jobId).length;
+ $("smartComponentGenerateAll").disabled=plan.status!=="ready"||unstarted===0||!!plan.auto?.enabled;
+ $("smartComponentDownload").disabled=done===0;
+ $("smartComponentHint").textContent=plan.status==="analyzing"?"正在识别组件...":plan.status==="failed"?"识别失败："+plan.error:"已识别 "+plan.items.length+" 个组件 · 已完成 "+done+" 个 · 待提交 "+unstarted+" 个"+(plan.auto?.enabled?" · 自动制作中":"")+(plan.auto?.error?" · "+plan.auto.error:"");
  for(const item of plan.items){
   const card=el("div","smart-component-card");if(item.url){const img=el("img");img.src=item.url;img.alt=item.name;card.append(img)}
   const info=el("div","smart-component-details");info.append(el("strong","",item.index+". "+item.name),el("small","",item.category+" · "+item.status));
+  if(item.resultId){const transparentStatus=item.category==="background"?"背景图无需透明":item.transparentVerified===true?"已检测到透明通道":"未检测到有效透明背景，请检查或重生成";info.append(el("small",item.transparentVerified===false&&item.category!=="background"?"smart-component-warning":"",transparentStatus));const view=el("button","soft-btn","查看大图");view.type="button";view.onclick=()=>openViewer(item.resultId);info.append(view)}
   const busy=item.status==="queued"||item.status==="running";
   const button=el("button","soft-btn",busy?"生成中...":item.status==="done"?"重新生成":item.status==="failed"?"重试此组件":"生成此组件");button.type="button";button.disabled=busy;
   button.onclick=async()=>{if(!confirm("生成「"+item.name+"」会调用图片模型并可能产生费用。继续？"))return;
    button.disabled=true;try{await api(projectPath("/ai-components/generate"),{method:"POST",body:{itemId:item.id,confirmCost:true,retry:item.status==="done"}});await refreshSmartComponents()}catch(e){toast(e.message);button.disabled=false}};
   info.append(button);card.append(info);items.append(card);
  }
+}
+async function generateAllSmartComponents(){
+ const plan=smartComponentPlan;if(!plan||plan.sourceId!==smartComponentSource||plan.status!=="ready")return;
+ const todo=plan.items.filter(x=>!x.jobId).length;if(!todo)return toast("没有等待制作的组件");
+ if(!confirm("即将自动逐个制作 "+todo+" 个组件。每个组件会单独调用付费图片模型，可能产生 "+todo+" 次费用，模型可能失败或重绘变形。确定开始吗？"))return;
+ const button=$("smartComponentGenerateAll");button.disabled=true;
+ try{await api(projectPath("/ai-components/generate-all"),{method:"POST",body:{confirmCost:true}});await refreshSmartComponents()}catch(e){toast(e.message);button.disabled=false}
+}
+function downloadSmartComponents(){
+ const plan=smartComponentPlan;if(!plan||plan.sourceId!==smartComponentSource)return;
+ const ids=plan.items.filter(x=>x.resultId&&x.status==="done").map(x=>x.resultId);
+ if(!ids.length)return toast("目前没有可下载的组件");
+ location.href=APP_BASE+"/api/export?ids="+encodeURIComponent(ids.join(","));
 }
 function closeSmartComponents(){hide("smartComponentModal");if(smartComponentTimer)clearInterval(smartComponentTimer);smartComponentTimer=null}
 async function runSmartComponentAnalysis(){
@@ -1217,6 +1234,8 @@ async function saveLocalImage(){if(!currentProject||!imageEditCanvas||!imageEdit
 function bindEvents(){
  $('smartComponentClose').onclick=closeSmartComponents;
  $('smartComponentAnalyze').onclick=runSmartComponentAnalysis;
+ $('smartComponentGenerateAll').onclick=generateAllSmartComponents;
+ $('smartComponentDownload').onclick=downloadSmartComponents;
  $('smartComponentModal').addEventListener('pointerdown',e=>{if(e.target.id==='smartComponentModal')closeSmartComponents()});
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('smartComponentModal').classList.contains('hidden')){e.preventDefault();e.stopImmediatePropagation();closeSmartComponents()}},true);
 
