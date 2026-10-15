@@ -8,6 +8,7 @@ const show=id=>$(id)?.classList.remove('hidden');
 const hide=id=>$(id)?.classList.add('hidden');
 let providers=[],activeId=null,editId=null,draftProvider=false,projectList=[],currentProject=null,historyItems=[],jobs=[],paused=false;
 let composerMode='image';
+let simpleStudio=true;
 const runtimeRoutes={text:{providerId:'',model:''},vision:{providerId:'',model:''}},runtimeCatalog=new Map();
 let selectedNodeId=null,viewerId=null,sourceId=null,sourceNodeId=null,maskData=null,maskSourceId=null;
 let enhanceMode=false;
@@ -162,7 +163,7 @@ async function switchProject(id){if(!id||!authorized)return;if(textChatBusy&&tex
  $('currentProjectTitle').textContent=currentProject.title;renderProjects();$('projectsPanel').classList.remove('open');
  const [h,j]=await Promise.all([api(`history?projectId=${id}`),api(`jobs?projectId=${id}`)]);historyItems=h.history||[];jobs=j.jobs||[];paused=!!j.paused;renderAll();
 }catch(e){toast('打开项目失败：'+e.message)}}
-function renderAll(){updateScene();renderNodes();renderConversation();renderContext();renderLibrary();updateStats();}
+function renderAll(){updateScene();renderNodes();renderConversation();renderContext();renderMemoryContext();renderLibrary();updateStats();}
 function updateStats(){const n=jobs.filter(j=>['queued','running'].includes(j.status)).length;$('queueBadge').textContent=n;$('libraryCount').textContent=historyItems.length;$('pauseBtn').textContent=paused?'▶ 恢复队列':'Ⅱ 暂停队列'}
 async function refreshProjectData(){if(polling||!currentProject||!authorized)return;polling=true;const id=currentProject.id;try{
  const [h,j,r]=await Promise.all([api(`history?projectId=${id}`),api(`jobs?projectId=${id}`),api(`/api/projects/${id}`)]);
@@ -1090,6 +1091,14 @@ function arrangeStudioLayout(){
  const instruction=zone.querySelector('.composer-instruction');
  if(instruction){instruction.className='studio-prompt-hint';instruction.textContent='Ctrl + Enter 发送'}
  const button=$('generateBtn');if(button){button.classList.add('studio-send-button');button.innerHTML='<svg class="icon"><use href="#ic-arrow"/></svg><span id="sendButtonLabel">开始生成</span>'}
+ const memoryBar=el('div','memory-context');memoryBar.id='memoryContext';zone.insertBefore(memoryBar,zone.firstChild);
+ const actions=el('div','memory-actions');actions.innerHTML='<button type="button" id="rememberRuleBtn">记住这条规范</button><button type="button" id="approveImageBtn">这张可以</button><button type="button" id="rejectImageBtn">这张不对</button><button type="button" id="showStudioTools">专业工具</button>';
+ zone.insertBefore(actions,zone.querySelector('.composer'));
+ $('rememberRuleBtn').onclick=rememberCurrentRule;
+ $('approveImageBtn').onclick=()=>feedbackCurrent('approved');
+ $('rejectImageBtn').onclick=()=>feedbackCurrent('rejected');
+ $('showStudioTools').onclick=()=>{simpleStudio=!simpleStudio;setSimpleStudio()};
+ setSimpleStudio();
  // Panel type/mode controls are moved rather than cloned; all API/model event bindings still target original IDs.
  const subtitle=$('assistantDescription');if(subtitle)subtitle.textContent='让灵感变成现实，支持 AI 绘图 · 文字对话';
  renderStudioLayerChips();
@@ -1109,6 +1118,10 @@ function renderStudioLayerChips(){
   chip.append(btn,remove);host.append(chip)
  }
 }
+function setSimpleStudio(){document.getElementById('assistantPanel')?.classList.toggle('simple-studio',simpleStudio);const b=$('showStudioTools');if(b)b.textContent=simpleStudio?'专业工具':'收起工具'}
+function renderMemoryContext(){const box=$('memoryContext');if(!box)return;const count=currentProject?.assistantMemory?.rules?.length||0;const node=currentNode();box.textContent=(count?'已记住 '+count+' 条项目规范':'当前项目还没有已确认规范')+(node?' · 已选中图片，可直接描述修改':' · 描述想做的图片即可开始')}
+async function rememberCurrentRule(){const text=$('prompt').value.trim();if(!text)return toast('先写下需要长期遵守的规范');if(!currentProject)return;try{const r=await api(projectPath('/memory/rule'),{method:'POST',body:{text}});currentProject.assistantMemory=r.memory;renderMemoryContext();$('prompt').value='';toast('已保存为项目美术规范，后续生图会自动使用')}catch(e){toast(e.message)}}
+async function feedbackCurrent(kind){const node=currentNode();if(node?.kind!=='generated')return toast('请先选中画布上的一张生成图');try{const note=kind==='rejected'?$('prompt').value.trim():'';const r=await api(projectPath('/memory/feedback'),{method:'POST',body:{nodeId:node.id,historyId:node.historyId,kind,note}});currentProject.assistantMemory=r.memory;renderMemoryContext();toast(kind==='approved'?'已确认作品':'已记录不满意反馈，不会误记成项目规则')}catch(e){toast(e.message)}}
 function setComposerMode(mode){
  composerMode=mode==='text'?'text':'image';
  $('imageModeToggle').classList.toggle('active',composerMode==='image');
