@@ -309,6 +309,15 @@
   </div>
  </section>
 </div>
+<div class="modal-back hidden smart-component-modal" id="smartComponentModal" role="dialog" aria-modal="true" aria-label="AI 智能拆组件">
+ <section class="modal smart-component-dialog">
+  <div class="modal-head"><div><span class="eyebrow">AI COMPONENT PRODUCTION</span><h2>AI 智能拆组件</h2><p>一次处理一张已生成的完整游戏 UI，组件可以单独生成和返工。</p></div><button class="icon-btn" type="button" id="smartComponentClose" aria-label="关闭拆组件">✕</button></div>
+  <div class="smart-component-body">
+   <div class="smart-component-source"><img id="smartComponentSource" alt="当前待拆解的完整游戏 UI"><button type="button" class="primary-btn" id="smartComponentAnalyze">AI 识别这张图（可能扣费）</button><p id="smartComponentHint" aria-live="polite">请选择一张图片。</p></div>
+   <div id="smartComponentItems" class="smart-component-items"></div>
+  </div>
+ </section>
+</div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <script src="assets/app.js" defer></script>
 <script src="assets/ui-system.js" defer></script>
@@ -316,3 +325,4 @@
 <script src="assets/asset-derivation.js" defer></script>
 <script src="assets/game-ui-delivery.js" defer></script>
 </body></html>
+
