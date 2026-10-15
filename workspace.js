@@ -397,7 +397,7 @@ function projectBackup(p){
  const fileIds=new Set(selectedHistory.map(h=>h.file).concat(p.nodes.filter(n=>n.kind==='reference').map(n=>n.assetFile)));
  let total=0;const media=[];
  for(const id of fileIds){const img=fetchMedia(id);total+=img.bytes.length;if(total>BUNDLE_MAX)throw Object.assign(Error('此项目媒体超过32MB，请分批备份后再导入'),{status:413});media.push({file:id,mime:img.mime,data:img.bytes.toString('base64')});}
- const safeProject={title:p.title,viewport:p.viewport,nodes:p.nodes,messages:p.messages,creativeWorkflow:p.creativeWorkflow||null,generationLayout:p.generationLayout||null};
+ const safeProject={title:p.title,viewport:p.viewport,nodes:p.nodes,messages:p.messages,creativeWorkflow:p.creativeWorkflow||null,generationLayout:p.generationLayout||null,aiComponentPlan:componentView(p).plan};
  return zlib.gzipSync(Buffer.from(JSON.stringify({kind:'hamoki-project',schema:1,exportedAt:time(),project:safeProject,history:selectedHistory,media})),{level:6});
 }
 function importProject(b){
@@ -419,7 +419,7 @@ function importProject(b){
  if(data.project.viewport){const v=data.project.viewport;proj.viewport={x:num(v.x,220,-500000,500000),y:num(v.y,130,-500000,500000),scale:num(v.scale,1,.18,2.8)}}
  // After all structure checks pass, persist media and remap every entity identifier.
  const mediaIds=new Map();for(const [old,img] of buffers)mediaIds.set(old,storeMedia(img));
- const importedHistory=data.history.map(h=>({id:oldHistId.get(h.id),file:mediaIds.get(h.file),projectId:proj.id,prompt:clampText(h.prompt,10000),editInstruction:clampText(h.editInstruction,4000),model:trim(h.model,150),providerName:trim(h.providerName,100),ratio:trim(h.ratio,20),resolution:trim(h.resolution,10),quality:trim(h.quality,10),transparentBg:!!h.transparentBg,createdAt:typeof h.createdAt==='string'?h.createdAt:time(),parentId:oldHistId.get(h.parentId)||null,favorite:!!h.favorite,imported:true}));
+ const importedHistory=data.history.map(h=>({id:oldHistId.get(h.id),file:mediaIds.get(h.file),projectId:proj.id,prompt:clampText(h.prompt,10000),editInstruction:clampText(h.editInstruction,4000),model:trim(h.model,150),providerName:trim(h.providerName,100),ratio:trim(h.ratio,20),resolution:trim(h.resolution,10),quality:trim(h.quality,10),transparentBg:!!h.transparentBg,componentTransparent:h.componentTransparent===true?true:h.componentTransparent===false?false:null,createdAt:typeof h.createdAt==='string'?h.createdAt:time(),parentId:oldHistId.get(h.parentId)||null,favorite:!!h.favorite,imported:true}));
  proj.nodes=data.project.nodes.map(n=>{
   const next={id:oldNodeId.get(n.id),kind:n.kind,...posNode(n),createdAt:typeof n.createdAt==='string'?n.createdAt:time(),parentNodeId:oldNodeId.get(n.parentNodeId)||null};
   if(n.groupId){if(!oldGroupId.has(n.groupId))oldGroupId.set(n.groupId,crypto.randomUUID());next.groupId=oldGroupId.get(n.groupId)}
@@ -429,6 +429,15 @@ function importProject(b){
   return next;
  });
  proj.messages=data.project.messages.map(m=>({id:crypto.randomUUID(),role:['user','result','assistant'].includes(m.role)?m.role:'user',content:clampText(m.content,4000),createdAt:typeof m.createdAt==='string'?m.createdAt:time(),imageId:oldHistId.get(m.imageId)||null,sourceId:oldHistId.get(m.sourceId)||null,referenceRoles:Array.isArray(m.referenceRoles)?m.referenceRoles.slice(0,8).filter(x=>oldNodeId.has(x.nodeId)).map(x=>({nodeId:oldNodeId.get(x.nodeId),role:REFERENCE_ROLES[x.role]?x.role:'general'})):[]}));
+ // Restore one-image component review map, remapping all identifiers.
+ const archivedComponents=data.project.aiComponentPlan;
+ if(archivedComponents&&oldHistId.has(archivedComponents.sourceId)&&Array.isArray(archivedComponents.items)){
+  const items=archivedComponents.items.slice(0,24).filter(x=>x&&typeof x.name==="string"&&x.name.length<=65&&aiComponent.CATEGORIES.has(x.category)&&Array.isArray(x.box)&&x.box.length===4&&x.box.every(v=>Number.isInteger(v)&&v>=0&&v<=1000)&&x.box[2]>x.box[0]&&x.box[3]>x.box[1]&&typeof x.description==="string"&&x.description.length<=900);
+  if(items.length){proj.aiComponentPlan={id:crypto.randomUUID(),sourceId:oldHistId.get(archivedComponents.sourceId),status:"ready",createdAt:time(),error:"",items:items.map((x,i)=>{
+   const resultId=oldHistId.get(x.resultId)||null;
+   return {id:crypto.randomUUID(),index:i+1,name:x.name,category:x.category,box:x.box,description:x.description,status:resultId?"done":"ready",jobId:null,importedResultId:resultId};
+  })}};
+ }
  // Import multi-document creative plans and remap every image/node ID safely.
  // Provider credentials, configured endpoints and model routes stay account-local.
  const oldFlow=data.project.creativeWorkflow;
@@ -787,7 +796,7 @@ function componentView(p){
  const plan=p.aiComponentPlan;if(!plan)return {plan:null};
  return {plan:{...plan,items:plan.items.map(item=>{
   const job=jobs.find(j=>j.id===item.jobId&&j.projectId===p.id);
-  const result=job?.resultId&&history.find(h=>h.id===job.resultId&&h.projectId===p.id);
+  const resultId=job?.resultId||item.importedResultId;const result=resultId&&history.find(h=>h.id===resultId&&h.projectId===p.id);
   return {...item,status:job?.status||item.status,error:job?.error||"",resultId:result?.id||null,transparentVerified:result?.componentTransparent??null,url:result?BASE+"/api/media/"+result.file:null};
  })}};
 }
