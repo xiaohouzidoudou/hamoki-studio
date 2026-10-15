@@ -156,7 +156,7 @@
   $('creativeStyleLock').textContent=f?.styleLocked?'风格已锁定 · 可点击解除':'锁定当前风格';
   const rows=(typeof historyItems!=='undefined'?historyItems:[]).filter(h=>h.projectId===projectId);
   const gallery=$('creativeQualityGallery'),previous=$('creativeGeneratedSelect').value;
-  const chosen=[previous,page?.quality?.historyId,(typeof selectedSceneNodes==='function'&&selectedSceneNodes().length===1?selectedSceneNodes()[0]?.historyId:null),rows[0]?.id].find(x=>rows.some(h=>h.id===x))||'';
+  const chosen=[(typeof selectedSceneNodes==='function'&&selectedSceneNodes().length===1?selectedSceneNodes()[0]?.historyId:null),previous,page?.quality?.historyId,rows[0]?.id].find(x=>rows.some(h=>h.id===x))||'';
   pick('creativeGeneratedSelect',rows.length?rows.slice(0,80).map((h,i)=>({value:h.id,label:(h.model||'作品')+' · '+(h.createdAt||'').slice(0,16)+' · #'+(i+1)})):[{value:'',label:'当前项目暂无生成图'}],chosen);
   gallery.replaceChildren();
   if(!rows.length)gallery.append(el('p','micro muted','当前项目暂无生成图，请先在画布完成生图。'));
