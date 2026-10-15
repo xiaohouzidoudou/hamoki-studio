@@ -1144,6 +1144,22 @@ function renderStudioLayerChips(){
 async function assistantSend(){
  const prompt=$('prompt').value.trim();if(!prompt)return toast('请先告诉我你想做什么');
  if(!currentProject)return toast('请先打开一个项目');
+ // Pages imported from real Word and prototypes should enter the specialist
+ // workflow directly, without a redundant paid intent-planning model call.
+ const hasCreativePage=!!currentProject?.creativeWorkflow?.pages?.length;
+ const editFeedback=/^(这张|这里|这个|刚才|上一张|改一下|修改|调整|不对|可以|满意|记住|以后)/.test(prompt);
+ if(hasCreativePage&&!editFeedback&&window.HamokiCreative?.prepareFromChat){
+  const send=$('generateBtn');send.disabled=true;
+  try{
+   const result=await window.HamokiCreative.prepareFromChat(prompt);
+   if(result?.handled){
+    if(result.started){$('prompt').value='';toast('专业美术工作流已启动，正在后台执行');await refreshProjectData()}
+    else toast(result.message||'无法启动专业美术工作流');
+    return;
+   }
+  }catch(e){toast('专业美术工作流未启动：'+e.message);return}
+  finally{send.disabled=false}
+ }
  const routeFromProject=currentProject?.creativeWorkflow?.routing?.text;
  const textRoute=routeFromProject?.providerId&&routeFromProject?.model?routeFromProject:runtimeSelection('text');
  if(!textRoute.providerId||!textRoute.model){toast('先配置文字模型，以便理解你的要求');return}
