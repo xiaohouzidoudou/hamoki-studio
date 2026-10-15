@@ -162,7 +162,7 @@
      <div class="creative-actions"><button class="primary-btn" type="button" id="creativeUsePrompt" disabled><svg class="icon sm"><use href="#ic-arrow"/></svg> 送入画布生图操作台</button><span class="micro muted">不会自动生成或扣除生图费用</span></div>
     </section>
     <section class="creative-section"><div class="creative-section-top"><div><span class="creative-kicker">05 · ART REVIEW</span><h3>生成后的视觉质检</h3><p>先在画布完成生图，再选择这张作品。独立视觉模型同时对照原型与风格进行审核。</p></div></div>
-      <div class="creative-actions"><select class="field" id="creativeGeneratedSelect" aria-label="要质检的生成图"></select><button type="button" class="soft-btn" id="creativeQuality" disabled><svg class="icon sm"><use href="#ic-search"/></svg> 检查生成图</button><button type="button" class="soft-btn" id="creativeUseFix" disabled>将返工建议放入生图框</button></div>
+      <div class="creative-quality-picker"><select class="field hidden" id="creativeGeneratedSelect" aria-label="要质检的生成图"></select><div class="creative-quality-gallery" id="creativeQualityGallery" role="group" aria-label="点击缩略图选择要质检的作品"></div></div><div class="creative-actions"><button type="button" class="soft-btn" id="creativeQuality" disabled><svg class="icon sm"><use href="#ic-search"/></svg> 检查生成图</button><button type="button" class="soft-btn" id="creativeUseFix" disabled>将返工建议放入生图框</button></div>
       <pre id="creativeQualityResult" class="creative-quality-result">尚未质检</pre>
     </section>
    </div>
