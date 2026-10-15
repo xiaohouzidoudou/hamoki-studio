@@ -393,7 +393,7 @@
   try{
    const r=await api('projects/'+id+'/creative/auto',{method:'POST',body:{
     pageId:page.id,instruction,confirmed:true,review,
-    ratio:$('ratio')?.value==='reference'?'9:16':$('ratio')?.value||'9:16',
+    ratio:instruction.match(/(?:^|[^0-9])((?:1:1|3:2|2:3|16:9|9:16|4:3|3:4))(?:$|[^0-9])/)?.[1]||'reference',
     resolution:$('resolution')?.value||'1K',quality:$('quality')?.value||'auto',
     routing:{text:typeof runtimeSelection==='function'?runtimeSelection('text'):{},vision:typeof runtimeSelection==='function'?runtimeSelection('vision'):{},image:{providerId:typeof activeId==='string'?activeId:'',model:$('imageModel')?.value||''}}
    }});
