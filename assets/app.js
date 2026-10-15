@@ -1242,6 +1242,27 @@ function renderCreativeAutoProgress(){
   progress.append(el('span','studio-auto-step '+state,names[i]));
  }
  host.append(progress);
+ if(run.status==='running'){
+  const visual=el('div','creative-live-visual');
+  const orbit=el('div','creative-live-orbit');
+  orbit.setAttribute('aria-hidden','true');
+  orbit.append(el('span','creative-live-ring'),el('span','creative-live-core'));
+  const detail=el('div','creative-live-copy');
+  const stageText=run.stage==='generation'?'图片模型正在绘制':run.stage==='quality'?'正在检查生成图片':run.stage==='director'?'正在准备美术设计方案':run.stage==='layout'?'正在分析 UI 原型':run.stage==='style'?'正在分析项目风格':'正在整理项目资料';
+  detail.append(el('strong','',stageText),el('small','',run.message||'任务已提交，等待后台返回实际进展'));
+  const started=Date.parse(run.startedAt||run.createdAt||'');
+  if(Number.isFinite(started)&&started>0){
+   const seconds=Math.max(0,Math.floor((Date.now()-started)/1000));
+   detail.append(el('small','creative-live-elapsed','已等待 '+Math.floor(seconds/60)+' 分 '+String(seconds%60).padStart(2,'0')+' 秒'));
+  }
+  visual.append(orbit,detail);host.append(visual);
+  if(run.stage==='generation'){
+   const placeholder=el('div','creative-image-placeholder');
+   placeholder.setAttribute('role','status');
+   placeholder.append(el('div','creative-image-shimmer'),el('span','creative-image-label','图片生成中 · 完成后自动出现在画布'));
+   host.append(placeholder);
+  }
+ }
  const failed=['failed','interrupted','uncertain'].includes(run.status);
  if(failed){
   const failureKey=[currentProject?.id||'',run.id||run.startedAt||'',run.status,String(run.error||run.message||'')].join('|');
