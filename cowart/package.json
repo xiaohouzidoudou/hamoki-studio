@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "predev": "npm install --no-save --package-lock=false @tldraw/assets@5.1.1 --no-audit --no-fund",
+    "prebuild": "npm install --no-save --package-lock=false @tldraw/assets@5.1.1 --no-audit --no-fund"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.0",
