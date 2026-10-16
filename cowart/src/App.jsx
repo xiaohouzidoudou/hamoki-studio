@@ -52,7 +52,6 @@ import {
   isCanvasSnapshot,
   sanitizeCanvasSnapshotForTldraw
 } from './canvasSnapshot.js'
-import { seedDemoCanvas } from './lib/demoCanvas.js'
 import {
   loadCanvasSnapshot,
   saveCanvasSnapshot,
@@ -1003,7 +1002,6 @@ export default function App() {
   const [aiPanelOpen, setAiPanelOpen] = useState(true)
   const [saveError, setSaveError] = useState('')
   const editorRef = useRef(null)
-  const needsDemoSeedRef = useRef(false)
   const getEditor = useCallback(() => editorRef.current, [])
 
   useEffect(() => {
@@ -1015,7 +1013,6 @@ export default function App() {
           loadCanvasSnapshot(),
           readViewState()
         ])
-        needsDemoSeedRef.current = canvasResult.storage === 'empty'
         const sanitized = sanitizeCanvasSnapshotForTldraw(canvasResult.snapshot)
         setSnapshot(sanitized.snapshot)
         setSkippedRecords(sanitized.skippedRecords)
@@ -1034,6 +1031,7 @@ export default function App() {
   }, [])
 
   const handleMount = useCallback((editor) => {
+    editor.user.updateUserPreferences({ colorScheme: 'dark' })
     editorRef.current = editor
     window.__cowartEditor = editor
     window.__cowartSelection = () => getCowartSelection(editor)
@@ -1152,19 +1150,6 @@ export default function App() {
     }
 
     editor.timers.requestAnimationFrame(() => {
-      if (needsDemoSeedRef.current) {
-        needsDemoSeedRef.current = false
-        void seedDemoCanvas(editor)
-          .then(() => {
-            scheduleSave()
-            editor.timers.setTimeout(syncViewState, 150)
-          })
-          .catch((error) => {
-            console.error('Cowart demo canvas seed failed:', error)
-          })
-        return
-      }
-
       restoreCowartViewState(editor, viewState)
     })
 
@@ -1322,13 +1307,13 @@ export default function App() {
   }
 
   return (
-    <main className="cowart-canvas" aria-label="Hamoki Studio · Cowart 自由画布">
+    <main className={`cowart-canvas${aiPanelOpen ? ' with-studio-panel' : ''}`} aria-label="Hamoki Studio · Cowart 自由画布">
       <SkippedRecordsNotice records={skippedRecords} />
       <Tldraw
         licenseKey={TLDRAW_LICENSE_KEY}
         assetUrls={TLDRAW_ASSET_URLS}
         snapshot={snapshot ?? undefined}
-        inferDarkMode
+        colorScheme="dark"
         onMount={handleMount}
         overrides={cowartUiOverrides}
         components={cowartComponents}
