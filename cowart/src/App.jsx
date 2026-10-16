@@ -60,8 +60,7 @@ import {
   writeViewState,
   subscribeCanvasChanges
 } from './lib/storage.js'
-import SettingsPanel from './ui/SettingsPanel.jsx'
-import AIPanel from './ui/AIPanel.jsx'
+import StudioPanel from './ui/StudioPanel.jsx'
 
 const TLDRAW_LICENSE_KEY = import.meta.env.VITE_TLDRAW_LICENSE_KEY
 
@@ -998,8 +997,8 @@ export default function App() {
   const [viewState, setViewState] = useState()
   const [loadError, setLoadError] = useState(null)
   const [skippedRecords, setSkippedRecords] = useState([])
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [aiPanelOpen, setAiPanelOpen] = useState(false)
+  const [aiPanelOpen, setAiPanelOpen] = useState(true)
+  const [saveError, setSaveError] = useState('')
   const editorRef = useRef(null)
   const needsDemoSeedRef = useRef(false)
   const getEditor = useCallback(() => editorRef.current, [])
@@ -1130,7 +1129,9 @@ export default function App() {
           setSkippedRecords(result.skippedRecords)
         }
         hasUnsavedChanges = false
+        setSaveError('')
       } catch (error) {
+        setSaveError(error.message || '保存失败，当前修改尚未同步到服务器')
         console.error(error)
       } finally {
         isSaving = false
@@ -1312,13 +1313,13 @@ export default function App() {
   if (loadError) {
     return (
       <main className="cowart-status" aria-live="polite">
-        Canvas file could not be loaded.
+        画布读取失败：{loadError?.message || '请检查是否登录 Studio'}
       </main>
     )
   }
 
   return (
-    <main className="cowart-canvas" aria-label="Cowart infinite canvas">
+    <main className="cowart-canvas" aria-label="Hamoki Studio · Cowart 自由画布">
       <SkippedRecordsNotice records={skippedRecords} />
       <Tldraw
         licenseKey={TLDRAW_LICENSE_KEY}
@@ -1330,16 +1331,27 @@ export default function App() {
         shapeUtils={cowartShapeUtils}
         tools={[CowartAnnotationTool]}
       />
+      {saveError && <aside className="hamoki-save-error" role="alert">
+        <strong>画布尚未同步</strong>：{saveError}
+        <button type="button" onClick={() => {
+          const editor = getEditor()
+          if (!editor) return
+          const blob = new Blob([JSON.stringify(editor.store.getStoreSnapshot())], { type: 'application/json' })
+          const url = URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = 'hamoki-cowart-unsaved-' + Date.now() + '.json'
+          link.click()
+          URL.revokeObjectURL(url)
+        }}>导出当前画布备份</button>
+      </aside>}
       <div className="cowart-ai-launcher">
         <button type="button" onClick={() => setAiPanelOpen((open) => !open)}>
-          ✨ AI 助手
+          🐵 {aiPanelOpen ? '收起 Studio' : 'AI 生图'}
         </button>
-        <button type="button" className="cowart-ai-launcher-settings" onClick={() => setSettingsOpen(true)}>
-          ⚙ 设置
-        </button>
+        <a className="hamoki-back-link" href="/" target="_blank" rel="noopener noreferrer">管理后台 ↗</a>
       </div>
-      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-      <AIPanel open={aiPanelOpen} onClose={() => setAiPanelOpen(false)} getEditor={getEditor} />
+      <StudioPanel open={aiPanelOpen} onClose={() => setAiPanelOpen(false)} getEditor={getEditor} />
     </main>
   )
 }
