@@ -1,9 +1,44 @@
-# Cowart migration (experimental)
+# Cowart → Hamoki Studio migration tracker
 
-Upstream: https://github.com/runc/Cowart and https://github.com/zhongerxin/Cowart. Cowart source has an MIT LICENSE, copied to cowart/LICENSE.cowart; tldraw has a separate licensing policy. Confirm tldraw authorization before production use: https://tldraw.dev/community/license.
+Upstream: [Cowart original](https://github.com/zhongerxin/Cowart) and [Cowart Web](https://github.com/runc/Cowart).
 
-This branch vendors the React/Vite Cowart browser canvas into cowart/, preserving the existing Studio production implementation and data. The Vite base path is /cowart/.
+## Implemented in feature/cowart-web-canvas-20261016
 
-To build locally: cd cowart && npm ci && npm run build.
+- Copied Cowart Web React/Vite/tldraw canvas into `cowart/`, retaining upstream MIT attribution at `cowart/LICENSE.cowart`. The tldraw dependency has its **own** license.
+- `COWART_PREVIEW=1` opt-in preview at `/cowart/`, behind Studio's existing HTTP-only login cookie. Default is OFF; no changes to the legacy UI.
+- Docker multi-stage Vite build, bundled frontend assets, strict same-origin asset CSP, and server-side authenticated preview.
+- Per-account and per-existing-project canvas snapshots at `GET/PUT /api/cowart/snapshot?projectId=<uuid>`. Writes use optimistic revision checks (409 on stale writes), account ownership checks, 12 MB request cap and existing 1 GiB / 5 GiB limits. The UI visibly alerts on failed saves and offers a JSON backup.
+- Server-backed model/provider selection through existing Studio `/api/providers`. **No browser-side API keys.** Added Cowart panel that submits image jobs through Studio `POST /api/jobs` with idempotency keys, polls job status, renders queued/running/done/failure, and inserts completed same-origin media images into the Cowart canvas.
+- One-way **explicit** import from a Studio project's original nodes to Cowart (image, reference, note). Deduplicates using original node metadata; never edits or deletes the old project. Batch limit 250 elements per click. Generated images use existing authenticated server media URLs.
+- Project picker and per-project browser camera state; image assets and Cowart source canvas persisted server-side per account.
+- Added Actions CI to build Cowart and run the entire Studio test suite (including dedicated multi-account preview/snapshot/conflict/restart tests).
 
-NOT YET INTEGRATED: server-side account and project synchronization; encrypted existing Studio providers; job queues and idempotent retries; Style DNA, Creative Workflow, image derivation, editing/cutting; deployment and regression testing. Cowart browser BYOK keys must NOT be used for production. Do not deploy to the public Studio or replace the old UI until the account-gated adapter and project migration have been implemented and tested.
+## Developer build
+
+```sh
+cd cowart
+npm ci
+npm run build
+```
+
+For Docker preview, set a legitimately issued tldraw license through build argument `VITE_TLDRAW_LICENSE_KEY` and set `COWART_PREVIEW=1` in runtime environment. `APP_BASE_PATH` must be empty for this first preview. The preview uses Studio's existing account sessions, NOT a second login.
+
+## Hard blockers before production cutover
+
+1. Perform a real browser E2E test under two separate users: login, first launch, save, refresh, reopen on another machine, annotation export, reference-image edit and image insertion.
+2. Run a paid upstream test **with user permission**, verify submitted ID, billing-safe uncertain-failure behavior, and history image retrieval. CI uses no paid keys.
+3. Verify tldraw production license and confirm no more restrictive terms were imported from third-party forks.
+4. Integrate the full Cowart agent orchestration (get selection → understand annotations → choose action → call Studio's server text/vision/image models → insert). The current panel is deliberate prompt-to-image/edit + references, not automatic multi-step AI orchestration.
+5. Integrate Studio's Style DNA, existing Creative Workflow, image derivation and component slicing as context-dependent actions (server data is retained and generation already reuses project context, but the full UI controls have not moved).
+6. Improve snapshot/media handling for larger canvases: currently a canvas containing many imported inline base64 images can exceed the 12 MB snapshot request cap; Studio-generated images use server URLs.
+7. Finish project migration/export/rollback and identify orphaned media/deleted historical images.
+8. After backup of production data volumes and license review, perform a gated staging deployment and visual UX verification before touching production.
+
+## Important behaviors and safeguards
+
+- Existing production `main` code, invitation accounts, encrypted provider credentials, queued jobs, images, projects and creative workflow data are unchanged by this PR.
+- The preview is disabled by default and does not expose provider secrets to frontend JavaScript.
+- Cowart-generated images are immediately placed on the selected canvas or next to the selected original; the source original remains intact.
+- A network timeout during a paid job is **uncertain**, not an automatic free retry. The UI asks the user to inspect the existing Studio task queue before re-submitting.
+- Saving a stale canvas returns 409; the editor does not silently overwrite the other editor's work, and its user can download a JSON backup.
+- The old Studio canvas remains accessible for comparison and export; no automatic destructive migration or silent cutover.
