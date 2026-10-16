@@ -15,6 +15,11 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: cowart/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python image validation dependencies
+        run: python -m pip install pillow pyyaml
       - name: Validate Studio backend
         run: node --check gateway.js
       - name: Install Cowart dependencies
