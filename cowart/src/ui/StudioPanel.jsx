@@ -58,6 +58,10 @@ export default function StudioPanel({ open, onClose, getEditor }) {
   const [model, setModel] = useState('')
   const [textProviderId, setTextProviderId] = useState('')
   const [textModel, setTextModel] = useState('')
+  const [visionProviderId, setVisionProviderId] = useState('')
+  const [visionModel, setVisionModel] = useState('')
+  const [visualEnabled, setVisualEnabled] = useState(true)
+  const [visualNotice, setVisualNotice] = useState('')
   const [intentMode, setIntentMode] = useState('smart')
   const [planNotice, setPlanNotice] = useState('')
   const [turns, setTurns] = useState([])
@@ -85,6 +89,8 @@ export default function StudioPanel({ open, onClose, getEditor }) {
         setProviderId((old) => old || p.activeId || p.providers?.[0]?.id || '')
         const textSource=(p.providers||[]).find(item=>item.capabilities?.text?.enabled!==false && (item.capabilities?.text?.hasKey||item.hasKey) && (item.capabilities?.text?.defaultModel||item.textModel))
         setTextProviderId(old=>old||textSource?.id||'')
+        const visualSource=(p.providers||[]).find(item=>item.capabilities?.vision?.enabled!==false && (item.capabilities?.vision?.hasKey||item.hasKey) && (item.capabilities?.vision?.defaultModel||item.visionModel))
+        setVisionProviderId(old=>old||visualSource?.id||'')
         if(!textSource)setIntentMode('direct')
       })
       .catch((e) => { if (!cancelled) setError(e.message) })
@@ -104,6 +110,12 @@ export default function StudioPanel({ open, onClose, getEditor }) {
 
   const provider = providers.find(p => p.id === providerId)
   const textProvider = providers.find(p=>p.id===textProviderId)
+  const visionProvider = providers.find(p=>p.id===visionProviderId)
+  const visionCandidates = Array.from(new Set([
+    visionProvider?.capabilities?.vision?.defaultModel,
+    ...(visionProvider?.capabilities?.vision?.models||[]),
+    visionProvider?.visionModel
+  ].filter(Boolean)))
   const textCandidates = Array.from(new Set([
     textProvider?.capabilities?.text?.defaultModel,
     ...(textProvider?.capabilities?.text?.models || []),
@@ -123,6 +135,10 @@ export default function StudioPanel({ open, onClose, getEditor }) {
   useEffect(() => {
     if(textProvider) setTextModel(textProvider.capabilities?.text?.defaultModel || textProvider.textModel || textCandidates[0] || '')
   }, [textProviderId, providers])
+
+  useEffect(()=>{
+    if(visionProvider)setVisionModel(visionProvider.capabilities?.vision?.defaultModel||visionProvider.visionModel||visionCandidates[0]||'')
+  },[visionProviderId,providers])
 
   // A refresh must never lose the identity of a possibly paid job.
   useEffect(() => {
@@ -227,13 +243,34 @@ export default function StudioPanel({ open, onClose, getEditor }) {
     try {
       if(intentMode==='smart') {
         if(!textProviderId||!textModel)throw Error('请先配置 Studio 文字模型，或选择「直接生图」')
-        setPhase('analyzing');setMessage('正在读取选区、标注与项目美术规范，并让文字模型分析操作…')
+        let visual
+        setVisualNotice('')
+        const imageForVision = selected.find(s=>s.type==='image')
+        if(visualEnabled && imageForVision) {
+          if(!visionProviderId||!visionModel)throw Error('已启用看图分析，但尚未配置视觉模型。请选择视觉模型或关闭看图分析')
+          setPhase('analyzing')
+          setMessage('准备当前选中的真实图片，交给 Studio 的视觉模型观察布局、颜色和具体元素…')
+          if(imageForVision.meta?.studioHistoryId) {
+            visual={sourceId:imageForVision.meta.studioHistoryId}
+          }else {
+            const exported=await exportSelectionToDataUrl(editor,[imageForVision.id])
+            if(exported.dataUrl.length>10*1024*1024)throw Error('选中的原图超过视觉识别限制（约 8MB），请压缩素材')
+            visual={image:exported.dataUrl}
+          }
+        }else if(visualEnabled && selected.some(s=>s.meta?.cowartAiImageHolder)){
+          setVisualNotice('选中的是空图片占位框，目前还没有真实像素可分析；将仅使用文字标注和 Style DNA')
+        }else if(imageForVision) {
+          setVisualNotice('这次未启用视觉模型，仅使用文字描述和画布标注')
+        }
+        setPhase('analyzing');setMessage(visual?'视觉模型正在看图，之后再由文字模型判断操作…':'正在读取选区、标注与项目美术规范，由文字模型判断操作…')
         const response = await studioJSON('/api/cowart/plan',{
           method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({projectId:context.projectId,prompt:instruction,
-            providerId:textProviderId,model:textModel,selection})
+            providerId:textProviderId,model:textModel,selection,
+            ...(visual?{visual,visionProviderId,visionModel}: {})})
         })
         const plan=response.plan || {}
+        if(response.visionUsed)setVisualNotice('视觉模型 '+(response.visionModel||'')+' 已观察所选原图，图片内容已纳入 AI 规划（不修改原图）')
         setTurns(old=>[...old,
           {id:crypto.randomUUID(),role:'user',content:prompt.trim(),createdAt:new Date().toISOString()},
           {id:crypto.randomUUID(),role:'assistant',content:plan.reply||'已分析你的要求',action:plan.action,createdAt:new Date().toISOString()}
@@ -342,7 +379,27 @@ export default function StudioPanel({ open, onClose, getEditor }) {
       <input value={textModel} onChange={e=>setTextModel(e.target.value)} list="hamoki-text-model-options" placeholder="例如 DeepSeek / GPT / Claude 兼容模型" />
       <datalist id="hamoki-text-model-options">{textCandidates.map(m=><option key={m} value={m} />)}</datalist>
     </label>}
-    <p className="hamoki-studio-note">智能模式先调用文字模型理解选区与标注；只有识别到明确的生图或修改指令，才自动提交 1 张付费图片任务。</p>
+    {intentMode==='smart' && <div className="hamoki-vision-settings">
+      <label className="hamoki-vision-switch">
+        <input type="checkbox" checked={visualEnabled} onChange={e=>setVisualEnabled(e.target.checked)} />
+        <span>有选中图片时先让视觉模型看图（单独消耗视觉模型额度）</span>
+      </label>
+      {visualEnabled && <div className="hamoki-studio-row">
+        <label className="hamoki-studio-field">视觉中转站
+          <select value={visionProviderId} onChange={e=>setVisionProviderId(e.target.value)}>
+            <option value="">请选择视觉中转站</option>
+            {providers.filter(p=>p.capabilities?.vision?.enabled!==false&&(p.capabilities?.vision?.hasKey||p.hasKey)).map(p=>
+              <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </label>
+        <label className="hamoki-studio-field">视觉模型
+          <input value={visionModel} onChange={e=>setVisionModel(e.target.value)}
+            list="hamoki-vision-model-options" placeholder="选择支持图片理解的模型" />
+          <datalist id="hamoki-vision-model-options">{visionCandidates.map(m=><option key={m} value={m} />)}</datalist>
+        </label>
+      </div>}
+    </div>}
+    <p className="hamoki-studio-note">智能模式只在选中真实图片时调用视觉模型；随后文字模型理解图片与标注。讨论不会自动创建图片任务。</p>
     <form onSubmit={submit}>
       <label className="hamoki-studio-field">图片中转站
         <select value={providerId} onChange={e => setProviderId(e.target.value)}>
@@ -375,6 +432,7 @@ export default function StudioPanel({ open, onClose, getEditor }) {
         {['analyzing','preparing','submitting','queued','running'].includes(phase) ? 'AI 正在处理…' : intentMode==='smart'?'智能理解并执行':'直接生成 1 张'}
       </button>
     </form>
+    {visualNotice && <div className="hamoki-studio-message" aria-live="polite">{visualNotice}</div>}
     {planNotice && <div className="hamoki-studio-message" aria-live="polite">AI 理解：{planNotice}</div>}
     {message && <div className="hamoki-studio-message" aria-live="polite">{message}</div>}
     {error && <div className="hamoki-studio-error" role="alert">{error}</div>}
