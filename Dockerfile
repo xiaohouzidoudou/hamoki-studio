@@ -3,7 +3,7 @@ WORKDIR /cowart
 ARG VITE_TLDRAW_LICENSE_KEY
 ENV VITE_TLDRAW_LICENSE_KEY=${VITE_TLDRAW_LICENSE_KEY}
 COPY cowart/package.json cowart/package-lock.json ./
-RUN npm ci --no-audit --no-fund && npm install --no-save --package-lock=false @tldraw/assets@5.1.1 --no-audit --no-fund
+RUN npm ci --no-audit --no-fund && npm install --no-save @tldraw/assets@5.1.1 --no-audit --no-fund
 COPY cowart/ ./
 RUN npm run build
 
