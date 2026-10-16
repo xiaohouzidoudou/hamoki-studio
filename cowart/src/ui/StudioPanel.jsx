@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { buildImageShapeRecords } from '../lib/placement.js'
 import { exportSelectionToDataUrl } from '../lib/selectionExport.js'
 import { getStudioContext, studioJSON } from '../lib/studioBridge.js'
+import { importLegacyStudioNodes } from '../lib/legacyImport.js'
 
 const RATIOS = [[1, 1], [3, 2], [2, 3], [16, 9], [9, 16], [4, 3], [3, 4]]
 const RATIO_NAMES = RATIOS.map(([a, b]) => a + ':' + b)
@@ -60,6 +61,8 @@ export default function StudioPanel({ open, onClose, getEditor }) {
   const [jobId, setJobId] = useState(null)
   const [phase, setPhase] = useState('idle')
   const [error, setError] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [importNotice, setImportNotice] = useState('')
   const [message, setMessage] = useState('')
   const active = useRef(null)
   const jobIdRef = useRef(null)
@@ -133,6 +136,20 @@ export default function StudioPanel({ open, onClose, getEditor }) {
     return () => { cancelled = true; window.clearTimeout(timer) }
   }, [jobId, context, getEditor])
 
+  async function importOldCanvas() {
+    if (!context || importing) return
+    setImporting(true)
+    setImportNotice('')
+    try {
+      const result = await importLegacyStudioNodes(getEditor(), context.projectId)
+      setImportNotice(result.imported + ' 个旧素材已导入当前画布，跳过 ' + result.skipped + ' 个。' + (result.more ? '项目较大，点击再次导入下一批。' : '已检查全部旧素材。'))
+    } catch (e) {
+      setImportNotice('导入失败：' + e.message + '。原有 Studio 作品未被修改。')
+    } finally {
+      setImporting(false)
+    }
+  }
+
   async function submit(event) {
     event.preventDefault()
     if (!context || !prompt.trim() || !model.trim() || !providerId || ['submitting','queued','running'].includes(phase)) return
@@ -185,6 +202,13 @@ export default function StudioPanel({ open, onClose, getEditor }) {
       </select>
     </label>}
     <p className="hamoki-studio-note">选中图片或 AI 占位框后输入要求。生成结果放在原图旁，使用已有 Studio 账号和中转站。</p>
+    {context && <div className="hamoki-legacy-tools">
+      <button type="button" disabled={importing} onClick={importOldCanvas}>
+        {importing ? '正在导入旧素材…' : '↳ 导入旧 Studio 画布素材'}
+      </button>
+      {importNotice && <small aria-live="polite">{importNotice}</small>}
+    </div>}
+
     <form onSubmit={submit}>
       <label className="hamoki-studio-field">图片中转站
         <select value={providerId} onChange={e => setProviderId(e.target.value)}>
