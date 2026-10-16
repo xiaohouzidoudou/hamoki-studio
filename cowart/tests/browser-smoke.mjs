@@ -46,6 +46,15 @@ try{
   assert.equal(response.status(),200)
   await page.locator('.hamoki-studio-panel').waitFor({timeout:25000})
   await page.waitForFunction(()=>!!window.__cowartEditor,{timeout:25000})
+  const dark=await page.evaluate(()=>window.__cowartEditor.user.getIsDarkMode())
+  assert.equal(dark,true,'Studio canvas must start in dark mode')
+  const canvasBounds=await page.locator('.cowart-canvas > .tl-container').boundingBox()
+  const panelBounds=await page.locator('.hamoki-studio-panel').boundingBox()
+  assert.ok(canvasBounds&&panelBounds)
+  assert.ok(canvasBounds.x+canvasBounds.width<=panelBounds.x+8,
+    'Studio sidebar must not overlap the editable canvas viewport on desktop')
+  const firstShapes=await page.evaluate(()=>window.__cowartEditor.getCurrentPageShapes().length)
+  assert.equal(firstShapes,0,'Fresh project should start on an empty canvas, not giant onboarding labels')
   await page.locator('textarea').fill('把周年庆奖励按钮简化，减少背景灯光，不增加前景')
   assert.equal(await page.locator('.hamoki-studio-panel textarea').inputValue(),
     '把周年庆奖励按钮简化，减少背景灯光，不增加前景')
