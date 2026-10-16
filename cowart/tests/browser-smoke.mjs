@@ -36,8 +36,10 @@ try{
   const projectId=projects.defaultId
   assert.match(projectId,/^[a-f0-9-]{36}$/)
   const page=await context.newPage()
-  const errors=[],apiResponses=[]
-  page.on('pageerror',e=>errors.push(e.message))
+  const errors=[],apiResponses=[],failedRequests=[],consoleErrors=[]
+  page.on('pageerror',e=>errors.push({message:e.message,stack:e.stack?.slice(0,750)}))
+  page.on('requestfailed',r=>failedRequests.push({url:r.url(),failure:r.failure()}))
+  page.on('console',msg=>{if(msg.type()==='error')consoleErrors.push(msg.text().slice(0,500))})
   page.on('response',res=>{if(res.url().includes('/api/cowart/snapshot'))apiResponses.push(res.status()+' '+res.request().method())})
   const entry=base+'/cowart/?projectId='+encodeURIComponent(projectId)
   const response=await page.goto(entry,{waitUntil:'domcontentloaded',timeout:25000})
@@ -69,7 +71,8 @@ try{
   assert.equal(stored,true,'Document was not saved to authenticated Studio snapshot')
   await page.reload({waitUntil:'domcontentloaded'})
   await page.waitForFunction(()=>!!window.__cowartEditor?.getShape('shape:smoke-green-card'),{timeout:25000})
-  assert.equal(errors.length,0,'Browser page errors: '+errors.join(' | '))
+  if(errors.length)console.error('Browser resources diagnostic:',JSON.stringify({errors,failedRequests,consoleErrors}))
+  assert.equal(errors.length,0,'Browser page errors: '+errors.map(x=>x.message).join(' | '))
   mkdirSync(path.join(root,'cowart','test-results'),{recursive:true})
   await page.screenshot({path:path.join(root,'cowart','test-results','browser-smoke.png'),fullPage:true})
   console.log('PASS: authenticated Cowart renders, Studio panel responds, tldraw shape persists and survives reload')
