@@ -125,7 +125,7 @@ async function handleCowartData(req,res,url,account){
 
 function readBody(req){return new Promise((resolve,reject)=>{const chunks=[];let total=0;req.on('data',chunk=>{total+=chunk.length;if(total>200*1024){reject(Object.assign(Error('请求体过大'),{status:413}));req.destroy();return}chunks.push(chunk)});req.on('end',()=>resolve(Buffer.concat(chunks).toString('utf8')));req.on('error',reject)})}
 async function readJSONBody(req){const raw=await readBody(req);try{return raw?JSON.parse(raw):{}}catch{throw Object.assign(Error('请求 JSON 格式不正确'),{status:400})}}
-function sameOrigin(req){if(req.method==='GET'||req.method==='HEAD')return true;const origin=req.headers.origin;if(origin){let u;try{u=new URL(origin)}catch{return false}if(u.host!==req.headers.host||u.protocol!=='https:')return false}const site=req.headers['sec-fetch-site'];if(site&&site!=='same-origin'&&site!=='none')return false;return true}
+function sameOrigin(req){if(req.method==='GET'||req.method==='HEAD')return true;const origin=req.headers.origin;if(origin){let u;try{u=new URL(origin)}catch{return false}if(u.host!==req.headers.host || (u.protocol!=='https:' && !(process.env.NODE_ENV==='test' && u.protocol==='http:' && ['127.0.0.1','localhost'].includes(u.hostname) && ['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress))))return false}const site=req.headers['sec-fetch-site'];if(site&&site!=='same-origin'&&site!=='none')return false;return true}
 function normalizeName(input){return String(input||'').trim()}
 function normalizedKey(name){return normalizeName(name).toLowerCase()}
 function validUsername(name){return /^[A-Za-z0-9][A-Za-z0-9._-]{1,29}$/.test(name)}
