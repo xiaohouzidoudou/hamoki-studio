@@ -20,7 +20,7 @@ const creativePages=require('./lib/creative-pages');
 const {referenceRatio}=require('./lib/creative-auto-ratio');
 const assistantMemory=require('./lib/assistant-memory');
 const assistantReview=require('./lib/assistant-review');
-const {nextGeneratedPosition}=require('./lib/canvas-placement');
+const {nextGeneratedPosition,intersects,TILE}=require('./lib/canvas-placement');
 const {retryPlan}=require('./lib/job-retry-policy');
 const generate=(...args)=>options.limiter.run(()=>upstreamGenerate(...args));
 const reverse=(...args)=>options.limiter.run(()=>upstreamReverse(...args));
@@ -500,7 +500,8 @@ async function creativeQuality(p,historyId){
 }
 function appendGeneratedNode(h,j){const p=project(j.projectId||defaultProject()?.id);if(!p)return;
  const parent=p.nodes.find(n=>n.historyId===h.parentId)||p.nodes.find(n=>n.id===j.sourceNodeId);
- const {x,y,w,h:height}=nextGeneratedPosition(p);
+ const reserved=j.reservedCanvasSlot&&Number.isSafeInteger(j.canvasX)&&Number.isSafeInteger(j.canvasY)&&!p.nodes.some(node=>intersects(j.canvasX,j.canvasY,node));
+ const {x,y,w,h:height}=reserved?{x:j.canvasX,y:j.canvasY,w:TILE,h:TILE}:nextGeneratedPosition(p);
  p.nodes.push({id:crypto.randomUUID(),kind:'generated',historyId:h.id,parentNodeId:parent?.id||null,x,y,w,h:height,createdAt:time()});
  p.messages.push({id:crypto.randomUUID(),role:'result',content:'已生成作品',createdAt:time(),groupId:j.groupId,imageId:h.id});
  p.messages=p.messages.slice(-400);p.nodes=p.nodes.slice(-1800);touchProject(p);
@@ -931,7 +932,8 @@ function submit(b){
  store.input.push(...uploadMedia);store.roleHints.push(...valid.refs.map(()=> 'general'));
  const groupId=crypto.randomUUID(),created=[];
  for(const t of valid.targets)for(let i=0;i<valid.count;i++)created.push(makeJob({...valid,submissionKey,submissionFingerprint,batchIndex:created.length},store,t.providerId,t.model,groupId));
- jobs.unshift(...created);saveJobs();const proj=assertProject(valid.projectId);
+ const proj=assertProject(valid.projectId);for(const job of created){const slot=nextGeneratedPosition(proj);job.canvasX=slot.x;job.canvasY=slot.y;job.reservedCanvasSlot=true}
+ jobs.unshift(...created);saveJobs();
  proj.messages.push({id:crypto.randomUUID(),role:'user',content:valid.editInstruction,createdAt:time(),groupId,sourceId:valid.sourceId,referenceRoles:valid.referenceNodes.map(n=>({nodeId:n.nodeId,role:n.role})),providerIds:valid.targets.map(t=>t.providerId)});
  proj.messages=proj.messages.slice(-400);touchProject(proj);schedule();return {jobs:created.map(publicJob),groupId};
 }

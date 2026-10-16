@@ -13,6 +13,8 @@ test('job cards render in world scene and preserve original positions',()=>{
  assert.match(app,/renderCanvasJobs\(\)/);
  assert.match(app,/Number\(job\.canvasX\)/);
  assert.match(app,/origin\.x\+origin\.w\+34/);
+ assert.match(app,/origin&&!job\.reservedCanvasSlot/);
+ assert.match(app,/emptyStage.*classList\.toggle\('hidden'/);
  assert.match(app,/retry\.onclick=\(\)=>retryJob\(job\.id\)/);
  assert.match(css,/\.canvas-job-card\.status-failed/);
  assert.match(css,/prefers-reduced-motion:reduce/);

@@ -105,6 +105,10 @@ test('V0.6.3 account workspaces isolate users, keys, media and survive restart',
  assert.equal((await b.request(hist[0].url)).status,404);
  const projectNodes=(await a.request('/api/projects/'+projectA)).body.project.nodes;
  assert.equal(projectNodes.length,2,'reference and generated image should be on canvas');
+ const createdNode=projectNodes.find(n=>n.kind==='generated');
+ assert.equal(submitted.body.jobs[0].reservedCanvasSlot,true,'queue reserves a stable canvas slot');
+ assert.equal(createdNode.x,submitted.body.jobs[0].canvasX,'final image must replace its reserved position');
+ assert.equal(createdNode.y,submitted.body.jobs[0].canvasY,'finished image must not jump elsewhere');
  const ids=projectNodes.map(n=>n.id);
  const bundle=await a.request('/api/projects/'+projectA+'/nodes/export?ids='+ids.join(','));
  assert.equal(bundle.status,200);

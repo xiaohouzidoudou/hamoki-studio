@@ -170,6 +170,10 @@ async function refreshProjectData(){if(polling||!currentProject||!authorized)ret
  if(currentProject?.id!==id)return;const oldHash=historyItems.map(x=>x.id+':'+x.favorite).join('|');const newHash=(h.history||[]).map(x=>x.id+':'+x.favorite).join('|');
  historyItems=h.history||[];jobs=j.jobs||[];paused=!!j.paused;updateStats();syncGenerationActivity();renderCanvasJobs();
  const p=r.project;
+ const summary=projectList.find(x=>x.id===id);
+ if(summary&&(summary.imageCount!==(p.nodes||[]).length||summary.title!==p.title)){
+  summary.imageCount=(p.nodes||[]).length;summary.title=p.title;renderProjects();
+ }
  if(!gesture&&projectSaveBusy===0&&(p.revision??0)!==lastProjectRevision){
    currentProject=p;lastProjectRevision=p.revision??0;renderNodes();renderMemoryContext();renderCreativeAutoProgress();if(!(textChatBusy&&textChatProjectId===id))renderConversation();renderProjects();setSaving('已同步');
  }else if(newHash!==oldHash&&!gesture){renderNodes();if(!(textChatBusy&&textChatProjectId===id))renderConversation()}
@@ -221,7 +225,7 @@ function renderNodes(){const layer=$('nodeLayer');layer.replaceChildren();const 
   }else{
     const box=el('div','node-image-box'),src=nodeImage(n),im=el('img');putPreview(im,src,previewImage(n));im.draggable=false;im.alt=n.kind==='reference'?'参考图片':'AI 生成作品';box.append(im);
     box.append(el('span','node-badge'+(n.kind==='reference'?' reference':''),n.kind==='reference'?'参考素材':'AI GENERATED'));
-    const foot=el('div','node-foot');const label=el('div','node-text');const h=currentHistory(n.historyId);label.append(el('b','',n.kind==='reference'?(n.title||'参考图片'):(h?.prompt||'生成的作品')),el('small','',n.kind==='reference'?'REFERENCE · 上传图片':(h?.model||'AI MODEL')+' · '+humanDate(n.createdAt)));foot.append(label);card.append(box,foot);card.ondblclick=e=>{e.stopPropagation();if(e.target.closest('.node-image-box'))return;if(h)openViewer(h.id);else addNodeAsRef(n)};
+    const foot=el('div','node-foot');const label=el('div','node-text');const h=currentHistory(n.historyId);label.append(el('b','',n.kind==='reference'?(n.title||'参考图片'):(h?.editInstruction||h?.prompt||'生成的作品')),el('small','',n.kind==='reference'?'REFERENCE · 上传图片':(h?.model||'AI MODEL')+' · '+humanDate(n.createdAt)));foot.append(label);card.append(box,foot);card.ondblclick=e=>{e.stopPropagation();if(e.target.closest('.node-image-box'))return;if(h)openViewer(h.id);else addNodeAsRef(n)};
   }
   card.addEventListener('pointerdown',e=>{if(e.target.closest('textarea,.inline-note,.resize-grip'))return;startNodeDrag(e,n)});
   const grip=el('span','resize-grip');grip.title='拖动调整大小';grip.addEventListener('pointerdown',e=>startResize(e,n));card.append(grip);layer.append(card);
@@ -235,12 +239,13 @@ function renderCanvasJobs(){
  const layer=$('jobLayer');if(!layer)return;layer.replaceChildren();
  if(!currentProject||!Array.isArray(jobs))return;
  const cards=visibleCanvasJobs();
+ $('emptyStage')?.classList.toggle('hidden',!!(currentProject.nodes?.length||cards.length));
  const occupied=new Set();
  for(const job of cards){
   const origin=currentProject.nodes?.find(n=>n.id===job.sourceNodeId);
   let x=Number.isFinite(Number(job.canvasX))?Number(job.canvasX):180;
   let y=Number.isFinite(Number(job.canvasY))?Number(job.canvasY):170;
-  if(origin){x=origin.x+origin.w+34;y=origin.y}
+  if(origin&&!job.reservedCanvasSlot){x=origin.x+origin.w+34;y=origin.y}
   // Keep task identity and its location stable across a retry without covering neighbouring cards.
   let key=Math.round(x/80)+':'+Math.round(y/80),offset=0;
   while(occupied.has(key)&&offset<18){y+=182;offset++;key=Math.round(x/80)+':'+Math.round(y/80)}
