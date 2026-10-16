@@ -2,11 +2,11 @@ name: Cowart experimental build
 on:
   push:
     branches: [feature/cowart-web-canvas-20261016]
-    paths: ['cowart/**', '.github/workflows/cowart-build.yml']
+    paths: ['cowart/**', '.github/workflows/cowart-build.yml', 'gateway.js', 'Dockerfile', 'compose.yaml', 'tests/cowart-preview.test.js']
   pull_request:
-    paths: ['cowart/**', '.github/workflows/cowart-build.yml']
+    paths: ['cowart/**', '.github/workflows/cowart-build.yml', 'gateway.js', 'Dockerfile', 'compose.yaml', 'tests/cowart-preview.test.js']
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,7 +15,15 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: cowart/package-lock.json
-      - run: npm ci --no-audit --no-fund
+      - name: Validate Studio backend
+        run: node --check gateway.js
+      - name: Install Cowart dependencies
+        run: npm ci --no-audit --no-fund
         working-directory: cowart
-      - run: npm run build
+      - name: Build Cowart preview
+        run: npm run build
         working-directory: cowart
+      - name: Stage production-like public assets
+        run: cp -r cowart/dist cowart-dist
+      - name: Run Studio regressions and Cowart account isolation
+        run: npm test
