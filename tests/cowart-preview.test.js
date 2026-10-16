@@ -22,7 +22,7 @@ async function launch(port, dataDir) {
     cwd: root,
     env: { ...process.env, HOST: '127.0.0.1', PORT: String(port), APP_ALLOWED_HOST: 'ps.test',
       APP_ENCRYPTION_KEY: 'cowart-test-encryption-key-at-least-32chars', INVITE_CODE: 'local-test',
-      COWART_PREVIEW: '1', DATA_DIR: dataDir, COOKIE_SECURE: '1', NODE_ENV: 'test',
+      COWART_PREVIEW: '1', DATA_DIR: dataDir, COOKIE_SECURE: '1', NODE_ENV: 'test', ALLOW_PRIVATE_UPSTREAMS: '1',
       USER_QUOTA_GB: '1', TOTAL_QUOTA_GB: '5' },
     stdio: ['ignore', 'pipe', 'pipe']
   })
@@ -96,6 +96,40 @@ test('Cowart preview requires a session; server snapshots have account-scoped op
     'asset:unsafe': { id: 'asset:unsafe', typeName: 'asset', type: 'image', props: { src: 'https://evil.example/leak.png' } }
   } }
   assert.equal((await a('/api/cowart/snapshot?projectId=' + pA, 'PUT', { snapshot: unsafe, revision: 1 })).status, 400)
+
+
+  // A separate text-model request plans one action but never starts a paid image job.
+  let llmCalls=0, privateDataSeen=false
+  const mock=http.createServer(async(req,res)=>{
+    let raw='';for await(const part of req)raw+=part
+    llmCalls++
+    if(raw.includes('NEVER_EXPOSE_KEY'))privateDataSeen=true
+    const plan=raw.includes('这张图请修改')?
+      {action:'image',mode:'edit',reply:'把按钮压暗',edit:{target:'按钮',change:'降低亮度',preserve:'布局不动'}}:
+      {action:'chat',mode:'new',reply:'当前页面主要布局可继续讨论'}
+    res.writeHead(200,{'Content-Type':'application/json'})
+    res.end(JSON.stringify({choices:[{message:{content:JSON.stringify(plan)}}]}))
+  })
+  await new Promise(resolve=>mock.listen(0,'127.0.0.1',resolve))
+  t.after(()=>mock.close())
+  const endpoint='http://127.0.0.1:'+mock.address().port+'/v1'
+  const provider=await a('/api/providers','POST',{name:'Mock Text Planner',url:endpoint,apiKey:'local-only',
+    mode:'openai',imageMode:'images',imageModel:'test-image',capabilities:{text:{defaultModel:'test-text'}}})
+  assert.equal(provider.status,201,JSON.stringify(provider.data))
+  const pid=provider.data.provider.id
+  const selection=[{kind:'image',selected:true,isGenerated:true,annotations:['降低灯光'],apiKey:'NEVER_EXPOSE_KEY'}]
+  assert.equal((await b('/api/cowart/plan','POST',{projectId:pA,prompt:'看看这张图',providerId:pid,model:'test-text',selection})).status,404)
+  const chat=await a('/api/cowart/plan','POST',{projectId:pA,prompt:'你觉得这个排版怎么样',providerId:pid,model:'test-text',selection})
+  assert.equal(chat.status,200,JSON.stringify(chat.data))
+  assert.equal(chat.data.plan.action,'chat')
+  assert.equal(chat.data.plan.requiresApproval,false)
+  const edit=await a('/api/cowart/plan','POST',{projectId:pA,prompt:'这张图请修改',providerId:pid,model:'test-text',selection})
+  assert.equal(edit.status,200,JSON.stringify(edit.data))
+  assert.equal(edit.data.plan.action,'edit')
+  assert.equal(edit.data.plan.editSpec.change,'降低亮度')
+  assert.equal((await a('/api/jobs?projectId='+pA)).data.jobs.length,0,'planning cannot initiate image billing')
+  assert.equal(privateDataSeen,false,'untrusted selection extras must not reach upstream')
+  assert.equal(llmCalls,2,'each explicit planning request uses the text model exactly once')
 
   await new Promise(resolve => { child.once('exit', resolve); child.kill('SIGTERM') })
   child = await launch(port, dir)
