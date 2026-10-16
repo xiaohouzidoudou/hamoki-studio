@@ -44,6 +44,7 @@ import {
 } from 'tldraw'
 import { AllSelection } from '@tiptap/pm/state'
 import 'tldraw/tldraw.css'
+import { getAssetUrlsByImport } from '@tldraw/assets/imports.vite'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import annotationToolIconRaw from './assets/tool-comment.svg?raw'
 import {
@@ -63,6 +64,8 @@ import {
 import StudioPanel from './ui/StudioPanel.jsx'
 
 const TLDRAW_LICENSE_KEY = import.meta.env.VITE_TLDRAW_LICENSE_KEY
+// Bundle tldraw icons/fonts/translations locally: strict same-origin CSP, offline-friendly.
+const TLDRAW_ASSET_URLS = getAssetUrlsByImport()
 
 const SELECTION_STATE_ELEMENT_ID = 'cowart-selection-state'
 const AI_IMAGE_TOOL_ID = 'ai-image'
@@ -1323,6 +1326,7 @@ export default function App() {
       <SkippedRecordsNotice records={skippedRecords} />
       <Tldraw
         licenseKey={TLDRAW_LICENSE_KEY}
+        assetUrls={TLDRAW_ASSET_URLS}
         snapshot={snapshot ?? undefined}
         inferDarkMode
         onMount={handleMount}
