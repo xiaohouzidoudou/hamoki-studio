@@ -19,6 +19,7 @@ const creativeUpstream=require('./lib/creative-upstream');
 const creativePages=require('./lib/creative-pages');
 const {referenceRatio}=require('./lib/creative-auto-ratio');
 const assistantMemory=require('./lib/assistant-memory');
+const cowartIntent=require('./lib/cowart-intent');
 const assistantReview=require('./lib/assistant-review');
 const {nextGeneratedPosition,intersects,TILE}=require('./lib/canvas-placement');
 const {retryPlan}=require('./lib/job-retry-policy');
@@ -1465,6 +1466,31 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
       return fail(res,405,'衍生素材接口操作不支持');
     }
     // Project, board, and conversation state are stored on the server, not localStorage.
+    if(route==='/api/cowart/plan'&&req.method==='POST'){
+      if(DEMO_MODE)return fail(res,403,'演示模式不支持 AI 分析');
+      const b=await readJSON(req),p=assertProject(b.projectId);
+      const instruction=clampText(b.prompt,2400).trim();
+      if(!instruction)throw Error('请先输入要求');
+      const providerChoice=effectiveProvider(provider(b.providerId||state.activeId),'text');
+      emptyProvider(providerChoice);
+      const model=assertModel(b.model||normalizedCapability(providerChoice,'text').defaultModel);
+      const workflow=creativeState(p),currentPage=creativeCurrent(workflow);
+      const history=p.messages.filter(m=>['assistant','user'].includes(m.role)).slice(-6);
+      const selection=cowartIntent.summarizeSelection(b.selection);
+      const context=cowartIntent.buildContext({
+        project:p,selection,history,
+        memoryGuide:assistantMemory.guide(p.assistantMemory,workflow.styleDNA||'',currentPage?.requirements||'')
+      });
+      const raw=await options.limiter.run(()=>generateText(providerChoice,{
+        model,prompt:cowartIntent.buildCowartPrompt(instruction,context),
+        maxOutputTokens:900,timeoutMs:90000
+      }));
+      const plan=cowartIntent.normalizeCowartPlan(raw);
+      if(plan.action==='edit'&&!selection.some(x=>x.kind==='image'||x.isGenerated)){
+        return respond(res,200,{plan:{action:'chat',reply:'请先在画布里选中要修改的原图，再告诉我怎么修改。',requiresApproval:false}});
+      }
+      return respond(res,200,{plan,providerName:providerChoice.name,model});
+    }
     if(route==='/api/assistant/plan'&&req.method==='POST'){
       if(DEMO_MODE)return fail(res,403,'演示模式不支持 AI 意图分析');
       const b=await readJSON(req),target=assertProject(b.projectId);
