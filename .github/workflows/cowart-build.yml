@@ -34,3 +34,18 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Run Studio regressions and Cowart account isolation
         run: npm test
+      - name: Install Chromium for browser smoke
+        run: |
+          npm install --no-save --package-lock=false playwright
+          npx playwright install --with-deps chromium
+        working-directory: cowart
+      - name: Test Cowart UI, save and reload in real Chromium
+        run: node tests/browser-smoke.mjs
+        working-directory: cowart
+      - name: Keep screenshot for UI review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cowart-browser-smoke
+          path: cowart/test-results/browser-smoke.png
+          if-no-files-found: ignore
