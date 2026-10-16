@@ -28,12 +28,15 @@ npm run build
 
 For Docker preview, set a legitimately issued tldraw license through build argument `VITE_TLDRAW_LICENSE_KEY` and set `COWART_PREVIEW=1` in runtime environment. `APP_BASE_PATH` must be empty for this first preview. The preview uses Studio's existing account sessions, NOT a second login.
 
+- **Visual inspection added:** when an actual image is selected, the operator may opt into a second, independent Studio **vision** provider/model. Existing generated-image IDs are resolved to media owned by the current project; external selected images are rasterized in the browser with a strict 8 MB server bound. The upstream vision model produces a text observation which precedes Style DNA in the text-planner prompt. Only the observation (not raw image bytes or API keys) reaches the text planner. The preview informs users that this consumes vision-model usage.
+- Vision and text model calls are mock-tested end to end, including source ownership validation, malformed/foreign visual payload rejection, no automatic image job creation, and ensuring original image bytes are not forwarded to the text model. Separate Chromium browser smoke checks the vision on/off control.
+
 ## Hard blockers before production cutover
 
 1. Perform a real browser E2E test under two separate users: login, first launch, save, refresh, reopen on another machine, annotation export, reference-image edit and image insertion.
 2. Run a paid upstream test **with user permission**, verify submitted ID, billing-safe uncertain-failure behavior, and history image retrieval. CI uses no paid keys.
 3. Verify tldraw production license and confirm no more restrictive terms were imported from third-party forks.
-4. Integrate the full Cowart agent orchestration (get selection → understand annotations → choose action → call Studio's server text/vision/image models → insert). The current panel is deliberate prompt-to-image/edit + references, not automatic multi-step AI orchestration.
+4. Finish **multi-step/visual agent tool orchestration**: selection and image pixels now reach a constrained vision+text planner, but Cowart's full generalized tool-calling cycle, multi-image semantic blending, automated image reviews and direct in-canvas component extraction still need integration and live provider tests.
 5. Integrate Studio's Style DNA, existing Creative Workflow, image derivation and component slicing as context-dependent actions (server data is retained and generation already reuses project context, but the full UI controls have not moved).
 6. Improve snapshot/media handling for larger canvases: currently a canvas containing many imported inline base64 images can exceed the 12 MB snapshot request cap; Studio-generated images use server URLs.
 7. Finish project migration/export/rollback and identify orphaned media/deleted historical images.
