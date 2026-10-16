@@ -68,12 +68,12 @@ function cowartProjectFile(account,id){
 function cowartCanvasResponse(req,res,pathname){
   const rel=pathname==='/cowart'||pathname==='/cowart/'?'index.html':pathname.slice('/cowart/'.length);
   if(req.method!=='GET'&&req.method!=='HEAD')return fail(res,405,'不支持的预览请求');
-  if(!/^(?:index\.html|cowart-logo\.svg|assets\/[A-Za-z0-9_.-]+\.(?:js|css|svg|png|webp|woff|woff2|ttf))$/.test(rel))return fail(res,404,'预览资源不存在');
+  if(!/^(?:index\.html|cowart-logo\.svg|assets\/[A-Za-z0-9_.-]+\.(?:js|css|svg|png|jpg|jpeg|webp|woff|woff2|ttf|json))$/.test(rel))return fail(res,404,'预览资源不存在');
   const file=path.join(ROOT,'cowart-dist',rel);
   fs.readFile(file,(err,data)=>{
     if(err)return fail(res,404,'画布预览未构建');
     const ext=path.extname(file);
-    res.writeHead(200,{'Content-Type':({'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.woff':'font/woff','.woff2':'font/woff2','.ttf':'font/ttf'})[ext]||'application/octet-stream',
+    res.writeHead(200,{'Content-Type':({'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.woff':'font/woff','.woff2':'font/woff2','.ttf':'font/ttf','.json':'application/json; charset=utf-8','.jpg':'image/jpeg','.jpeg':'image/jpeg'})[ext]||'application/octet-stream',
       'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin',
       'Content-Security-Policy':"default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
       'Cross-Origin-Resource-Policy':'same-origin'});
