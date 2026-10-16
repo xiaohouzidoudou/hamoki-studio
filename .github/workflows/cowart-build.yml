@@ -2,7 +2,7 @@ name: Cowart experimental build
 on:
   push:
     branches: [feature/cowart-web-canvas-20261016]
-    paths: ['cowart/**', '.github/workflows/cowart-build.yml', 'gateway.js', 'Dockerfile', 'compose.yaml', 'tests/cowart-preview.test.js']
+    paths: ['cowart/**', '.github/workflows/cowart-build.yml', 'gateway.js', 'Dockerfile', 'compose.yaml', 'tests/cowart-*.test.js', 'workspace.js', 'lib/cowart-intent.js']
   pull_request:
     paths: ['cowart/**', '.github/workflows/cowart-build.yml', 'gateway.js', 'Dockerfile', 'compose.yaml', 'tests/cowart-preview.test.js']
 jobs:
