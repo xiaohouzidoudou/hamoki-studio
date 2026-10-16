@@ -156,11 +156,17 @@ test('Cowart preview requires a session; server snapshots have account-scoped op
   assert.equal(visualSummaryPassed,true,'visual description reaches text planner')
   assert.equal(visionRawLeakedToText,false,'original image bytes must not be copied to text planning model')
   assert.equal((await a('/api/jobs?projectId='+pA)).data.jobs.length,0,'vision + planning must not submit any image job')
-  const notOwner=await b('/api/cowart/plan','POST',{
-    projectId:pB,prompt:'帮我看看原图',providerId:pid,model:'test-text',
+  const notOwnedHistory=await a('/api/cowart/plan','POST',{
+    projectId:pA,prompt:'帮我看看原图',providerId:pid,model:'test-text',
     visionProviderId:pid,visionModel:'test-vision',visual:{sourceId:'11111111-1111-4111-8111-111111111111'}
   })
-  assert.notEqual(notOwner.status,200,'never use a history source not owned by the requesting account')
+  assert.equal(notOwnedHistory.status,404,'never read non-project history sources for vision')
+  const malformedVisual=await a('/api/cowart/plan','POST',{
+    projectId:pA,prompt:'请审图',providerId:pid,model:'test-text',
+    visionProviderId:pid,visionModel:'test-vision',visual:{sourceId:'11111111-1111-4111-8111-111111111111',image:tinyPng}
+  })
+  assert.notEqual(malformedVisual.status,200,'cannot ambiguously supply a foreign source and arbitrary image bytes')
+  assert.equal(visionCalls,1,'rejected image requests must not cause additional upstream analysis')
 
   const conversation=await a('/api/cowart/messages?projectId='+pA)
   assert.equal(conversation.status,200)
