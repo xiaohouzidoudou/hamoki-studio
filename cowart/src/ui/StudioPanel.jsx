@@ -66,6 +66,7 @@ export default function StudioPanel({ open, onClose, getEditor }) {
   const [resolution, setResolution] = useState('1K')
   const [jobId, setJobId] = useState(null)
   const [phase, setPhase] = useState('idle')
+  const [retryTick, setRetryTick] = useState(0)
   const [error, setError] = useState('')
   const [importing, setImporting] = useState(false)
   const [importNotice, setImportNotice] = useState('')
@@ -123,6 +124,27 @@ export default function StudioPanel({ open, onClose, getEditor }) {
     if(textProvider) setTextModel(textProvider.capabilities?.text?.defaultModel || textProvider.textModel || textCandidates[0] || '')
   }, [textProviderId, providers])
 
+  // A refresh must never lose the identity of a possibly paid job.
+  useEffect(() => {
+    if(!context?.projectId)return
+    const key=context.projectId
+    try {
+      const activeJob=JSON.parse(sessionStorage.getItem('hamoki-cowart-active:'+key)||'null')
+      if(activeJob?.jobId && /^[a-f0-9-]{36}$/i.test(activeJob.jobId)) {
+        active.current={anchorId:activeJob.anchorId||null,ratio:activeJob.ratio||'1:1'}
+        setJobId(activeJob.jobId)
+        setPhase('queued')
+        setMessage('已恢复上次任务编号，正在核对任务队列…')
+        return
+      }
+      const unknown=JSON.parse(sessionStorage.getItem('hamoki-cowart-last-request:'+key)||'null')
+      if(unknown?.requestId && Date.now()-unknown.at<24*3600*1000) {
+        setPhase('uncertain')
+        setError('上次图片请求的结果尚未确认（请求编号 '+unknown.requestId+'）。请到 Studio 队列核对后再新建任务，防止重复扣费。')
+      }
+    }catch(e){console.warn('Could not restore previous job:',e)}
+  }, [context?.projectId])
+
   // Job identity is fixed once submitted. Never silently send a second paid request.
   useEffect(() => {
     if (!jobId || !context?.projectId) return
@@ -141,7 +163,7 @@ export default function StudioPanel({ open, onClose, getEditor }) {
         }
         if (job.status !== 'done') {
           setPhase(job.status)
-          setMessage(job.status === 'queued' ? '排队中…' : '正在生成图片…')
+          setMessage(job.status === 'queued' ? '排队中…' : '正在生成图片…'+(Number.isFinite(Number(job.progress))?' '+Math.round(Number(job.progress))+'%':''))
           timer = window.setTimeout(check, 2500)
           return
         }
@@ -151,6 +173,8 @@ export default function StudioPanel({ open, onClose, getEditor }) {
         const dimensions = await imageDimensions(found.url)
         if (cancelled) return
         const added = insertStudioResult(getEditor(), { ...found, dimensions }, active.current?.anchorId, active.current?.ratio || '1:1')
+        sessionStorage.removeItem('hamoki-cowart-active:'+context.projectId)
+        sessionStorage.removeItem('hamoki-cowart-last-request:'+context.projectId)
         setPhase('done')
         setMessage(added ? '已完成，并放置在所选图片旁边' : '已完成，画布已存在此图片，无须重复插入')
       } catch (e) {
@@ -162,7 +186,7 @@ export default function StudioPanel({ open, onClose, getEditor }) {
     }
     check()
     return () => { cancelled = true; window.clearTimeout(timer) }
-  }, [jobId, context, getEditor])
+  }, [jobId, context, getEditor, retryTick])
 
   async function importOldCanvas() {
     if (!context || importing) return
@@ -261,6 +285,8 @@ export default function StudioPanel({ open, onClose, getEditor }) {
       })
       if(!answer.jobs?.[0]?.id)throw Error('任务已提交但未返回编号；请到 Studio 任务队列核对')
       jobIdRef.current=answer.jobs[0].id
+      sessionStorage.setItem('hamoki-cowart-active:'+context.projectId,JSON.stringify({jobId:answer.jobs[0].id,anchorId:anchor?.id||null,ratio}))
+      sessionStorage.removeItem('hamoki-cowart-last-request:'+context.projectId)
       setJobId(answer.jobs[0].id)
       setPhase(answer.jobs[0].status||'queued')
       setMessage('任务已提交，开始追踪进度')
@@ -353,7 +379,16 @@ export default function StudioPanel({ open, onClose, getEditor }) {
     {message && <div className="hamoki-studio-message" aria-live="polite">{message}</div>}
     {error && <div className="hamoki-studio-error" role="alert">{error}</div>}
     {jobId && <small>任务 ID：{jobId} · {phase}</small>}
-    {['done','failed','uncertain','answered','cancelled','interrupted'].includes(phase) && <button className="hamoki-studio-next" type="button" onClick={() => { setJobId(null); setPhase('idle'); setError(''); setMessage(''); setPlanNotice('') }}>开启下一轮</button>}
+    {phase==='uncertain' && jobId && <button className="hamoki-studio-next" type="button"
+      onClick={()=>{setError('');setMessage('正在重新查询原任务，不会提交新生图…');setRetryTick(x=>x+1)}}>重新查询原任务（不扣新费用）</button>}
+    {['done','failed','uncertain','answered','cancelled','interrupted'].includes(phase) && <button className="hamoki-studio-next" type="button" onClick={() => {
+      if(phase==='uncertain'&&!window.confirm('确认已经核对 Studio 任务队列和历史记录？未确认的请求可能已计费，切换到新任务会产生重复费用风险。'))return
+      if(context?.projectId){
+        sessionStorage.removeItem('hamoki-cowart-active:'+context.projectId)
+        sessionStorage.removeItem('hamoki-cowart-last-request:'+context.projectId)
+      }
+      setJobId(null); setPhase('idle'); setError(''); setMessage(''); setPlanNotice('')
+    }}>开启下一轮</button>}
     <p className="hamoki-studio-note">模型设置仍在 <a href="/" target="_blank" rel="noopener noreferrer">Studio 中转站管理</a>。密钥只存储在服务器。</p>
   </section>
 }
