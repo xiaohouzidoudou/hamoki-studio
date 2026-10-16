@@ -1,4 +1,4 @@
-import { getStudioSnapshot, putStudioSnapshot } from './studioBridge.js'
+import { getStudioSnapshot, putStudioSnapshot, getStudioContext } from './studioBridge.js'
 // IndexedDB-backed canvas persistence.
 //
 // Replaces the Vite dev-server middleware that previously stored the tldraw
@@ -140,10 +140,13 @@ export async function writeSelection(selection) {
   return { ok: true }
 }
 export async function readViewState() {
-  return { viewState: sessionViewState }
+  const { projectId } = await getStudioContext()
+  return { viewState: (await kvGet('viewState:' + projectId)) || sessionViewState }
 }
 export async function writeViewState(viewState) {
+  const { projectId } = await getStudioContext()
   sessionViewState = viewState
+  await kvSet('viewState:' + projectId, viewState)
   return { ok: true }
 }
 
