@@ -168,7 +168,7 @@ function updateStats(){const n=jobs.filter(j=>['queued','running'].includes(j.st
 async function refreshProjectData(){if(polling||!currentProject||!authorized)return;polling=true;const id=currentProject.id;try{
  const [h,j,r]=await Promise.all([api(`history?projectId=${id}`),api(`jobs?projectId=${id}`),api(`/api/projects/${id}`)]);
  if(currentProject?.id!==id)return;const oldHash=historyItems.map(x=>x.id+':'+x.favorite).join('|');const newHash=(h.history||[]).map(x=>x.id+':'+x.favorite).join('|');
- historyItems=h.history||[];jobs=j.jobs||[];paused=!!j.paused;updateStats();syncGenerationActivity();
+ historyItems=h.history||[];jobs=j.jobs||[];paused=!!j.paused;updateStats();syncGenerationActivity();renderCanvasJobs();
  const p=r.project;
  if(!gesture&&projectSaveBusy===0&&(p.revision??0)!==lastProjectRevision){
    currentProject=p;lastProjectRevision=p.revision??0;renderNodes();renderMemoryContext();renderCreativeAutoProgress();if(!(textChatBusy&&textChatProjectId===id))renderConversation();renderProjects();setSaving('已同步');
@@ -226,7 +226,51 @@ function renderNodes(){const layer=$('nodeLayer');layer.replaceChildren();const 
   card.addEventListener('pointerdown',e=>{if(e.target.closest('textarea,.inline-note,.resize-grip'))return;startNodeDrag(e,n)});
   const grip=el('span','resize-grip');grip.title='拖动调整大小';grip.addEventListener('pointerdown',e=>startResize(e,n));card.append(grip);layer.append(card);
  }
- renderLinks();placeToolbar();renderStudioLayerChips();}
+ renderLinks();placeToolbar();renderStudioLayerChips();renderCanvasJobs();}
+function visibleCanvasJobs(all=jobs){
+ const retried=new Set(all.map(j=>j.retryOf).filter(Boolean));
+ return all.filter(j=>['queued','running','failed','interrupted'].includes(j.status)&&!retried.has(j.id)&&!j.resultId).slice(0,30);
+}
+function renderCanvasJobs(){
+ const layer=$('jobLayer');if(!layer)return;layer.replaceChildren();
+ if(!currentProject||!Array.isArray(jobs))return;
+ const cards=visibleCanvasJobs();
+ const occupied=new Set();
+ for(const job of cards){
+  const origin=currentProject.nodes?.find(n=>n.id===job.sourceNodeId);
+  let x=Number.isFinite(Number(job.canvasX))?Number(job.canvasX):180;
+  let y=Number.isFinite(Number(job.canvasY))?Number(job.canvasY):170;
+  if(origin){x=origin.x+origin.w+34;y=origin.y}
+  // Keep task identity and its location stable across a retry without covering neighbouring cards.
+  let key=Math.round(x/80)+':'+Math.round(y/80),offset=0;
+  while(occupied.has(key)&&offset<18){y+=182;offset++;key=Math.round(x/80)+':'+Math.round(y/80)}
+  occupied.add(key);
+  const card=el('article','canvas-job-card status-'+job.status);
+  card.dataset.jobId=job.id;card.style.left=x+'px';card.style.top=y+'px';
+  card.setAttribute('role','group');card.setAttribute('aria-label',statusLabel(job.status)+'的生图任务');
+  const heading=el('div','canvas-job-head');
+  const title=el('strong','',statusLabel(job.status));
+  const mark=el('span','canvas-job-spinner');
+  mark.setAttribute('aria-hidden','true');
+  heading.append(mark,title);
+  if(job.progress&&job.status==='running')heading.append(el('span','canvas-job-progress',Math.round(Number(job.progress))+'%'));
+  const body=el('p','canvas-job-prompt',(job.editInstruction||job.prompt||'图片生成任务').slice(0,160));
+  const details=el('small','canvas-job-meta',(job.providerName||'图片模型')+' · '+(job.model||'未选模型'));
+  const actions=el('div','canvas-job-actions');
+  const inspect=el('button','','查看任务');inspect.type='button';inspect.onclick=()=>openLibrary('queue');
+  actions.append(inspect);
+  if(['failed','interrupted'].includes(job.status)){
+   const risk=el('span','canvas-job-risk',job.status==='interrupted'||job.upstreamId?'可能已计费 · 先检查':'生成失败 · 重试可能再次计费');
+   const retry=el('button','canvas-job-retry',job.upstreamId?'恢复或确认重试':'确认后重试');
+   retry.type='button';retry.onclick=()=>retryJob(job.id);
+   card.append(heading,body,details,el('p','canvas-job-error',job.error||'任务中断，结果状态待确认'),risk);
+   actions.append(retry);
+  }else card.append(heading,body,details,el('p','canvas-job-info',job.status==='queued'?'等待模型空闲':'正在等待上游生成结果'));
+  card.append(actions);
+  card.addEventListener('pointerdown',e=>e.stopPropagation());
+  layer.append(card);
+ }
+}
 function renderLinks(){const svg=$('linkLayer');svg.replaceChildren();if(!currentProject)return;const nodes=currentProject.nodes;const nById=new Map(nodes.map(n=>[n.id,n]));
  const bounds=worldViewBounds();for(const n of nodes){if(!n.parentNodeId)continue;const p=nById.get(n.parentNodeId);if(!p||(!nodeVisible(n,bounds)&&!nodeVisible(p,bounds)))continue;const x1=p.x+p.w,y1=p.y+p.h*.46,x2=n.x,y2=n.y+n.h*.46,dx=Math.max(65,Math.abs(x2-x1)*.5);const line=document.createElementNS('http://www.w3.org/2000/svg','path');line.setAttribute('class','version-link');line.setAttribute('d',`M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`);svg.appendChild(line)}
  svg.style.display=$('versionToggle').classList.contains('disabled-links')?'none':'block';}
@@ -733,6 +777,9 @@ async function submitGeneration(targets=null,planned=false,editSpec=null,prepare
   const message=(demoMode?'演示提交':'真实付费请求')+'：即将提交 '+count+' 个任务'+(body.mask?'（局部蒙版）':'')+'\n本次实际使用：\n'+details+'\n比例 '+body.ratio+' / 分辨率 '+body.resolution+'\n'+reviewLine+(demoMode?'不会扣费':'会产生中转站费用，取消或超时也可能已计费')+'。确认继续？';
   if(!confirm(message))return 'cancelled';
   if(!targets&&body.model)rememberQuickModel(body.model);
+  // The server remembers this key with the job; a repeated transport request cannot bill twice.
+  const requestKey=globalThis.crypto?.randomUUID?.();
+  if(requestKey)body.idempotencyKey=requestKey;
   let response;
   try{response=await api('jobs',{method:'POST',body})}
   catch(e){toast('提交状态未确认：'+e.message+'。请先查看任务队列，勿直接重复提交');return 'uncertain'}
@@ -1522,7 +1569,29 @@ function renderLibrary(){const root=$('libraryItems');if(!root)return;root.repla
 function statusLabel(s){return({queued:'排队中',running:'生成中',done:'已完成',failed:'生成失败',interrupted:'已中断',cancelled:'已取消'})[s]||s}
 async function toggleQueue(){try{await api('queue',{method:'POST',body:{action:paused?'resume':'pause'}});paused=!paused;updateStats();renderLibrary();toast(paused?'队列已暂停，正在运行中的任务不会中断':'队列已恢复')}catch(e){toast(e.message)}}
 async function cancelJob(id){if(!confirm('取消任务可能仍产生上游费用，确定吗？'))return;try{await api(`jobs/${id}/cancel`,{method:'POST',body:{}});await refreshProjectData()}catch(e){toast(e.message)}}
-async function retryJob(id){const previous=jobs.find(j=>j.id===id),p=activeProvider(),model=$('imageModel').value.trim();if(!p||!model)return toast('请先选择本次重试使用的服务商和生图模型');if(!confirm(`使用当前选择重试：${p.name} / ${model}\n原任务：${previous?.providerName||'未知'} / ${previous?.model||'未知'}\n这会再次请求上游并可能扣费，确认吗？`))return;try{await api(`jobs/${id}/retry`,{method:'POST',body:{providerId:p.id,model}});await refreshProjectData();toast('已按当前选择重新入队')}catch(e){toast(e.message)}}
+const retrySubmitPending=new Set();
+async function retryJob(id){
+ if(retrySubmitPending.has(id))return;
+ const previous=jobs.find(j=>j.id===id);
+ if(!previous||!['failed','cancelled','interrupted'].includes(previous.status))return toast('任务状态已经变化，请刷新队列');
+ if(jobs.some(j=>j.retryOf===id))return toast('已有后续任务，请查看最新任务状态');
+ const original=providers.find(p=>p.id===previous.providerId);
+ const resume=!!previous.upstreamId&&original?.mode==='grsai';
+ const p=resume?original:activeProvider();
+ const model=resume?previous.model:$('imageModel').value.trim();
+ if(!p||!model)return toast('请先选择本次重试使用的服务商和图片模型');
+ const warning=resume
+  ?'检测到 Grsai 原任务 ID。将继续查询原任务，不会新建上游生成请求。\n原模型：'+p.name+' / '+model+'\n确定继续查询吗？'
+  :'原任务：'+(previous.providerName||'未知')+' / '+(previous.model||'未知')+'\n本次：'+p.name+' / '+model+'\n原任务可能已经扣费，即使显示失败或中断。请先检查任务记录；确认后重新发起新的付费请求？';
+ if(!confirm(warning))return;
+ retrySubmitPending.add(id);
+ try{
+  const result=await api(`jobs/${id}/retry`,{method:'POST',body:{providerId:p.id,model,acknowledgePotentialCharge:!resume}});
+  await refreshProjectData();
+  toast(result.resumeOriginal?'已继续查询原 Grsai 任务，不会重新发起上游生成':'新任务已排队，原失败记录已保留');
+ }catch(e){toast('未能确认重试：'+e.message+'。请检查任务队列，避免重复操作')}
+ finally{retrySubmitPending.delete(id)}
+}
 function showFromLibrary(){const id=viewerId;hide('viewerModal');continueFrom(id)}
 // Existing mask mechanics from V0.3: an opaque mask where painted pixels become transparent.
 async function openMask(id){const h=currentHistory(id);if(!h)return;const p=activeProvider();if(p?.mode!=='openai'||p?.imageMode!=='images'||p?.capabilities?.edit?.enabled===false)return toast('请配置支持蒙版编辑的 Images Edits 服务商');maskSourceId=h.id;maskMarked=0;maskErase=false;maskSetTool(false);show('maskModal');const im=$('maskImg');im.onload=()=>{const c=$('maskCanvas');c.width=im.naturalWidth;c.height=im.naturalHeight;c.style.width=im.getBoundingClientRect().width+'px';c.style.height=im.getBoundingClientRect().height+'px';maskCanvasRaw=document.createElement('canvas');maskCanvasRaw.width=c.width;maskCanvasRaw.height=c.height;repaintMask=maskCanvasRaw.getContext('2d');visualMask=c.getContext('2d');resetMask()};im.src=h.url}

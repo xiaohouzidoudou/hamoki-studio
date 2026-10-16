@@ -82,8 +82,15 @@ test('V0.6.3 account workspaces isolate users, keys, media and survive restart',
  assert.equal((await b.request(photo)).status,404);
  const csrf=await a.request('/api/projects','POST',{title:'恶意跨站'},'https://evil.example');assert.equal(csrf.status,403);
  const noKey=await b.request('/api/jobs','POST',{prompt:'不能使用 A 的 Key',count:1});assert.equal(noKey.status,400);assert.equal(hits,0);
- const submitted=await a.request('/api/jobs','POST',{projectId:projectA,providerId:pid,prompt:'画一只戴帽子的小猴子',count:1,ratio:'1:1',resolution:'1K'});
+ const originalRequest={projectId:projectA,providerId:pid,prompt:'画一只戴帽子的小猴子',count:1,ratio:'1:1',resolution:'1K',idempotencyKey:'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'};
+ const submitted=await a.request('/api/jobs','POST',originalRequest);
  assert.equal(submitted.status,201,JSON.stringify(submitted.body));
+ const repeated=await a.request('/api/jobs','POST',originalRequest);
+ assert.equal(repeated.status,201,JSON.stringify(repeated.body));
+ assert.equal(repeated.body.idempotent,true);
+ assert.equal(repeated.body.jobs[0].id,submitted.body.jobs[0].id);
+ const conflicting=await a.request('/api/jobs','POST',{...originalRequest,prompt:'重复标识但不同内容'});
+ assert.equal(conflicting.status,409);
  let entry=null;
  for(let i=0;i<140;i++){
   const jobs=(await a.request('/api/jobs?projectId='+projectA)).body.jobs;
