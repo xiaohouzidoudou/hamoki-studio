@@ -25,5 +25,7 @@ jobs:
         working-directory: cowart
       - name: Stage production-like public assets
         run: cp -r cowart/dist cowart-dist
+      - name: Install Studio backend dependencies
+        run: npm ci --no-audit --no-fund
       - name: Run Studio regressions and Cowart account isolation
         run: npm test
