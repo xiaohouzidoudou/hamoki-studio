@@ -1466,6 +1466,13 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
       return fail(res,405,'衍生素材接口操作不支持');
     }
     // Project, board, and conversation state are stored on the server, not localStorage.
+    if(route==='/api/cowart/messages'&&req.method==='GET'){
+      if(process.env.COWART_PREVIEW!=='1')return fail(res,404,'Cowart 开发预览未开启');
+      const p=assertProject(url.searchParams.get('projectId'));
+      const messages=p.messages.filter(m=>m.capability==='cowart')
+        .slice(-60).map(m=>({id:m.id,role:m.role,content:clampText(m.content,1600),action:m.action||null,createdAt:m.createdAt}));
+      return respond(res,200,{messages});
+    }
     if(route==='/api/cowart/plan'&&req.method==='POST'){
       if(process.env.COWART_PREVIEW!=='1')return fail(res,404,'Cowart 开发预览未开启');
       if(DEMO_MODE)return fail(res,403,'演示模式不支持 AI 分析');
@@ -1486,10 +1493,14 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
         model,prompt:cowartIntent.buildCowartPrompt(instruction,context),
         maxOutputTokens:900,timeoutMs:90000
       }));
-      const plan=cowartIntent.normalizeCowartPlan(raw);
+      let plan=cowartIntent.normalizeCowartPlan(raw);
       if(plan.action==='edit'&&!selection.some(x=>x.kind==='image'||x.isGenerated)){
-        return respond(res,200,{plan:{action:'chat',reply:'请先在画布里选中要修改的原图，再告诉我怎么修改。',requiresApproval:false}});
+        plan={action:'chat',reply:'请先在画布里选中要修改的原图，再告诉我怎么修改。',requiresApproval:false};
       }
+      p.messages.push({id:crypto.randomUUID(),role:'user',content:instruction,createdAt:time(),capability:'cowart'});
+      p.messages.push({id:crypto.randomUUID(),role:'assistant',content:clampText(plan.reply||'已分析画布要求',1000),
+        action:plan.action,createdAt:time(),model,providerId:providerChoice.id,capability:'cowart'});
+      p.messages=p.messages.slice(-400);touchProject(p);
       return respond(res,200,{plan,providerName:providerChoice.name,model});
     }
     if(route==='/api/assistant/plan'&&req.method==='POST'){
