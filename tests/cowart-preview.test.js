@@ -99,11 +99,22 @@ test('Cowart preview requires a session; server snapshots have account-scoped op
 
 
   // A separate text-model request plans one action but never starts a paid image job.
-  let llmCalls=0, privateDataSeen=false
+  let llmCalls=0,visionCalls=0,privateDataSeen=false,visualSummaryPassed=false,visionRawLeakedToText=false
   const mock=http.createServer(async(req,res)=>{
     let raw='';for await(const part of req)raw+=part
-    llmCalls++
     if(raw.includes('NEVER_EXPOSE_KEY'))privateDataSeen=true
+    const isVision=raw.includes('"type":"image_url"')
+    if(isVision)visionCalls++
+    else {
+      llmCalls++
+      if(raw.includes('按钮的颜色偏黄'))visualSummaryPassed=true
+      if(raw.includes('iVBORw0KGgoAAAANS'))visionRawLeakedToText=true
+    }
+    if(isVision){
+      res.writeHead(200,{'Content-Type':'application/json'})
+      res.end(JSON.stringify({choices:[{message:{content:'这是一个游戏周年庆界面，按钮的颜色偏黄，背景较暗，没有复杂前景'}}]}))
+      return
+    }
     const plan=raw.includes('这张图请修改')?
       {action:'image',mode:'edit',reply:'把按钮压暗',edit:{target:'按钮',change:'降低亮度',preserve:'布局不动'}}:
       {action:'chat',mode:'new',reply:'当前页面主要布局可继续讨论'}
@@ -130,9 +141,30 @@ test('Cowart preview requires a session; server snapshots have account-scoped op
   assert.equal((await a('/api/jobs?projectId='+pA)).data.jobs.length,0,'planning cannot initiate image billing')
   assert.equal(privateDataSeen,false,'untrusted selection extras must not reach upstream')
   assert.equal(llmCalls,2,'each explicit planning request uses the text model exactly once')
+  const tinyPng='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLduAAAAABJRU5ErkJggg=='
+  const imagePlan=await a('/api/cowart/plan','POST',{
+    projectId:pA,prompt:'请根据这张图聊聊按钮',providerId:pid,model:'test-text',
+    visionProviderId:pid,visionModel:'test-vision',
+    selection,visual:{image:tinyPng}
+  })
+  assert.equal(imagePlan.status,200,JSON.stringify(imagePlan.data))
+  assert.equal(imagePlan.data.visionUsed,true)
+  assert.equal(imagePlan.data.visionModel,'test-vision')
+  assert.match(imagePlan.data.visualSummary,/按钮的颜色偏黄/)
+  assert.equal(visionCalls,1,'one upstream visual interpretation per explicitly requested image')
+  assert.equal(llmCalls,3,'one additional text planner after visual analysis')
+  assert.equal(visualSummaryPassed,true,'visual description reaches text planner')
+  assert.equal(visionRawLeakedToText,false,'original image bytes must not be copied to text planning model')
+  assert.equal((await a('/api/jobs?projectId='+pA)).data.jobs.length,0,'vision + planning must not submit any image job')
+  const notOwner=await b('/api/cowart/plan','POST',{
+    projectId:pB,prompt:'帮我看看原图',providerId:pid,model:'test-text',
+    visionProviderId:pid,visionModel:'test-vision',visual:{sourceId:'11111111-1111-4111-8111-111111111111'}
+  })
+  assert.notEqual(notOwner.status,200,'never use a history source not owned by the requesting account')
+
   const conversation=await a('/api/cowart/messages?projectId='+pA)
   assert.equal(conversation.status,200)
-  assert.deepEqual(conversation.data.messages.map(x=>x.role),['user','assistant','user','assistant'])
+  assert.deepEqual(conversation.data.messages.map(x=>x.role),['user','assistant','user','assistant','user','assistant'])
   assert.equal(conversation.data.messages[3].action,'edit')
   assert.equal((await b('/api/cowart/messages?projectId='+pA)).status,404,'Cowart conversation must never leak between accounts')
 
