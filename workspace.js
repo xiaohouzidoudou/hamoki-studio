@@ -20,7 +20,8 @@ const creativePages=require('./lib/creative-pages');
 const {referenceRatio}=require('./lib/creative-auto-ratio');
 const assistantMemory=require('./lib/assistant-memory');
 const assistantReview=require('./lib/assistant-review');
-const {nextGeneratedPosition}=require('./lib/canvas-placement');
+const {nextGeneratedPosition,intersects,TILE}=require('./lib/canvas-placement');
+const {retryPlan}=require('./lib/job-retry-policy');
 const generate=(...args)=>options.limiter.run(()=>upstreamGenerate(...args));
 const reverse=(...args)=>options.limiter.run(()=>upstreamReverse(...args));
 const listModels=(...args)=>options.limiter.run(()=>upstreamListModels(...args));
@@ -499,7 +500,8 @@ async function creativeQuality(p,historyId){
 }
 function appendGeneratedNode(h,j){const p=project(j.projectId||defaultProject()?.id);if(!p)return;
  const parent=p.nodes.find(n=>n.historyId===h.parentId)||p.nodes.find(n=>n.id===j.sourceNodeId);
- const {x,y,w,h:height}=nextGeneratedPosition(p);
+ const reserved=j.reservedCanvasSlot&&Number.isSafeInteger(j.canvasX)&&Number.isSafeInteger(j.canvasY)&&!p.nodes.some(node=>intersects(j.canvasX,j.canvasY,node));
+ const {x,y,w,h:height}=reserved?{x:j.canvasX,y:j.canvasY,w:TILE,h:TILE}:nextGeneratedPosition(p);
  p.nodes.push({id:crypto.randomUUID(),kind:'generated',historyId:h.id,parentNodeId:parent?.id||null,x,y,w,h:height,createdAt:time()});
  p.messages.push({id:crypto.randomUUID(),role:'result',content:'已生成作品',createdAt:time(),groupId:j.groupId,imageId:h.id});
  p.messages=p.messages.slice(-400);p.nodes=p.nodes.slice(-1800);touchProject(p);
@@ -695,7 +697,7 @@ function storePreview(name,pic){mediaPath(name);if(!fs.existsSync(mediaPath(name
 function fetchMedia(name){const bytes=fs.readFileSync(mediaPath(name));return {mime:guessMime(bytes),bytes}}
 function sendMedia(req,res,filename,mime,cache='private, max-age=604800'){const stat=fs.statSync(filename);const tag='"'+stat.size.toString(16)+'-'+Math.round(stat.mtimeMs).toString(16)+'"';if(req.headers['if-none-match']===tag){res.writeHead(304,{'ETag':tag,'Cache-Control':cache});return res.end()}res.writeHead(200,{'Content-Type':mime,'Content-Length':stat.size,'Cache-Control':cache,'ETag':tag,'X-Content-Type-Options':'nosniff'});const stream=fs.createReadStream(filename);stream.on('error',e=>{console.error('[Hamoki media stream]',e.code||'stream');res.destroy(e)});return stream.pipe(res)}
 function publicHistory(h){return {...h,url:BASE+'/api/media/'+h.file,previewUrl:BASE+'/api/previews/'+h.file};}
-function publicJob(j){const {referenceMedia,maskMedia,maskSourceMedia,roleHints,review,...exposed}=j;return {...exposed,referenceRoles:roleHints||[]};}
+function publicJob(j){const {referenceMedia,maskMedia,maskSourceMedia,roleHints,review,submissionKey,submissionFingerprint,...exposed}=j;return {...exposed,referenceRoles:roleHints||[]};}
 function pngDimensions(bytes){if(!bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))||bytes.length<24)throw Error('蒙版及蒙版原图必须为 PNG');return [bytes.readUInt32BE(16),bytes.readUInt32BE(20)]}
 function saveSourceFiles(refs,mask,maskSource){
  let size=0;const input=[];
@@ -828,7 +830,7 @@ async function execute(job){const abort=new AbortController();controllers.set(jo
     job.status='queued';job.nextRunAt=Date.now()+delay;job.error+='（上游429限流，'+Math.ceil(delay/1000)+' 秒后重试，最多3次）';job.updatedAt=time();saveJobs();schedule();
   }else jobStatusOk(job,'failed');
 }finally{controllers.delete(job.id)}}
-function makeJob(b,store,providerId,model,groupId){const p=effectiveProvider(provider(providerId),b.capability||'image');emptyProvider(p);return {id:crypto.randomUUID(),groupId,providerId,capability:b.capability||'image',providerName:p.name,model:assertModel(model||p.imageModel),prompt:b.prompt,editInstruction:b.editInstruction||'',roleHints:store.roleHints||[],transparentBg:!!b.transparentBg,ratio:b.ratio,resolution:b.resolution,quality:b.quality,sourceId:b.sourceId||null,referenceMedia:store.input,maskMedia:store.mask,maskSourceMedia:store.maskSource,projectId:b.projectId,sourceNodeId:b.sourceNodeId||null,canvasX:b.canvasX,canvasY:b.canvasY,batchIndex:b.batchIndex||0,review:b.review||null,reviewStatus:b.review?'pending':null,createdAt:time(),updatedAt:time(),status:'queued',attempts:0,resultId:null,error:'',retryOf:b.retryOf||null}}
+function makeJob(b,store,providerId,model,groupId){const p=effectiveProvider(provider(providerId),b.capability||'image');emptyProvider(p);return {id:crypto.randomUUID(),groupId,providerId,capability:b.capability||'image',providerName:p.name,model:assertModel(model||p.imageModel),prompt:b.prompt,editInstruction:b.editInstruction||'',roleHints:store.roleHints||[],transparentBg:!!b.transparentBg,ratio:b.ratio,resolution:b.resolution,quality:b.quality,sourceId:b.sourceId||null,referenceMedia:store.input,maskMedia:store.mask,maskSourceMedia:store.maskSource,projectId:b.projectId,sourceNodeId:b.sourceNodeId||null,canvasX:b.canvasX,canvasY:b.canvasY,batchIndex:b.batchIndex||0,review:b.review||null,reviewStatus:b.review?'pending':null,createdAt:time(),updatedAt:time(),status:'queued',attempts:0,resultId:null,error:'',retryOf:b.retryOf||null,submissionKey:b.submissionKey||null,submissionFingerprint:b.submissionFingerprint||null}}
 const REFERENCE_ROLES={shape:'角色造型、身份及结构',color:'颜色与配色，不复制其主体',style:'绘画风格、线条和上色技巧，不复制内容',pose:'动作与构图',background:'背景与场景',general:'综合参考'};
 function validateCreation(b){
  const instruction=trim(b.prompt,16000),refs=Array.isArray(b.references)?b.references:[];
@@ -909,6 +911,17 @@ function validateCreation(b){
  return {capability,prompt,editInstruction:instruction,refs,referenceNodes:images,count,targets,ratio,resolution,quality,review,transparentBg,sourceId:source?.id||null,sourceNodeId,projectId:targetProject.id,canvasX:num(b.canvasX,180),canvasY:num(b.canvasY,170),mask:b.mask||null,maskSourceImage:b.maskSourceImage||null};
 }
 function submit(b){
+ const key=b.idempotencyKey;
+ if(key!==undefined&&!/^[a-f0-9-]{36}$/i.test(String(key)))throw Object.assign(Error('无效的请求标识'),{status:400});
+ const submissionKey=key||null;
+ const submissionFingerprint=submissionKey?crypto.createHash('sha256').update(JSON.stringify({...b,idempotencyKey:undefined})).digest('hex'):null;
+ if(submissionKey){
+  const previous=jobs.filter(j=>j.submissionKey===submissionKey);
+  if(previous.length){
+   if(previous.some(j=>j.submissionFingerprint!==submissionFingerprint||j.projectId!==b.projectId))throw Object.assign(Error('请求标识与原任务内容不匹配，已阻止重复扣费'),{status:409});
+   return {jobs:previous.map(publicJob),groupId:previous[0].groupId,idempotent:true};
+  }
+ }
  const valid=validateCreation(b);
  for(const t of valid.targets){const p=effectiveProvider(provider(t.providerId),valid.capability);emptyProvider(p);t.model=assertModel(t.model||p.imageModel)}
  const store=saveSourceFiles(valid.refs,valid.mask,valid.maskSourceImage);
@@ -918,8 +931,9 @@ function submit(b){
  for(const r of effectiveRefs){store.input.push(r.file);store.roleHints.push(r.role)}
  store.input.push(...uploadMedia);store.roleHints.push(...valid.refs.map(()=> 'general'));
  const groupId=crypto.randomUUID(),created=[];
- for(const t of valid.targets)for(let i=0;i<valid.count;i++)created.push(makeJob({...valid,batchIndex:created.length},store,t.providerId,t.model,groupId));
- jobs.unshift(...created);saveJobs();const proj=assertProject(valid.projectId);
+ for(const t of valid.targets)for(let i=0;i<valid.count;i++)created.push(makeJob({...valid,submissionKey,submissionFingerprint,batchIndex:created.length},store,t.providerId,t.model,groupId));
+ const proj=assertProject(valid.projectId);for(const job of created){const slot=nextGeneratedPosition(proj);job.canvasX=slot.x;job.canvasY=slot.y;job.reservedCanvasSlot=true}
+ jobs.unshift(...created);saveJobs();
  proj.messages.push({id:crypto.randomUUID(),role:'user',content:valid.editInstruction,createdAt:time(),groupId,sourceId:valid.sourceId,referenceRoles:valid.referenceNodes.map(n=>({nodeId:n.nodeId,role:n.role})),providerIds:valid.targets.map(t=>t.providerId)});
  proj.messages=proj.messages.slice(-400);touchProject(proj);schedule();return {jobs:created.map(publicJob),groupId};
 }
@@ -1696,7 +1710,15 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
     if(req.method==='POST'&&route==='/api/queue'){const b=await readJSON(req);if(!['pause','resume'].includes(b.action))throw Error('无效队列操作');paused=b.action==='pause';saveJobs();if(!paused)schedule();return respond(res,200,{paused})}
     const jm=route.match(/^\/api\/jobs\/([a-f0-9-]{36})\/(cancel|retry)$/);
     if(jm&&req.method==='POST'){const j=jobs.find(x=>x.id===jm[1]);if(!j)return fail(res,404,'任务不存在');if(jm[2]==='cancel'){if(!['queued','running','interrupted'].includes(j.status))throw Error('任务当前不可取消');j.status='cancelled';j.updatedAt=time();controllers.get(j.id)?.abort();saveJobs();return respond(res,200,{job:publicJob(j)})}
-      if(!['failed','cancelled','interrupted'].includes(j.status))throw Error('此任务不需要重试');const request=await readJSON(req);const newProviderId=request.providerId||j.providerId,newModel=assertModel(request.model||j.model);const selected=effectiveProvider(provider(newProviderId),j.capability||'image');emptyProvider(selected);if(j.maskMedia&&(selected.mode!=='openai'||(selected.imageMode||'images')!=='images'))throw Error('本次选中的模型接口不支持蒙版，已阻止任务提交');if(j.transparentBg&&(selected.mode!=='openai'||(selected.imageMode||'images')!=='images'))throw Error('本次选中的模型接口不支持透明背景，已阻止任务提交');const again={...j,upstreamId:(newProviderId===j.providerId&&newModel===j.model)?j.upstreamId:null,progress:0,providerId:newProviderId,providerName:selected.name,model:newModel,id:crypto.randomUUID(),createdAt:time(),updatedAt:time(),startedAt:null,resultId:null,error:'',status:'queued',attempts:0,retryOf:j.id};jobs.unshift(again);saveJobs();schedule();return respond(res,201,{job:publicJob(again)});
+      const request=await readJSON(req);
+      const newProviderId=request.providerId||j.providerId,newModel=assertModel(request.model||j.model);
+      const selected=effectiveProvider(provider(newProviderId),j.capability||'image');
+      emptyProvider(selected);
+      const policy=retryPlan(j,jobs,{providerId:newProviderId,model:newModel,mode:selected.mode,acknowledgePotentialCharge:request.acknowledgePotentialCharge});
+      if(j.maskMedia&&(selected.mode!=='openai'||(selected.imageMode||'images')!=='images'))throw Error('本次选中的模型接口不支持蒙版，已阻止任务提交');
+      if(j.transparentBg&&(selected.mode!=='openai'||(selected.imageMode||'images')!=='images'))throw Error('本次选中的模型接口不支持透明背景，已阻止任务提交');
+      const again={...j,upstreamId:policy.upstreamId,progress:0,providerId:newProviderId,providerName:selected.name,model:newModel,id:crypto.randomUUID(),createdAt:time(),updatedAt:time(),startedAt:null,resultId:null,error:'',status:'queued',attempts:0,retryOf:j.id,canvasX:j.canvasX,canvasY:j.canvasY,submissionKey:null,submissionFingerprint:null};
+      jobs.unshift(again);saveJobs();schedule();return respond(res,201,{job:publicJob(again),resumeOriginal:policy.resumeOriginal});
     }
     if(req.method==='GET'&&route==='/api/history'){const q=trim(url.searchParams.get('q'),150).toLowerCase(),favorites=url.searchParams.get('favorite')==='1';let listed=history.filter(h=>(!favorites||h.favorite)&&(!url.searchParams.get('projectId')||h.projectId===url.searchParams.get('projectId')));if(q)listed=listed.filter(h=>[h.prompt,h.model,h.providerName].some(s=>(s||'').toLowerCase().includes(q)));return respond(res,200,{history:listed.slice(0,1500).map(publicHistory),total:listed.length})}
     const fm=route.match(/^\/api\/history\/([a-f0-9-]{36})\/favorite$/);if(fm&&req.method==='POST'){const h=history.find(x=>x.id===fm[1]);if(!h)return fail(res,404,'图片不存在');h.favorite=!!(await readJSON(req)).favorite;saveHistory();return respond(res,200,{image:publicHistory(h)})}
@@ -1712,7 +1734,7 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
     const msg=String(e?.message||'服务错误').slice(0,450);
     // Most 404s are normal navigation/missing thumbnails; record actionable failures only.
     if(!(e.status===404||route.startsWith('/api/previews/')))diag({source:e.upstreamStatus?'upstream':'backend',action:'api_request',method:req.method,path:route,status:e.upstreamStatus||e.status||400,message:msg});
-    if(!res.headersSent){const code=[400,401,403,404,413,415].includes(e.status)?e.status:400;return fail(res,code,msg)}console.error('[Hamoki]',route,msg);
+    if(!res.headersSent){const code=[400,401,403,404,409,413,415].includes(e.status)?e.status:400;return fail(res,code,msg)}console.error('[Hamoki]',route,msg);
   }
 }
 

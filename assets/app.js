@@ -168,8 +168,12 @@ function updateStats(){const n=jobs.filter(j=>['queued','running'].includes(j.st
 async function refreshProjectData(){if(polling||!currentProject||!authorized)return;polling=true;const id=currentProject.id;try{
  const [h,j,r]=await Promise.all([api(`history?projectId=${id}`),api(`jobs?projectId=${id}`),api(`/api/projects/${id}`)]);
  if(currentProject?.id!==id)return;const oldHash=historyItems.map(x=>x.id+':'+x.favorite).join('|');const newHash=(h.history||[]).map(x=>x.id+':'+x.favorite).join('|');
- historyItems=h.history||[];jobs=j.jobs||[];paused=!!j.paused;updateStats();syncGenerationActivity();
+ historyItems=h.history||[];jobs=j.jobs||[];paused=!!j.paused;updateStats();syncGenerationActivity();renderCanvasJobs();
  const p=r.project;
+ const summary=projectList.find(x=>x.id===id);
+ if(summary&&(summary.imageCount!==(p.nodes||[]).length||summary.title!==p.title)){
+  summary.imageCount=(p.nodes||[]).length;summary.title=p.title;renderProjects();
+ }
  if(!gesture&&projectSaveBusy===0&&(p.revision??0)!==lastProjectRevision){
    currentProject=p;lastProjectRevision=p.revision??0;renderNodes();renderMemoryContext();renderCreativeAutoProgress();if(!(textChatBusy&&textChatProjectId===id))renderConversation();renderProjects();setSaving('已同步');
  }else if(newHash!==oldHash&&!gesture){renderNodes();if(!(textChatBusy&&textChatProjectId===id))renderConversation()}
@@ -221,16 +225,62 @@ function renderNodes(){const layer=$('nodeLayer');layer.replaceChildren();const 
   }else{
     const box=el('div','node-image-box'),src=nodeImage(n),im=el('img');putPreview(im,src,previewImage(n));im.draggable=false;im.alt=n.kind==='reference'?'参考图片':'AI 生成作品';box.append(im);
     box.append(el('span','node-badge'+(n.kind==='reference'?' reference':''),n.kind==='reference'?'参考素材':'AI GENERATED'));
-    const foot=el('div','node-foot');const label=el('div','node-text');const h=currentHistory(n.historyId);label.append(el('b','',n.kind==='reference'?(n.title||'参考图片'):(h?.prompt||'生成的作品')),el('small','',n.kind==='reference'?'REFERENCE · 上传图片':(h?.model||'AI MODEL')+' · '+humanDate(n.createdAt)));foot.append(label);card.append(box,foot);card.ondblclick=e=>{e.stopPropagation();if(e.target.closest('.node-image-box'))return;if(h)openViewer(h.id);else addNodeAsRef(n)};
+    const foot=el('div','node-foot');const label=el('div','node-text');const h=currentHistory(n.historyId);label.append(el('b','',n.kind==='reference'?(n.title||'参考图片'):(h?.editInstruction||h?.prompt||'生成的作品')),el('small','',n.kind==='reference'?'REFERENCE · 上传图片':(h?.model||'AI MODEL')+' · '+humanDate(n.createdAt)));foot.append(label);card.append(box,foot);card.ondblclick=e=>{e.stopPropagation();if(e.target.closest('.node-image-box'))return;if(h)openViewer(h.id);else addNodeAsRef(n)};
   }
   card.addEventListener('pointerdown',e=>{if(e.target.closest('textarea,.inline-note,.resize-grip'))return;startNodeDrag(e,n)});
   const grip=el('span','resize-grip');grip.title='拖动调整大小';grip.addEventListener('pointerdown',e=>startResize(e,n));card.append(grip);layer.append(card);
  }
- renderLinks();placeToolbar();renderStudioLayerChips();}
+ renderLinks();placeToolbar();renderStudioLayerChips();renderCanvasJobs();}
+function visibleCanvasJobs(all=jobs){
+ const retried=new Set(all.map(j=>j.retryOf).filter(Boolean));
+ return all.filter(j=>['queued','running','failed','interrupted'].includes(j.status)&&!retried.has(j.id)&&!j.resultId).slice(0,30);
+}
+function renderCanvasJobs(){
+ const layer=$('jobLayer');if(!layer)return;layer.replaceChildren();
+ if(!currentProject||!Array.isArray(jobs))return;
+ const cards=visibleCanvasJobs();
+ $('emptyStage')?.classList.toggle('hidden',!!(currentProject.nodes?.length||cards.length));
+ const occupied=new Set();
+ for(const job of cards){
+  const origin=currentProject.nodes?.find(n=>n.id===job.sourceNodeId);
+  let x=Number.isFinite(Number(job.canvasX))?Number(job.canvasX):180;
+  let y=Number.isFinite(Number(job.canvasY))?Number(job.canvasY):170;
+  if(origin&&!job.reservedCanvasSlot){x=origin.x+origin.w+34;y=origin.y}
+  // Keep task identity and its location stable across a retry without covering neighbouring cards.
+  let key=Math.round(x/80)+':'+Math.round(y/80),offset=0;
+  while(occupied.has(key)&&offset<18){y+=182;offset++;key=Math.round(x/80)+':'+Math.round(y/80)}
+  occupied.add(key);
+  const card=el('article','canvas-job-card status-'+job.status);
+  card.dataset.jobId=job.id;card.style.left=x+'px';card.style.top=y+'px';
+  card.setAttribute('role','group');card.setAttribute('aria-label',statusLabel(job.status)+'的生图任务');
+  const heading=el('div','canvas-job-head');
+  const title=el('strong','',statusLabel(job.status));
+  const mark=el('span','canvas-job-spinner');
+  mark.setAttribute('aria-hidden','true');
+  heading.append(mark,title);
+  if(job.progress&&job.status==='running')heading.append(el('span','canvas-job-progress',Math.round(Number(job.progress))+'%'));
+  const body=el('p','canvas-job-prompt',(job.editInstruction||job.prompt||'图片生成任务').slice(0,160));
+  const details=el('small','canvas-job-meta',(job.providerName||'图片模型')+' · '+(job.model||'未选模型'));
+  const actions=el('div','canvas-job-actions');
+  const inspect=el('button','','查看任务');inspect.type='button';inspect.onclick=()=>openLibrary('queue');
+  actions.append(inspect);
+  if(['failed','interrupted'].includes(job.status)){
+   const risk=el('span','canvas-job-risk',job.status==='interrupted'||job.upstreamId?'可能已计费 · 先检查':'生成失败 · 重试可能再次计费');
+   const retry=el('button','canvas-job-retry',job.upstreamId?'恢复或确认重试':'确认后重试');
+   retry.type='button';retry.onclick=()=>retryJob(job.id);
+   card.append(heading,body,details,el('p','canvas-job-error',job.error||'任务中断，结果状态待确认'),risk);
+   actions.append(retry);
+  }else card.append(heading,body,details,el('p','canvas-job-info',job.status==='queued'?'等待模型空闲':'正在等待上游生成结果'));
+  card.append(actions);
+  card.addEventListener('pointerdown',e=>e.stopPropagation());
+  layer.append(card);
+ }
+}
 function renderLinks(){const svg=$('linkLayer');svg.replaceChildren();if(!currentProject)return;const nodes=currentProject.nodes;const nById=new Map(nodes.map(n=>[n.id,n]));
  const bounds=worldViewBounds();for(const n of nodes){if(!n.parentNodeId)continue;const p=nById.get(n.parentNodeId);if(!p||(!nodeVisible(n,bounds)&&!nodeVisible(p,bounds)))continue;const x1=p.x+p.w,y1=p.y+p.h*.46,x2=n.x,y2=n.y+n.h*.46,dx=Math.max(65,Math.abs(x2-x1)*.5);const line=document.createElementNS('http://www.w3.org/2000/svg','path');line.setAttribute('class','version-link');line.setAttribute('d',`M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`);svg.appendChild(line)}
  svg.style.display=$('versionToggle').classList.contains('disabled-links')?'none':'block';}
 function selectNode(id,additive=false){
+ if(inlineChatNodeId&&inlineChatNodeId!==id)closeInlineChat();
  if(additive){if(multiNodeIds.has(id))multiNodeIds.delete(id);else if(id)multiNodeIds.add(id)}
  else{multiNodeIds.clear();if(id)multiNodeIds.add(id)}
  selectedNodeId=multiNodeIds.has(id)?id:[...multiNodeIds].at(-1)||null;
@@ -513,6 +563,7 @@ function openSelectedImageCut(){
  }}));
 }
 function placeToolbar(){
+ positionInlineChat();
  const toolbar=$('selectionToolbar'),images=selectedSceneNodes().filter(n=>n.kind!=='note'),n=currentNode();
  toolbar.classList.toggle('bulk-selection-toolbar',images.length>1);
  if(!n||(!images.length&&n.kind!=='note')){hide('selectionToolbar');return}
@@ -531,9 +582,9 @@ function placeToolbar(){
  }
  const choices=n.kind==='note'?[['edit','编辑',()=>editNote(n,document.querySelector('.canvas-node[data-id="'+n.id+'"]'))],['trash','移除',()=>removeNode(n),true]]:
  n.kind==='reference'?[['edit','本地编辑',()=>openLocalImageEditor(n)],['plus','设为参考',()=>toggleReferenceNode(n.id,'general')],['wand','图片反推',()=>reverseNode(n)],['download','下载',downloadSelectedImages],['trash','移除',()=>removeNode(n),true]]:
- [['spark','AI 智能拆组件',()=>openSmartComponents(n.historyId)],['image','一键切图',openSelectedImageCut],['edit','本地编辑',()=>openLocalImageEditor(n)],['wand','继续修改',()=>continueFrom(n.historyId,n.id)],['refresh','重生成',()=>regenerateFrom(n.historyId,n.id)],['edit','局部重绘',()=>openMask(n.historyId)],['spark','高清增强',()=>enhanceFrom(n.historyId,n.id)],['image','去背景',()=>removeBackground(n.historyId,n.id)],['copy','设为参考',()=>toggleReferenceNode(n.id,'general')],['zoom','反推',()=>reverseNode(n)],['download','下载',()=>{location.href=APP_BASE+'/api/download/'+n.historyId}],['trash','移除',()=>removeNode(n),true]];
+ [['spark','AI 智能拆组件',()=>openSmartComponents(n.historyId)],['image','一键切图',openSelectedImageCut],['edit','本地编辑',()=>openLocalImageEditor(n)],['wand','图片对话',()=>openInlineChat(n)],['wand','继续修改',()=>continueFrom(n.historyId,n.id)],['refresh','重生成',()=>regenerateFrom(n.historyId,n.id)],['edit','局部重绘',()=>openMask(n.historyId)],['spark','高清增强',()=>enhanceFrom(n.historyId,n.id)],['image','去背景',()=>removeBackground(n.historyId,n.id)],['copy','设为参考',()=>toggleReferenceNode(n.id,'general')],['zoom','反推',()=>reverseNode(n)],['download','下载',()=>{location.href=APP_BASE+'/api/download/'+n.historyId}],['trash','移除',()=>removeNode(n),true]];
  if(n.kind!=='note')choices.unshift(['zoom','查看原图',()=>openCanvasOriginal(n)]);
- const primary=n.kind==='note'?new Set(['编辑']):n.kind==='reference'?new Set(['查看原图','本地编辑','设为参考']):new Set(['查看原图','AI 智能拆组件','一键切图']);
+ const primary=n.kind==='note'?new Set(['编辑']):n.kind==='reference'?new Set(['查看原图','本地编辑','设为参考']):new Set(['图片对话','一键切图','查看原图']);
  const extras=el('div','selection-more-menu');extras.setAttribute('role','group');extras.setAttribute('aria-label','更多图片操作');
  for(const [icon,label,action,danger] of choices){
   const b=el('button',danger?'destructive':'');b.type='button';b.innerHTML=ico(icon);b.append(document.createTextNode(label));
@@ -570,7 +621,7 @@ function startNodeDrag(e,n){
 function startResize(e,n){if(e.button!==0&&e.pointerType!=='touch')return;e.preventDefault();e.stopPropagation();selectNode(n.id);gesture={type:'resize',id:e.pointerId,nodeId:n.id,origin:boardXY(e),startW:n.w,startH:n.h,before:snapshotScene([n.id])};$('board').setPointerCapture(e.pointerId)}
 function startPan(e){e.preventDefault();$('board').classList.toggle('middle-panning',e.button===1);gesture={type:'pan',id:e.pointerId,origin:boardXY(e),startX:cam.x,startY:cam.y};$('board').setPointerCapture(e.pointerId)}
 function startPinch(){if(activePointers.size<2)return;const a=[...activePointers.values()],center={x:(a[0].x+a[1].x)/2,y:(a[0].y+a[1].y)/2},distance=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);gesture={type:'pinch',center,distance,start:{...cam},wx:(center.x-cam.x)/cam.scale,wy:(center.y-cam.y)/cam.scale}}
-function pointerDown(e){if(e.button===1){e.preventDefault();e.stopPropagation();activePointers.set(e.pointerId,boardXY(e));startPan(e);return}if(e.button!==0&&e.pointerType!=='touch')return;const pt=boardXY(e);activePointers.set(e.pointerId,pt);if(activePointers.size>=2&&e.pointerType==='touch'){startPinch();return}if(e.target.closest('.tool-dock,.canvas-hud,.selection-toolbar,.empty-cta'))return;if(e.target.closest('.canvas-node'))return;const pos=worldXY(e);if(tool==='note'){createNote(pos);changeTool('select');return}
+function pointerDown(e){if(e.button===1){e.preventDefault();e.stopPropagation();activePointers.set(e.pointerId,boardXY(e));startPan(e);return}if(e.button!==0&&e.pointerType!=='touch')return;const pt=boardXY(e);activePointers.set(e.pointerId,pt);if(activePointers.size>=2&&e.pointerType==='touch'){startPinch();return}if(e.target.closest('.tool-dock,.canvas-hud,.selection-toolbar,.canvas-inline-chat,.empty-cta'))return;if(e.target.closest('.canvas-node'))return;const pos=worldXY(e);if(tool==='note'){createNote(pos);changeTool('select');return}
  if(tool==='select'&&e.pointerType!=='touch'){e.preventDefault();marqueeRect=el('div','marquee-rect');$('board').append(marqueeRect);gesture={type:'marquee',id:e.pointerId,origin:pt,start:pos,additive:!!e.shiftKey};$('board').setPointerCapture(e.pointerId);return}
  selectNode(null);startPan(e)}
 function pointerMove(e){
@@ -623,6 +674,60 @@ function continueFrom(id,nodeId){
  $('transparentBg').checked=false;$('prompt').value='';$('prompt').placeholder='正在修改上一版本：例如「换成红色头发，其他部分不变」';
  renderContext();$('prompt').focus();if(innerWidth<850)$('assistantPanel').classList.add('open');toast('已把原图设为编辑参考；继续使用你当前选择的服务商、模型与参数');
 }
+let inlineChatNodeId=null,inlineChatSubmitting=false,inlineChatUncertain=false;
+function closeInlineChat(){inlineChatNodeId=null;inlineChatUncertain=false;hide('canvasInlineChat')}
+function positionInlineChat(){
+ const panel=$('canvasInlineChat');if(!inlineChatNodeId||panel.classList.contains('hidden'))return;
+ const n=currentProject?.nodes?.find(x=>x.id===inlineChatNodeId);if(!n){closeInlineChat();return}
+ const board=$('board'),margin=12;
+ const targetX=cam.x+n.x*cam.scale,targetBelow=cam.y+(n.y+n.h)*cam.scale+12;
+ const targetAbove=cam.y+n.y*cam.scale-panel.offsetHeight-12;
+ panel.style.left=clamp(targetX,margin,Math.max(margin,board.clientWidth-panel.offsetWidth-margin))+'px';
+ panel.style.top=clamp(targetBelow+panel.offsetHeight<=board.clientHeight-margin?targetBelow:targetAbove,margin,Math.max(margin,board.clientHeight-panel.offsetHeight-margin))+'px';
+}
+function openInlineChat(n){
+ if(!n||n.kind!=='generated'||!currentHistory(n.historyId))return toast('请先选中已生成图片');
+ if(inlineChatSubmitting)return;
+ inlineChatNodeId=n.id;inlineChatUncertain=false;$('canvasInlineSend').textContent='开始修改';
+ $('canvasInlinePrompt').value='';show('canvasInlineChat');positionInlineChat();$('canvasInlinePrompt').focus();
+}
+function prepareInlineGenerationBody(n,text){
+ // Build one image-edit job with the existing validator. Restore every main-panel field synchronously.
+ const prompt=$('prompt'),amount=$('amount'),transparent=$('transparentBg');
+ const saved={prompt:prompt.value,amount:amount.value,transparent:transparent.checked,sourceId,sourceNodeId,maskData,maskSourcePng,referenceInputs,referenceNodeRoles};
+ try{
+  prompt.value=text;amount.value='1';transparent.checked=false;
+  sourceId=n.historyId;sourceNodeId=n.id;maskData=null;maskSourcePng=null;referenceInputs=[];referenceNodeRoles=[];
+  const body=generationBody(null);
+  body.canvasX=Math.round(n.x+n.w+48);body.canvasY=Math.round(n.y);
+  return body;
+ }finally{
+  prompt.value=saved.prompt;amount.value=saved.amount;transparent.checked=saved.transparent;
+  sourceId=saved.sourceId;sourceNodeId=saved.sourceNodeId;maskData=saved.maskData;maskSourcePng=saved.maskSourcePng;
+  referenceInputs=saved.referenceInputs;referenceNodeRoles=saved.referenceNodeRoles;
+ }
+}
+async function submitInlineChat(){
+ if(inlineChatSubmitting||generationSubmissionPending)return;
+ if(inlineChatUncertain){document.querySelector('[data-library="queue"]')?.click();toast('先在任务队列确认刚才是否成功提交；避免重复扣费');return}
+ const n=currentProject?.nodes?.find(x=>x.id===inlineChatNodeId),text=$('canvasInlinePrompt').value.trim();
+ if(!n||n.kind!=='generated'||!currentHistory(n.historyId))return toast('原图已不可用');
+ if(!text)return toast('请描述要修改的内容');
+ inlineChatSubmitting=true;$('canvasInlineSend').disabled=true;
+ try{
+  const body=prepareInlineGenerationBody(n,text);
+  if(body.ratio==='reference'){
+   const src=currentHistory(n.historyId)?.url;
+   if(!src)throw Error('找不到参考图');
+   const size=await new Promise((ok,fail)=>{const image=new Image();image.onload=()=>ok([image.naturalWidth,image.naturalHeight]);image.onerror=()=>fail(Error('读取参考图比例失败'));image.src=src});
+   body.ratio=nearestSupportedAspectRatio(...size);
+  }
+  const result=await submitGeneration(null,true,null,body);
+  if(result==='submitted')closeInlineChat();
+  else if(result==='uncertain'){inlineChatUncertain=true;$('canvasInlineSend').textContent='检查任务队列'}
+ }catch(e){toast('无法准备修改任务：'+e.message)}
+ finally{inlineChatSubmitting=false;$('canvasInlineSend').disabled=false}
+}
 function regenerateFrom(id,nodeId){continueFrom(id,nodeId);$('prompt').value='保持原图的角色造型和整体构图，重新生成一个细节更精致的版本。';toast('重新生成已准备好，点击发送后才会调用模型并计费')}
 function enhanceFrom(id,nodeId){continueFrom(id,nodeId);enhanceMode=true;$('resolution').value='4K';$('quality').value='high';$('prompt').value='尽量保持原图主体、色彩、构图完全一致。强化线条清晰度、材质细节及光影层次，输出当前模型可支持的最高细节版本。';toast('已准备 AI 高清重绘，实际尺寸和效果取决于模型；不会无提示扣费')}
 function removeBackground(id,nodeId){const p=activeProvider();if(!p||p.mode!=='openai'||p.imageMode!=='images')return toast('透明去背景需要支持透明输出的 OpenAI Images 模型');continueFrom(id,nodeId);$('transparentBg').checked=true;$('prompt').value='只保留原图的主体，移除背景和杂物，背景透明，尽量保留发丝、饰品边缘等细节。';toast('已准备 AI 去背景，生成图可能有细节变化；确认后才会收费')}
@@ -656,9 +761,47 @@ function generationBody(targets){if(!currentProject)throw Error('请先选择项
  const canAutoFix=(!targets||targets.length===1)&&Number($('amount').value)===1&&activeProvider()?.mode==='openai'&&activeProvider()?.imageMode==='images';
  const review=simpleStudio&&!demoMode&&vision.providerId&&vision.model?{enabled:true,confirmed:true,providerId:vision.providerId,model:vision.model,autoFixMax:canAutoFix?1:0}:null;
  return {projectId:currentProject.id,prompt:text,providerId:activeId,model:($('imageModel').value.trim()||activeProvider()?.imageModel||''),ratio:$('ratio').value,resolution:$('resolution').value,quality:$('quality').value,count:Number($('amount').value),transparentBg:$('transparentBg').checked,references:referenceInputs.map(r=>r.data),referenceNodes:referenceNodeRoles.map(r=>({...r})),sourceId,sourceNodeId,review,mask:maskData,maskSourceImage:maskSourcePng,canvasX:Math.round(point.x),canvasY:Math.round(point.y),...(targets?{targets,count:1}:{})}}
-async function submitGeneration(targets=null,planned=false,editSpec=null){if(simpleStudio&&!targets&&!planned)return assistantSend();if(composerMode==='text'&&!targets)return submitTextChat();let body;try{const referenceRatio=await referenceRatioValue();body=generationBody(targets);if(body.sourceId&&editSpec)body.editSpec=editSpec;if(referenceRatio){body.ratio=referenceRatio;toast('已按参考图选择最接近的模型比例：'+referenceRatio)}}catch(e){if(e.message!=='请先配置对应能力的中转站')toast(e.message);return}const count=targets?targets.length:body.count;if(!targets&&body.model)rememberQuickModel(body.model);const displayTargets=targets?.length?targets:[{providerId:body.providerId,model:body.model}];const details=displayTargets.map(t=>(providers.find(p=>p.id===t.providerId)?.name||'未选择服务商')+' / '+(t.model||'未选择模型')).join('\n');if(!confirm(`${demoMode?'演示提交':'真实付费请求'}：即将提交 ${count} 个任务${body.mask?'（局部蒙版）':''}\n本次实际使用：\n${details}\n比例 ${body.ratio} / 分辨率 ${body.resolution}\n${body.review?(body.review.autoFixMax?'包含一次视觉审图及最多一次自动纠偏、一次视觉复查；纠偏和复查都可能额外计费\n':'包含每张图一次视觉审图（额外计费）\n'):'未启用自动视觉审图\n'}${demoMode?'不会扣费':'会产生中转站费用，取消或超时也可能已计费'}。确认继续？`))return;
- $('generateBtn').disabled=true;try{const r=await api('jobs',{method:'POST',body});toast(`已提交 ${r.jobs.length} 个${demoMode?'演示':'真实'}任务，结果会自动落到当前画布`);hide('compareModal');referenceInputs=[];referenceNodeRoles=[];sourceId=sourceNodeId=maskData=null;maskSourcePng=null;editingPrompt=null;enhanceMode=false;$('transparentBg').checked=false;renderContext();$('prompt').value='';await refreshProjectData();if(window.innerWidth<850)$('assistantPanel').classList.remove('open')}
- catch(e){toast('生成提交失败：'+e.message)}finally{$('generateBtn').disabled=false}}
+let generationSubmissionPending=false;
+async function submitGeneration(targets=null,planned=false,editSpec=null,preparedBody=null){
+ if(simpleStudio&&!targets&&!planned&&!preparedBody)return assistantSend();
+ if(composerMode==='text'&&!targets&&!preparedBody)return submitTextChat();
+ if(generationSubmissionPending){toast('已有一个提交正在处理，请勿重复发送');return 'busy'}
+ generationSubmissionPending=true;$('generateBtn').disabled=true;
+ try{
+  let body=preparedBody;
+  if(!body){
+   const referenceRatio=await referenceRatioValue();
+   body=generationBody(targets);
+   if(body.sourceId&&editSpec)body.editSpec=editSpec;
+   if(referenceRatio){body.ratio=referenceRatio;toast('已按参考图选择最接近的模型比例：'+referenceRatio)}
+  }
+  const count=targets?targets.length:body.count;
+  const displayTargets=targets?.length?targets:[{providerId:body.providerId,model:body.model}];
+  const details=displayTargets.map(t=>(providers.find(p=>p.id===t.providerId)?.name||'未选择服务商')+' / '+(t.model||'未选择模型')).join('\n');
+  const reviewLine=body.review?(body.review.autoFixMax?'包含一次视觉审图及最多一次自动纠偏、一次视觉复查；纠偏和复查可能额外计费\n':'包含每张图一次视觉审图（额外计费）\n'):'未启用自动视觉审图\n';
+  const message=(demoMode?'演示提交':'真实付费请求')+'：即将提交 '+count+' 个任务'+(body.mask?'（局部蒙版）':'')+'\n本次实际使用：\n'+details+'\n比例 '+body.ratio+' / 分辨率 '+body.resolution+'\n'+reviewLine+(demoMode?'不会扣费':'会产生中转站费用，取消或超时也可能已计费')+'。确认继续？';
+  if(!confirm(message))return 'cancelled';
+  if(!targets&&body.model)rememberQuickModel(body.model);
+  // The server remembers this key with the job; a repeated transport request cannot bill twice.
+  const requestKey=globalThis.crypto?.randomUUID?.();
+  if(requestKey)body.idempotencyKey=requestKey;
+  let response;
+  try{response=await api('jobs',{method:'POST',body})}
+  catch(e){toast('提交状态未确认：'+e.message+'。请先查看任务队列，勿直接重复提交');return 'uncertain'}
+  toast('已提交 '+(response.jobs?.length||count)+' 个'+(demoMode?'演示':'真实')+'任务，生成结果会出现在画布');
+  hide('compareModal');
+  if(!preparedBody){
+   referenceInputs=[];referenceNodeRoles=[];sourceId=sourceNodeId=maskData=null;maskSourcePng=null;editingPrompt=null;enhanceMode=false;
+   $('transparentBg').checked=false;renderContext();$('prompt').value='';
+  }
+  try{await refreshProjectData()}catch(e){toast('任务已提交，但列表刷新失败：'+e.message)}
+  if(!preparedBody&&window.innerWidth<850)$('assistantPanel').classList.remove('open');
+  return 'submitted';
+ }catch(e){
+  if(e.message!=='请先配置对应能力的中转站')toast(e.message);
+  return 'invalid';
+ }finally{generationSubmissionPending=false;$('generateBtn').disabled=false}
+}
 function activeGenerationJobs(){return jobs.filter(j=>j.status==='queued'||j.status==='running')}
 function updateGenerationElapsed(){
  const clock=$('generationElapsed');if(!clock)return;
@@ -1431,7 +1574,29 @@ function renderLibrary(){const root=$('libraryItems');if(!root)return;root.repla
 function statusLabel(s){return({queued:'排队中',running:'生成中',done:'已完成',failed:'生成失败',interrupted:'已中断',cancelled:'已取消'})[s]||s}
 async function toggleQueue(){try{await api('queue',{method:'POST',body:{action:paused?'resume':'pause'}});paused=!paused;updateStats();renderLibrary();toast(paused?'队列已暂停，正在运行中的任务不会中断':'队列已恢复')}catch(e){toast(e.message)}}
 async function cancelJob(id){if(!confirm('取消任务可能仍产生上游费用，确定吗？'))return;try{await api(`jobs/${id}/cancel`,{method:'POST',body:{}});await refreshProjectData()}catch(e){toast(e.message)}}
-async function retryJob(id){const previous=jobs.find(j=>j.id===id),p=activeProvider(),model=$('imageModel').value.trim();if(!p||!model)return toast('请先选择本次重试使用的服务商和生图模型');if(!confirm(`使用当前选择重试：${p.name} / ${model}\n原任务：${previous?.providerName||'未知'} / ${previous?.model||'未知'}\n这会再次请求上游并可能扣费，确认吗？`))return;try{await api(`jobs/${id}/retry`,{method:'POST',body:{providerId:p.id,model}});await refreshProjectData();toast('已按当前选择重新入队')}catch(e){toast(e.message)}}
+const retrySubmitPending=new Set();
+async function retryJob(id){
+ if(retrySubmitPending.has(id))return;
+ const previous=jobs.find(j=>j.id===id);
+ if(!previous||!['failed','cancelled','interrupted'].includes(previous.status))return toast('任务状态已经变化，请刷新队列');
+ if(jobs.some(j=>j.retryOf===id))return toast('已有后续任务，请查看最新任务状态');
+ const original=providers.find(p=>p.id===previous.providerId);
+ const resume=!!previous.upstreamId&&original?.mode==='grsai';
+ const p=resume?original:activeProvider();
+ const model=resume?previous.model:$('imageModel').value.trim();
+ if(!p||!model)return toast('请先选择本次重试使用的服务商和图片模型');
+ const warning=resume
+  ?'检测到 Grsai 原任务 ID。将继续查询原任务，不会新建上游生成请求。\n原模型：'+p.name+' / '+model+'\n确定继续查询吗？'
+  :'原任务：'+(previous.providerName||'未知')+' / '+(previous.model||'未知')+'\n本次：'+p.name+' / '+model+'\n原任务可能已经扣费，即使显示失败或中断。请先检查任务记录；确认后重新发起新的付费请求？';
+ if(!confirm(warning))return;
+ retrySubmitPending.add(id);
+ try{
+  const result=await api(`jobs/${id}/retry`,{method:'POST',body:{providerId:p.id,model,acknowledgePotentialCharge:!resume}});
+  await refreshProjectData();
+  toast(result.resumeOriginal?'已继续查询原 Grsai 任务，不会重新发起上游生成':'新任务已排队，原失败记录已保留');
+ }catch(e){toast('未能确认重试：'+e.message+'。请检查任务队列，避免重复操作')}
+ finally{retrySubmitPending.delete(id)}
+}
 function showFromLibrary(){const id=viewerId;hide('viewerModal');continueFrom(id)}
 // Existing mask mechanics from V0.3: an opaque mask where painted pixels become transparent.
 async function openMask(id){const h=currentHistory(id);if(!h)return;const p=activeProvider();if(p?.mode!=='openai'||p?.imageMode!=='images'||p?.capabilities?.edit?.enabled===false)return toast('请配置支持蒙版编辑的 Images Edits 服务商');maskSourceId=h.id;maskMarked=0;maskErase=false;maskSetTool(false);show('maskModal');const im=$('maskImg');im.onload=()=>{const c=$('maskCanvas');c.width=im.naturalWidth;c.height=im.naturalHeight;c.style.width=im.getBoundingClientRect().width+'px';c.style.height=im.getBoundingClientRect().height+'px';maskCanvasRaw=document.createElement('canvas');maskCanvasRaw.width=c.width;maskCanvasRaw.height=c.height;repaintMask=maskCanvasRaw.getContext('2d');visualMask=c.getContext('2d');resetMask()};im.src=h.url}
@@ -1501,6 +1666,7 @@ function bindEvents(){
  $('referenceFiles').onchange=async e=>{await addFiles(e.target.files);e.target.value='';if(window.__reverseAfterUpload&&referenceInputs.length){window.__reverseAfterUpload=false;reverseImage=referenceInputs[0].data;openReverse()}};
  $('emptyNote').onclick=()=>createNote(currentBoardPoint(.35,.32));document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>changeTool(b.dataset.tool));$('latestGenerated').onclick=focusLatestGenerated;$('fitCanvas').onclick=fitCanvas;$('zoomOut').onclick=()=>zoomAt(.8,$('board').clientWidth/2,$('board').clientHeight/2);$('zoomIn').onclick=()=>zoomAt(1.25,$('board').clientWidth/2,$('board').clientHeight/2);
  $('versionToggle').onclick=()=>{$('versionToggle').classList.toggle('disabled-links');renderLinks();toast($('versionToggle').classList.contains('disabled-links')?'版本连接线已隐藏':'版本连接线已显示')};
+ $('canvasInlineChat').addEventListener('pointerdown',e=>e.stopPropagation());$('canvasInlineChat').addEventListener('wheel',e=>e.stopPropagation());$('canvasInlineClose').onclick=closeInlineChat;$('canvasInlineSend').onclick=submitInlineChat;$('canvasInlinePrompt').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();submitInlineChat()}if(e.key==='Escape')closeInlineChat()});
  $('generateBtn').onclick=()=>submitGeneration();$('compareOpen').onclick=showCompare;$('submitCompare').onclick=submitCompare;$('moreSettings').onclick=()=>$('advanced').classList.toggle('hidden');
  $('skillsToggle').onclick=()=>{const open=$('skillsMenu').classList.contains('hidden');$('skillsMenu').classList.toggle('hidden',!open);$('skillsToggle').setAttribute('aria-expanded',String(open))};
  document.querySelectorAll('[data-skill]').forEach(b=>b.onclick=()=>applySkill(b.dataset.skill));
