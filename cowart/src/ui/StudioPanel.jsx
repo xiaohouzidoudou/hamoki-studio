@@ -60,6 +60,7 @@ export default function StudioPanel({ open, onClose, getEditor }) {
   const [textModel, setTextModel] = useState('')
   const [intentMode, setIntentMode] = useState('smart')
   const [planNotice, setPlanNotice] = useState('')
+  const [turns, setTurns] = useState([])
   const [prompt, setPrompt] = useState('')
   const [ratio, setRatio] = useState('1:1')
   const [resolution, setResolution] = useState('1K')
@@ -90,6 +91,15 @@ export default function StudioPanel({ open, onClose, getEditor }) {
     if (editor) setRatio(ratioForSelection(editor))
     return () => { cancelled = true }
   }, [open, getEditor])
+
+  useEffect(() => {
+    if (!context?.projectId) return
+    let cancelled=false
+    studioJSON('/api/cowart/messages?projectId='+encodeURIComponent(context.projectId))
+      .then(data=>{if(!cancelled)setTurns(data.messages||[])})
+      .catch(e=>{if(!cancelled)console.warn('Cowart conversation not loaded:',e.message)})
+    return ()=>{cancelled=true}
+  }, [context?.projectId])
 
   const provider = providers.find(p => p.id === providerId)
   const textProvider = providers.find(p=>p.id===textProviderId)
@@ -200,6 +210,10 @@ export default function StudioPanel({ open, onClose, getEditor }) {
             providerId:textProviderId,model:textModel,selection})
         })
         const plan=response.plan || {}
+        setTurns(old=>[...old,
+          {id:crypto.randomUUID(),role:'user',content:prompt.trim(),createdAt:new Date().toISOString()},
+          {id:crypto.randomUUID(),role:'assistant',content:plan.reply||'已分析你的要求',action:plan.action,createdAt:new Date().toISOString()}
+        ].slice(-60))
         setPlanNotice(plan.reply || '')
         if(plan.action==='chat') {
           setPhase('answered')
@@ -269,6 +283,13 @@ export default function StudioPanel({ open, onClose, getEditor }) {
       </select>
     </label>}
     <p className="hamoki-studio-note">选中图片或 AI 占位框后输入要求。生成结果放在原图旁，使用已有 Studio 账号和中转站。</p>
+    <div className="hamoki-conversation" aria-label="当前项目 AI 对话记录">
+      {!turns.length && <div className="hamoki-conversation-empty">在画布选一张图片，写下你的要求。我会分析标注和已确认的项目美术规范。</div>}
+      {turns.map((turn,index)=><div key={turn.id||index} className={'hamoki-bubble '+(turn.role==='user'?'is-user':'is-assistant')}>
+        <small>{turn.role==='user'?'你':'🐵 AI 助手'}{turn.action==='edit'?' · 编辑计划':turn.action==='generate'?' · 生图计划':''}</small>
+        <span>{turn.content}</span>
+      </div>)}
+    </div>
     {context && <div className="hamoki-legacy-tools">
       <button type="button" disabled={importing} onClick={importOldCanvas}>
         {importing ? '正在导入旧素材…' : '↳ 导入旧 Studio 画布素材'}
