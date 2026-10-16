@@ -12,6 +12,11 @@ Upstream: [Cowart original](https://github.com/zhongerxin/Cowart) and [Cowart We
 - One-way **explicit** import from a Studio project's original nodes to Cowart (image, reference, note). Deduplicates using original node metadata; never edits or deletes the old project. Batch limit 250 elements per click. Generated images use existing authenticated server media URLs.
 - Project picker and per-project browser camera state; image assets and Cowart source canvas persisted server-side per account.
 - Added Actions CI to build Cowart and run the entire Studio test suite (including dedicated multi-account preview/snapshot/conflict/restart tests).
+- Added `/api/cowart/plan`: uses the chosen server-side **text** model with current selected shapes, nearby annotation notes, project Style DNA and scoped conversation; model output can only request discussion, a single generation, or an edit. The frontend never gives the model account credentials, image bytes, direct SSH, or arbitrary tool permissions.
+- Smart execution is opt-in per send and submits at most one paid image job. Direct generation remains a manual fallback. `GET /api/cowart/messages` persists a project-scoped text planning conversation without leaking to other users.
+- Pending job IDs and anchors survive refresh in sessionStorage; uncertain billing outcomes block silent resubmission and offer an explicit check-original-job button.
+- CI now runs a real headless Chromium smoke test including authenticated entry, drawing a shape, server save and reloading it. Screenshot artifacts are retained.
+- Bundles tldraw fonts/icons/translations in the Vite output to avoid CDN requests under strict CSP; allows local `data:` translation fetches only.
 
 ## Developer build
 
