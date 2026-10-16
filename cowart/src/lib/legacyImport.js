@@ -29,8 +29,11 @@ export async function importLegacyStudioNodes(editor, projectId) {
   let imported = 0
   let skipped = 0
   const LIMIT = 250
-  for (const node of project.nodes.slice(0, LIMIT)) {
+  const processed = new Set()
+  for (const node of project.nodes) {
     if (existing.has(node.id)) continue
+    if (processed.size >= LIMIT) break
+    processed.add(node.id)
     try {
       if (node.kind === 'note') {
         editor.createShape({
@@ -73,5 +76,5 @@ export async function importLegacyStudioNodes(editor, projectId) {
       skipped++
     }
   }
-  return { imported, skipped, more: project.nodes.length > LIMIT, total: project.nodes.length }
+  return { imported, skipped, more: project.nodes.some(node => !existing.has(node.id) && !processed.has(node.id)), total: project.nodes.length }
 }
