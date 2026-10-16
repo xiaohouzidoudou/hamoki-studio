@@ -1467,6 +1467,7 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
     }
     // Project, board, and conversation state are stored on the server, not localStorage.
     if(route==='/api/cowart/plan'&&req.method==='POST'){
+      if(process.env.COWART_PREVIEW!=='1')return fail(res,404,'Cowart 开发预览未开启');
       if(DEMO_MODE)return fail(res,403,'演示模式不支持 AI 分析');
       const b=await readJSON(req),p=assertProject(b.projectId);
       const instruction=clampText(b.prompt,2400).trim();
