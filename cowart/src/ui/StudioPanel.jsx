@@ -3,6 +3,7 @@ import { buildImageShapeRecords } from '../lib/placement.js'
 import { exportSelectionToDataUrl } from '../lib/selectionExport.js'
 import { getStudioContext, studioJSON } from '../lib/studioBridge.js'
 import { importLegacyStudioNodes } from '../lib/legacyImport.js'
+import { summarizeCanvasSelection } from '../lib/selectionContext.js'
 
 const RATIOS = [[1, 1], [3, 2], [2, 3], [16, 9], [9, 16], [4, 3], [3, 4]]
 const RATIO_NAMES = RATIOS.map(([a, b]) => a + ':' + b)
@@ -55,6 +56,10 @@ export default function StudioPanel({ open, onClose, getEditor }) {
   const [providers, setProviders] = useState([])
   const [providerId, setProviderId] = useState('')
   const [model, setModel] = useState('')
+  const [textProviderId, setTextProviderId] = useState('')
+  const [textModel, setTextModel] = useState('')
+  const [intentMode, setIntentMode] = useState('smart')
+  const [planNotice, setPlanNotice] = useState('')
   const [prompt, setPrompt] = useState('')
   const [ratio, setRatio] = useState('1:1')
   const [resolution, setResolution] = useState('1K')
@@ -76,6 +81,9 @@ export default function StudioPanel({ open, onClose, getEditor }) {
         setContext(c)
         setProviders(p.providers || [])
         setProviderId((old) => old || p.activeId || p.providers?.[0]?.id || '')
+        const textSource=(p.providers||[]).find(item=>item.capabilities?.text?.enabled!==false && (item.capabilities?.text?.hasKey||item.hasKey) && (item.capabilities?.text?.defaultModel||item.textModel))
+        setTextProviderId(old=>old||textSource?.id||'')
+        if(!textSource)setIntentMode('direct')
       })
       .catch((e) => { if (!cancelled) setError(e.message) })
     const editor = getEditor()
@@ -84,6 +92,12 @@ export default function StudioPanel({ open, onClose, getEditor }) {
   }, [open, getEditor])
 
   const provider = providers.find(p => p.id === providerId)
+  const textProvider = providers.find(p=>p.id===textProviderId)
+  const textCandidates = Array.from(new Set([
+    textProvider?.capabilities?.text?.defaultModel,
+    ...(textProvider?.capabilities?.text?.models || []),
+    textProvider?.textModel
+  ].filter(Boolean)))
   const candidates = Array.from(new Set([
     provider?.capabilities?.image?.defaultModel,
     ...(provider?.capabilities?.image?.models || []),
@@ -94,6 +108,10 @@ export default function StudioPanel({ open, onClose, getEditor }) {
     if (!provider) return
     setModel(provider.capabilities?.image?.defaultModel || provider.imageModel || candidates[0] || '')
   }, [providerId, providers])
+
+  useEffect(() => {
+    if(textProvider) setTextModel(textProvider.capabilities?.text?.defaultModel || textProvider.textModel || textCandidates[0] || '')
+  }, [textProviderId, providers])
 
   // Job identity is fixed once submitted. Never silently send a second paid request.
   useEffect(() => {
@@ -152,39 +170,88 @@ export default function StudioPanel({ open, onClose, getEditor }) {
 
   async function submit(event) {
     event.preventDefault()
-    if (!context || !prompt.trim() || !model.trim() || !providerId || ['submitting','queued','running'].includes(phase)) return
+    if (!context || !prompt.trim() || ['analyzing','submitting','queued','running'].includes(phase)) return
+    if (phase==='uncertain') {
+      setError('上一条请求结果未确认，请先通过任务队列核对，再明确开启下一条任务。')
+      return
+    }
     const editor = getEditor()
     const selected = editor?.getSelectedShapes() || []
-    const anchor = selected[0]
-    const source = selected.length === 1 ? anchor?.meta?.studioHistoryId : null
-    const referenceIds = selected.filter(shape => !shape.meta?.cowartAiImageHolder).map(shape => shape.id)
-    setPhase('submitting'); setError(''); setMessage('正在提交到 Studio 任务队列…')
-    const requestId = crypto.randomUUID()
-    active.current = { anchorId: anchor?.id || null, ratio, requestId }
+    const selectedImage = selected.filter(s=>s.type==='image' && s.meta?.studioHistoryId)
+    if (selectedImage.length > 1) {
+      setError('一次只能编辑一张原图，请只选择一张主图，其余素材可以作为参考')
+      return
+    }
+    const source = selectedImage[0]?.meta?.studioHistoryId || null
+    const anchor = selected.find(s=>s.meta?.cowartAiImageHolder) || selectedImage[0] || selected[0]
+    const referenceIds = selected.filter(s=>!s.meta?.cowartAiImageHolder && s.id!==selectedImage[0]?.id).map(s=>s.id)
+    let instruction = prompt.trim()
+    let editSpec = null
+    const selection = summarizeCanvasSelection(editor)
+    setError('');setPlanNotice('');setMessage('')
+    let action='generate'
     try {
-      const refs = []
-      // Existing generated images use server-side sourceId; other canvas artwork can be rasterized.
-      if (!source && referenceIds.length) {
-        const exported = await exportSelectionToDataUrl(editor, referenceIds)
-        if (exported.dataUrl.length > 10*1024*1024) throw new Error('选区参考图超过 10MB，请缩小选区或先压缩素材')
+      if(intentMode==='smart') {
+        if(!textProviderId||!textModel)throw Error('请先配置 Studio 文字模型，或选择「直接生图」')
+        setPhase('analyzing');setMessage('正在读取选区、标注与项目美术规范，并让文字模型分析操作…')
+        const response = await studioJSON('/api/cowart/plan',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({projectId:context.projectId,prompt:instruction,
+            providerId:textProviderId,model:textModel,selection})
+        })
+        const plan=response.plan || {}
+        setPlanNotice(plan.reply || '')
+        if(plan.action==='chat') {
+          setPhase('answered')
+          setMessage(plan.reply || '这是一条讨论，不需要扣费生图')
+          return
+        }
+        action=plan.action
+        editSpec=plan.editSpec || null
+        if(plan.instructions)instruction+='\n【画布修改计划】'+plan.instructions
+      }
+      if(!model.trim()||!providerId)throw Error('请先选择图片中转站和模型')
+      if(action==='edit'&&!source&&!selected.some(x=>x.type==='image'))
+        throw Error('请先选中需要修改的图片。编辑未提交，也没有产生图片费用')
+      setPhase('preparing');setMessage('正在准备画布参考素材…')
+      const refs=[]
+      if(!source && referenceIds.length) {
+        const exported=await exportSelectionToDataUrl(editor,referenceIds)
+        if(exported.dataUrl.length>10*1024*1024)throw Error('选区参考图超过 10MB，请缩小选区或压缩素材')
+        refs.push(exported.dataUrl)
+      } else if(!source && selected.some(x=>x.type==='image')) {
+        const exported=await exportSelectionToDataUrl(editor,selected.filter(x=>x.type==='image').map(x=>x.id))
+        if(exported.dataUrl.length>10*1024*1024)throw Error('源图片超过 10MB，请先压缩')
         refs.push(exported.dataUrl)
       }
-      const answer = await studioJSON('/api/jobs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: context.projectId, prompt: prompt.trim(), providerId, model: model.trim(),
-          references: refs, sourceId: source || undefined, ratio, resolution, quality: 'auto',
-          count: 1, idempotencyKey: requestId
-        })
+      // Non-generated reference items selected alongside a generated original are exported separately.
+      if(source && referenceIds.length) {
+        const exported=await exportSelectionToDataUrl(editor,referenceIds)
+        if(exported.dataUrl.length>10*1024*1024)throw Error('附加参考素材超过 10MB')
+        refs.push(exported.dataUrl)
+      }
+      setPhase('submitting');setMessage('准备完成，正在提交恰好一张图片到 Studio 原有任务队列…')
+      const requestId=crypto.randomUUID()
+      active.current={anchorId:anchor?.id||null,ratio,requestId}
+      const payload={
+        projectId:context.projectId,prompt:instruction,providerId,model:model.trim(),
+        references:refs,sourceId:source||undefined,
+        editSpec:editSpec||undefined,
+        ratio,resolution,quality:'auto',count:1,idempotencyKey:requestId
+      }
+      // Keep the same payload and idempotency key available for uncertain-submission diagnosis.
+      sessionStorage.setItem('hamoki-cowart-last-request:'+context.projectId,
+        JSON.stringify({requestId,at:Date.now(),providerId,model:model.trim(),prompt:instruction}))
+      const answer=await studioJSON('/api/jobs',{
+        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)
       })
-      if (!answer.jobs?.[0]?.id) throw new Error('上游没有返回任务标识')
-      jobIdRef.current = answer.jobs[0].id
+      if(!answer.jobs?.[0]?.id)throw Error('任务已提交但未返回编号；请到 Studio 任务队列核对')
+      jobIdRef.current=answer.jobs[0].id
       setJobId(answer.jobs[0].id)
-      setPhase(answer.jobs[0].status || 'queued')
-      setMessage('任务已提交，开始追踪状态')
+      setPhase(answer.jobs[0].status||'queued')
+      setMessage('任务已提交，开始追踪进度')
     } catch(e) {
-      setError(e.message + '。若是网络中断，请先到 Studio 任务队列核对，不要直接重试，以免重复扣费')
+      setError(e.message + '。如果已经提交过付费任务，请先检查 Studio 的队列与历史，不要直接重复扣费')
       setPhase('uncertain')
     }
   }
@@ -209,6 +276,26 @@ export default function StudioPanel({ open, onClose, getEditor }) {
       {importNotice && <small aria-live="polite">{importNotice}</small>}
     </div>}
 
+    <div className="hamoki-studio-row">
+      <label className="hamoki-studio-field">执行方式
+        <select value={intentMode} onChange={e=>setIntentMode(e.target.value)}>
+          <option value="smart">智能理解 · 按意图操作</option>
+          <option value="direct">直接生图 · 不分析</option>
+        </select>
+      </label>
+      {intentMode==='smart' && <label className="hamoki-studio-field">文字分析模型
+        <select value={textProviderId} onChange={e=>setTextProviderId(e.target.value)}>
+          <option value="">请选择文字中转站</option>
+          {providers.filter(p=>p.capabilities?.text?.enabled!==false&&(p.capabilities?.text?.hasKey||p.hasKey)).map(p=>
+            <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+      </label>}
+    </div>
+    {intentMode==='smart' && <label className="hamoki-studio-field">文字模型 ID
+      <input value={textModel} onChange={e=>setTextModel(e.target.value)} list="hamoki-text-model-options" placeholder="例如 DeepSeek / GPT / Claude 兼容模型" />
+      <datalist id="hamoki-text-model-options">{textCandidates.map(m=><option key={m} value={m} />)}</datalist>
+    </label>}
+    <p className="hamoki-studio-note">智能模式先调用文字模型理解选区与标注；只有识别到明确的生图或修改指令，才自动提交 1 张付费图片任务。</p>
     <form onSubmit={submit}>
       <label className="hamoki-studio-field">图片中转站
         <select value={providerId} onChange={e => setProviderId(e.target.value)}>
@@ -237,14 +324,15 @@ export default function StudioPanel({ open, onClose, getEditor }) {
         <textarea rows={5} value={prompt} onChange={e => setPrompt(e.target.value)}
           placeholder="例如：保持所选游戏 UI 布局，把按钮改为亮黄色，背景压暗，不增加前景装饰" />
       </label>
-      <button className="hamoki-studio-submit" disabled={['submitting','queued','running'].includes(phase) || !prompt.trim() || !model.trim() || !providerId} type="submit">
-        {['submitting','queued','running'].includes(phase) ? '任务进行中…' : '生成 1 张'}
+      <button className="hamoki-studio-submit" disabled={['analyzing','preparing','submitting','queued','running','uncertain'].includes(phase) || !prompt.trim() || (intentMode==='smart' ? (!textModel.trim()||!textProviderId) : (!model.trim()||!providerId))} type="submit">
+        {['analyzing','preparing','submitting','queued','running'].includes(phase) ? 'AI 正在处理…' : intentMode==='smart'?'智能理解并执行':'直接生成 1 张'}
       </button>
     </form>
+    {planNotice && <div className="hamoki-studio-message" aria-live="polite">AI 理解：{planNotice}</div>}
     {message && <div className="hamoki-studio-message" aria-live="polite">{message}</div>}
     {error && <div className="hamoki-studio-error" role="alert">{error}</div>}
     {jobId && <small>任务 ID：{jobId} · {phase}</small>}
-    {['done','failed','uncertain','cancelled','interrupted'].includes(phase) && <button className="hamoki-studio-next" type="button" onClick={() => { setJobId(null); setPhase('idle'); setError(''); setMessage('') }}>新建下一项任务</button>}
+    {['done','failed','uncertain','answered','cancelled','interrupted'].includes(phase) && <button className="hamoki-studio-next" type="button" onClick={() => { setJobId(null); setPhase('idle'); setError(''); setMessage(''); setPlanNotice('') }}>开启下一轮</button>}
     <p className="hamoki-studio-note">模型设置仍在 <a href="/" target="_blank" rel="noopener noreferrer">Studio 中转站管理</a>。密钥只存储在服务器。</p>
   </section>
 }
