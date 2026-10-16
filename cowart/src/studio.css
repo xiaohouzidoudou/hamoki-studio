@@ -30,3 +30,13 @@
 .hamoki-bubble small{font-size:10px;color:#abd0b6}
 .hamoki-bubble.is-assistant{background:#234533;color:#e5f8e8;align-self:flex-start}
 .hamoki-bubble.is-user{background:#334740;color:#f1f8f1;align-self:flex-end}
+
+/* Desktop workspace: tldraw owns its own viewport; the Studio assistant is not an overlay. */
+.cowart-canvas {background:#101a17}
+.cowart-canvas.with-studio-panel > .tl-container {width:calc(100% - 386px)!important;max-width:calc(100% - 386px)!important}
+.cowart-canvas .cowart-ai-launcher {top:14px!important;bottom:auto!important;right:404px!important;left:auto!important;transform:none!important}
+.cowart-canvas:not(.with-studio-panel) .cowart-ai-launcher {right:16px!important}
+@media(max-width:840px) {
+  .cowart-canvas.with-studio-panel > .tl-container {width:100%!important;max-width:100%!important}
+  .cowart-canvas .cowart-ai-launcher {top:auto!important;bottom:10px!important;left:10px!important;right:auto!important}
+}
