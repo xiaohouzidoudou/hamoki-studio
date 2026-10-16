@@ -1,3 +1,4 @@
+import { getStudioSnapshot, putStudioSnapshot } from './studioBridge.js'
 // IndexedDB-backed canvas persistence.
 //
 // Replaces the Vite dev-server middleware that previously stored the tldraw
@@ -109,66 +110,49 @@ async function normalizeAssetSources(snapshot) {
   return snapshot
 }
 
+
+let serverRevision = 0
+let sessionSelection = { selectedShapes: [], updatedAt: null }
+let sessionViewState = { version: 1, currentPageId: null, camera: { x: 0, y: 0, z: 1 }, updatedAt: null }
+
+// All real canvas data is saved per account + project on Studio, never under a shared browser DB.
 export async function loadCanvasSnapshot() {
-  const snapshot = await kvGet(KEY_CANVAS)
-  if (!isCanvasSnapshot(snapshot)) {
-    return { snapshot: null, storage: 'empty' }
-  }
-  return { snapshot, storage: 'indexeddb' }
+  const response = await getStudioSnapshot()
+  serverRevision = response.revision || 0
+  return { snapshot: response.snapshot, storage: response.snapshot ? 'studio' : 'empty' }
 }
 
 export async function saveCanvasSnapshot(snapshot) {
-  if (!isCanvasSnapshot(snapshot)) {
-    return { storage: 'invalid', skippedRecords: [] }
-  }
-
+  if (!isCanvasSnapshot(snapshot)) return { storage: 'invalid', skippedRecords: [] }
   const normalized = await normalizeAssetSources(snapshot)
   const sanitized = sanitizeCanvasSnapshotForTldraw(normalized)
-  if (!sanitized.snapshot) {
-    return { storage: 'invalid', skippedRecords: sanitized.skippedRecords }
-  }
-
-  await kvSet(KEY_CANVAS, sanitized.snapshot)
-  broadcastCanvasChange({ storage: 'indexeddb' })
-  return { storage: 'indexeddb', skippedRecords: sanitized.skippedRecords }
+  if (!sanitized.snapshot) return { storage: 'invalid', skippedRecords: sanitized.skippedRecords }
+  const response = await putStudioSnapshot(sanitized.snapshot, serverRevision)
+  serverRevision = response.revision
+  return { storage: 'studio', skippedRecords: sanitized.skippedRecords }
 }
 
 export async function readSelection() {
-  const selection = await kvGet(KEY_SELECTION)
-  return { selection: selection ?? EMPTY_SELECTION }
+  return { selection: sessionSelection }
 }
-
 export async function writeSelection(selection) {
-  await kvSet(KEY_SELECTION, selection)
+  sessionSelection = selection
   return { ok: true }
 }
-
 export async function readViewState() {
-  const viewState = await kvGet(KEY_VIEW_STATE)
-  return { viewState: viewState ?? DEFAULT_VIEW_STATE }
+  return { viewState: sessionViewState }
 }
-
 export async function writeViewState(viewState) {
-  await kvSet(KEY_VIEW_STATE, viewState)
+  sessionViewState = viewState
   return { ok: true }
 }
 
-// Hierarchical model settings: providers[] (each with credentials + models[])
-// plus per-domain active pointers (image / orchestrator). Stored locally; the
-// user accepts key-exposure risk (BYOK). Migrates legacy flat structures.
+// Browser BYOK is intentionally disabled; account keys must remain on Studio backend.
 export async function readSettings() {
-  const stored = await kvGet(KEY_SETTINGS)
-  const migrated = migrateSettings(stored)
-  if (migrated !== stored) {
-    // Persist the migrated shape so subsequent reads skip migration.
-    await kvSet(KEY_SETTINGS, migrated)
-  }
-  return migrated
+  return { providers: [], image: { activeProviderId: null, activeModelId: null }, orchestrator: { activeProviderId: null, activeModelId: null } }
 }
-
-export async function writeSettings(settings) {
-  await kvSet(KEY_SETTINGS, settings)
-  return { ok: true }
+export async function writeSettings() {
+  throw new Error('请通过 Studio 的中转站管理设置模型；Cowart 不在浏览器保存密钥')
 }
 
 function emptySettings() {
@@ -255,6 +239,8 @@ export function broadcastCanvasChange(info) {
 }
 
 export function subscribeCanvasChanges(callback) {
+  // Cross-tab remote merges are disabled until conflict resolution is implemented.
+  return () => {}
   const channel = getCanvasChannel()
   if (!channel) return () => {}
   const handler = (event) => {
