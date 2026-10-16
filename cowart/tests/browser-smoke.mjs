@@ -55,6 +55,13 @@ try{
     'Studio sidebar must not overlap the editable canvas viewport on desktop')
   const firstShapes=await page.evaluate(()=>window.__cowartEditor.getCurrentPageShapes().length)
   assert.equal(firstShapes,0,'Fresh project should start on an empty canvas, not giant onboarding labels')
+  await page.getByLabel('执行方式').selectOption('smart')
+  const visionSwitch=page.locator('.hamoki-vision-switch input[type="checkbox"]')
+  await visionSwitch.waitFor({timeout:8000})
+  assert.equal(await visionSwitch.isChecked(),true,'Selected-image visual understanding is enabled by default')
+  await visionSwitch.uncheck()
+  assert.equal(await visionSwitch.isChecked(),false,'User can disable additional charged vision analysis')
+  await visionSwitch.check()
   await page.locator('textarea').fill('把周年庆奖励按钮简化，减少背景灯光，不增加前景')
   assert.equal(await page.locator('.hamoki-studio-panel textarea').inputValue(),
     '把周年庆奖励按钮简化，减少背景灯光，不增加前景')
