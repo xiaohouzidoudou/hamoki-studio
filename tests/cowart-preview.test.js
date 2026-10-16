@@ -130,6 +130,12 @@ test('Cowart preview requires a session; server snapshots have account-scoped op
   assert.equal((await a('/api/jobs?projectId='+pA)).data.jobs.length,0,'planning cannot initiate image billing')
   assert.equal(privateDataSeen,false,'untrusted selection extras must not reach upstream')
   assert.equal(llmCalls,2,'each explicit planning request uses the text model exactly once')
+  const conversation=await a('/api/cowart/messages?projectId='+pA)
+  assert.equal(conversation.status,200)
+  assert.deepEqual(conversation.data.messages.map(x=>x.role),['user','assistant','user','assistant'])
+  assert.equal(conversation.data.messages[3].action,'edit')
+  assert.equal((await b('/api/cowart/messages?projectId='+pA)).status,404,'Cowart conversation must never leak between accounts')
+
 
   await new Promise(resolve => { child.once('exit', resolve); child.kill('SIGTERM') })
   child = await launch(port, dir)
