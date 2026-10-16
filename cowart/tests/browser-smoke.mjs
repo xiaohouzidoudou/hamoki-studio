@@ -36,8 +36,9 @@ try{
   const projectId=projects.defaultId
   assert.match(projectId,/^[a-f0-9-]{36}$/)
   const page=await context.newPage()
-  const errors=[]
+  const errors=[],apiResponses=[]
   page.on('pageerror',e=>errors.push(e.message))
+  page.on('response',res=>{if(res.url().includes('/api/cowart/snapshot'))apiResponses.push(res.status()+' '+res.request().method())})
   const entry=base+'/cowart/?projectId='+encodeURIComponent(projectId)
   const response=await page.goto(entry,{waitUntil:'domcontentloaded',timeout:25000})
   assert.equal(response.status(),200)
@@ -58,6 +59,12 @@ try{
     const res=await context.request.get(base+'/api/cowart/snapshot?projectId='+projectId)
     const obj=await res.json()
     if(obj.snapshot?.store?.['shape:smoke-green-card']){stored=true;break}
+  }
+  mkdirSync(path.join(root,'cowart','test-results'),{recursive:true})
+  await page.screenshot({path:path.join(root,'cowart','test-results','browser-smoke.png'),fullPage:true})
+  if(!stored) {
+    const saveAlert=await page.locator('.hamoki-save-error').allTextContents()
+    console.error('Browser save diagnostic:',JSON.stringify({saveAlert,apiResponses,errors,appLogs:output.slice(-1400)}))
   }
   assert.equal(stored,true,'Document was not saved to authenticated Studio snapshot')
   await page.reload({waitUntil:'domcontentloaded'})
