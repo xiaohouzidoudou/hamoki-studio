@@ -182,7 +182,9 @@ export default function StudioPanel({ open, onClose, getEditor }) {
         }
         if (job.status !== 'done') {
           setPhase(job.status)
-          setMessage(job.status === 'queued' ? '排队中…' : '正在生成图片…'+(Number.isFinite(Number(job.progress))?' '+Math.round(Number(job.progress))+'%':''))
+          const progress = job.progress == null || job.progress === '' ? null : Number(job.progress)
+          const progressText = progress !== null && Number.isFinite(progress) ? ' '+Math.max(0,Math.min(100,Math.round(progress)))+'%' : ''
+          setMessage(job.status === 'queued' ? '排队中…' : '正在生成图片…'+progressText)
           timer = window.setTimeout(check, 2500)
           return
         }
