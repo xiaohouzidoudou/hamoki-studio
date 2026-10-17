@@ -240,6 +240,9 @@ export default function StudioPanel({ open, onClose, getEditor }) {
     const selection = summarizeCanvasSelection(editor)
     setError('');setPlanNotice('');setMessage('')
     let action='generate'
+    // Only an ambiguous network response after a paid POST can enter uncertain state.
+    // Validation, planning and reference export failures never submit an image job.
+    let paidRequestStarted = false
     try {
       if(intentMode==='smart') {
         if(!textProviderId||!textModel)throw Error('请先配置 Studio 文字模型，或选择「直接生图」')
@@ -317,6 +320,7 @@ export default function StudioPanel({ open, onClose, getEditor }) {
       // Keep the same payload and idempotency key available for uncertain-submission diagnosis.
       sessionStorage.setItem('hamoki-cowart-last-request:'+context.projectId,
         JSON.stringify({requestId,at:Date.now(),providerId,model:model.trim(),prompt:instruction}))
+      paidRequestStarted = true
       const answer=await studioJSON('/api/jobs',{
         method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)
       })
@@ -328,8 +332,13 @@ export default function StudioPanel({ open, onClose, getEditor }) {
       setPhase(answer.jobs[0].status||'queued')
       setMessage('任务已提交，开始追踪进度')
     } catch(e) {
-      setError(e.message + '。如果已经提交过付费任务，请先检查 Studio 的队列与历史，不要直接重复扣费')
-      setPhase('uncertain')
+      if (paidRequestStarted) {
+        setError(e.message + '。付费请求结果未确认，请先检查 Studio 的队列与历史，不要直接重复扣费')
+        setPhase('uncertain')
+      } else {
+        setError(e.message + '。图片任务尚未提交，没有产生本次生图费用；修正后可以重新发送')
+        setPhase('failed')
+      }
     }
   }
 
