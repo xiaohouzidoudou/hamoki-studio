@@ -1,0 +1,54 @@
+name: Cowart experimental build
+on:
+  push:
+    branches: [feature/cowart-web-canvas-20261016]
+    paths: ['cowart/**', '.github/workflows/cowart-build.yml', 'gateway.js', 'Dockerfile', 'compose.yaml', 'tests/cowart-*.test.js', 'workspace.js', 'lib/cowart-intent.js']
+  pull_request:
+    paths: ['cowart/**', '.github/workflows/cowart-build.yml', 'gateway.js', 'Dockerfile', 'compose.yaml', 'tests/cowart-preview.test.js']
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: cowart/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python image validation dependencies
+        run: python -m pip install pillow pyyaml
+      - name: Validate Studio backend
+        run: node --check gateway.js
+      - name: Install Cowart dependencies
+        run: npm ci --no-audit --no-fund
+        working-directory: cowart
+      - name: Install pinned local tldraw assets package
+        run: npm install --no-save @tldraw/assets@5.1.1 --no-audit --no-fund
+        working-directory: cowart
+      - name: Build Cowart preview
+        run: npm run build
+        working-directory: cowart
+      - name: Stage production-like public assets
+        run: cp -r cowart/dist cowart-dist
+      - name: Install Studio backend dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Run Studio regressions and Cowart account isolation
+        run: npm test
+      - name: Install Chromium for browser smoke
+        run: |
+          npm install --no-save --package-lock=false playwright
+          npx playwright install --with-deps chromium
+        working-directory: cowart
+      - name: Test Cowart UI, save and reload in real Chromium
+        run: node tests/browser-smoke.mjs
+        working-directory: cowart
+      - name: Keep screenshot for UI review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cowart-browser-smoke
+          path: cowart/test-results/browser-smoke.png
+          if-no-files-found: ignore

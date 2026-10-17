@@ -1,0 +1,48 @@
+.hamoki-studio-panel{position:absolute;z-index:20;right:14px;top:14px;bottom:14px;width:min(365px,calc(100vw - 28px));overflow:auto;padding:18px;background:#151d1b;color:#e6f4ec;border:1px solid #345549;border-radius:16px;box-shadow:0 15px 48px #0008;font:14px/1.5 system-ui,sans-serif}
+.hamoki-studio-panel header{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px;font-size:16px}
+.hamoki-studio-panel header button{border:0;background:#22332c;color:#e6f4ec;border-radius:8px;font-size:20px;width:30px;height:30px;cursor:pointer}
+.hamoki-studio-field{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:#b5d3c3;margin-bottom:13px}
+.hamoki-studio-field select,.hamoki-studio-field input,.hamoki-studio-field textarea{width:100%;min-width:0;box-sizing:border-box;padding:10px 12px;background:#0c1412;color:#f2fff8;border:1px solid #456454;border-radius:9px;font:14px/1.5 system-ui,sans-serif;outline:none;resize:vertical}
+.hamoki-studio-field select:focus,.hamoki-studio-field input:focus,.hamoki-studio-field textarea:focus{border-color:#7fd49c;box-shadow:0 0 0 2px #348a5e44}
+.hamoki-studio-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.hamoki-studio-note{color:#a2bdb0;font-size:12px;line-height:1.55;margin:8px 0 16px}
+.hamoki-studio-note a{color:#9de3af}
+.hamoki-studio-submit{width:100%;padding:12px 15px;background:#9ae09f;border:1px solid #d2f8ce;color:#123420;border-radius:10px;font:700 14px/1.4 system-ui,sans-serif;cursor:pointer}
+.hamoki-studio-submit:disabled{opacity:.45;cursor:not-allowed}
+.hamoki-studio-message{margin:12px 0 8px;padding:10px;border-radius:8px;background:#254234;color:#cbf6d6}
+.hamoki-studio-error{margin:12px 0 8px;padding:10px;border-radius:8px;background:#4b2327;color:#ffc6bf;border:1px solid #a64a4a;white-space:pre-wrap}
+.hamoki-studio-panel small{display:block;margin-top:12px;color:#b4c9b9;overflow-wrap:anywhere}
+.hamoki-studio-next{margin:10px 0 0;border:1px solid #568b6d;border-radius:8px;padding:8px 12px;background:#263b31;color:#d8f6e4;cursor:pointer}
+.cowart-ai-launcher{z-index:21;right:402px!important;bottom:16px!important}
+.hamoki-back-link{display:inline-flex;align-items:center;padding:10px 12px;border-radius:8px;background:#233830;color:#cfead7;text-decoration:none}
+.hamoki-save-error{position:absolute;z-index:25;left:12px;top:12px;max-width:min(590px,calc(100vw - 28px));padding:12px 15px;background:#592729;color:#ffe2dc;border:1px solid #df7777;border-radius:10px}
+.hamoki-save-error button{margin-left:12px;padding:5px 9px;border-radius:6px;border:1px solid #ffc3b9;color:#fff;background:#6a3335;cursor:pointer}
+@media(max-width:840px){.hamoki-studio-panel{right:8px;top:8px;bottom:8px;width:min(350px,calc(100vw - 16px))}.cowart-ai-launcher{right:auto!important;left:10px;bottom:10px!important;transform:none!important;flex-wrap:wrap}}
+
+.hamoki-legacy-tools{background:#1e3329;border:1px solid #466c50;border-radius:10px;padding:10px;margin:12px 0}
+.hamoki-legacy-tools button{width:100%;cursor:pointer;border:1px solid #73a17d;background:#274735;color:#d8f3dc;padding:8px;border-radius:8px;font-weight:600}
+.hamoki-legacy-tools button:disabled{opacity:.55;cursor:wait}
+.hamoki-legacy-tools small{display:block;margin-top:8px;color:#bdd6c5}
+
+.hamoki-conversation{max-height:210px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:12px;background:#101a16;border:1px solid #385545;border-radius:12px;margin:8px 0 16px;scrollbar-color:#4e745c transparent}
+.hamoki-conversation-empty{font-size:12px;color:#a0baab;line-height:1.6}
+.hamoki-bubble{width:fit-content;max-width:95%;display:flex;flex-direction:column;gap:4px;padding:9px 12px;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.55 system-ui,sans-serif}
+.hamoki-bubble small{font-size:10px;color:#abd0b6}
+.hamoki-bubble.is-assistant{background:#234533;color:#e5f8e8;align-self:flex-start}
+.hamoki-bubble.is-user{background:#334740;color:#f1f8f1;align-self:flex-end}
+
+/* Desktop workspace: tldraw owns its own viewport; the Studio assistant is not an overlay. */
+.cowart-canvas {background:#101a17}
+.cowart-canvas.with-studio-panel > .tl-container {width:calc(100% - 386px)!important;max-width:calc(100% - 386px)!important}
+.cowart-canvas .cowart-ai-launcher {top:14px!important;bottom:auto!important;right:404px!important;left:auto!important;transform:none!important}
+.cowart-canvas:not(.with-studio-panel) .cowart-ai-launcher {right:16px!important}
+@media(max-width:840px) {
+  .cowart-canvas.with-studio-panel > .tl-container {width:100%!important;max-width:100%!important}
+  .cowart-canvas .cowart-ai-launcher {top:auto!important;bottom:10px!important;left:10px!important;right:auto!important}
+}
+
+.hamoki-vision-settings{border:1px solid #355445;background:#172820;border-radius:10px;padding:11px 12px;margin:10px 0 12px}
+.hamoki-vision-switch{display:flex;gap:9px;align-items:flex-start;font-size:12px;line-height:1.5;color:#c5e8d1;cursor:pointer}
+.hamoki-vision-switch input{margin:3px 0 0;accent-color:#88d8a1;flex-shrink:0}
+.hamoki-vision-settings .hamoki-studio-row{margin-top:12px}
+.hamoki-vision-settings .hamoki-studio-field{margin-bottom:0}

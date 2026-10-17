@@ -19,6 +19,7 @@ const creativeUpstream=require('./lib/creative-upstream');
 const creativePages=require('./lib/creative-pages');
 const {referenceRatio}=require('./lib/creative-auto-ratio');
 const assistantMemory=require('./lib/assistant-memory');
+const cowartIntent=require('./lib/cowart-intent');
 const assistantReview=require('./lib/assistant-review');
 const {nextGeneratedPosition,intersects,TILE}=require('./lib/canvas-placement');
 const {retryPlan}=require('./lib/job-retry-policy');
@@ -1465,6 +1466,71 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
       return fail(res,405,'衍生素材接口操作不支持');
     }
     // Project, board, and conversation state are stored on the server, not localStorage.
+    if(route==='/api/cowart/messages'&&req.method==='GET'){
+      if(process.env.COWART_PREVIEW!=='1')return fail(res,404,'Cowart 开发预览未开启');
+      const p=assertProject(url.searchParams.get('projectId'));
+      const messages=p.messages.filter(m=>m.capability==='cowart')
+        .slice(-60).map(m=>({id:m.id,role:m.role,content:clampText(m.content,1600),action:m.action||null,createdAt:m.createdAt}));
+      return respond(res,200,{messages});
+    }
+    if(route==='/api/cowart/plan'&&req.method==='POST'){
+      if(process.env.COWART_PREVIEW!=='1')return fail(res,404,'Cowart 开发预览未开启');
+      if(DEMO_MODE)return fail(res,403,'演示模式不支持 AI 分析');
+      const b=await readJSON(req),p=assertProject(b.projectId);
+      const instruction=clampText(b.prompt,2400).trim();
+      if(!instruction)throw Error('请先输入要求');
+      const providerChoice=effectiveProvider(provider(b.providerId||state.activeId),'text');
+      emptyProvider(providerChoice);
+      const model=assertModel(b.model||normalizedCapability(providerChoice,'text').defaultModel);
+      const workflow=creativeState(p),currentPage=creativeCurrent(workflow);
+      const conversation=p.messages.filter(m=>['assistant','user'].includes(m.role)).slice(-6);
+      const selection=cowartIntent.summarizeSelection(b.selection);
+      let visualSummary='',visionUsed=false,visionModelName=null;
+      if(b.visual!=null){
+        if(!b.visual||typeof b.visual!=='object'||Array.isArray(b.visual))throw Error('视觉分析参数格式错误');
+        const sourceId=typeof b.visual.sourceId==='string'?b.visual.sourceId:'';
+        const inline=typeof b.visual.image==='string'?b.visual.image:'';
+        if(!!sourceId===!!inline)throw Error('视觉分析必须且只能指定一张已有作品或一张选区图片');
+        let image;
+        if(sourceId){
+          const source=history.find(h=>h.id===sourceId&&h.projectId===p.id);
+          if(!source)return fail(res,404,'所选原图不属于当前项目');
+          const bytes=fs.readFileSync(mediaPath(source.file));
+          if(bytes.length>8*1024*1024)throw Error('选中原图超过视觉分析 8MB 限制，请选用小图或关闭视觉分析');
+          image={mime:guessMime(bytes),bytes};
+        }else{
+          if(inline.length>11*1024*1024)throw Error('选区图片过大，请压缩后再使用视觉分析');
+          const pic=imageFromDataURL(inline);
+          if(pic.bytes.length>8*1024*1024)throw Error('视觉分析图片不可超过 8MB');
+          image={mime:pic.mime,bytes:pic.bytes};
+        }
+        const visionProvider=effectiveProvider(provider(b.visionProviderId||state.activeId),'vision');
+        emptyProvider(visionProvider);
+        const visualModel=creativeModel(visionProvider,'vision',b.visionModel);
+        const description=await options.limiter.run(()=>analyzeCreativeImages(visionProvider,[image],
+          visualModel,cowartIntent.buildVisualPrompt(instruction,selection),{timeoutMs:90000}));
+        visualSummary=String(description||'').trim().slice(0,2600);
+        if(!visualSummary)throw Error('视觉模型没有返回可用分析，尚未提交图片生成任务');
+        visionUsed=true;visionModelName=visualModel;
+      }
+      const context=cowartIntent.buildContext({
+        project:p,selection,history:conversation,visualSummary,
+        memoryGuide:assistantMemory.guide(p.assistantMemory,workflow.styleDNA||'',currentPage?.requirements||'')
+      });
+      const raw=await options.limiter.run(()=>generateText(providerChoice,{
+        model,prompt:cowartIntent.buildCowartPrompt(instruction,context),
+        maxOutputTokens:900,timeoutMs:90000
+      }));
+      let plan=cowartIntent.normalizeCowartPlan(raw);
+      if(plan.action==='edit'&&!selection.some(x=>x.kind==='image'||x.isGenerated)){
+        plan={action:'chat',reply:'请先在画布里选中要修改的原图，再告诉我怎么修改。',requiresApproval:false};
+      }
+      p.messages.push({id:crypto.randomUUID(),role:'user',content:instruction,createdAt:time(),capability:'cowart'});
+      p.messages.push({id:crypto.randomUUID(),role:'assistant',content:clampText(plan.reply||'已分析画布要求',1000),
+        action:plan.action,createdAt:time(),model,providerId:providerChoice.id,capability:'cowart'});
+      p.messages=p.messages.slice(-400);touchProject(p);
+      return respond(res,200,{plan,providerName:providerChoice.name,model,visionUsed,visionModel:visionModelName,visualSummary:visionUsed?visualSummary:''});
+    }
     if(route==='/api/assistant/plan'&&req.method==='POST'){
       if(DEMO_MODE)return fail(res,403,'演示模式不支持 AI 意图分析');
       const b=await readJSON(req),target=assertProject(b.projectId);

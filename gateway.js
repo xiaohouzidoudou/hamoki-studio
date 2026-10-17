@@ -53,9 +53,79 @@ function serveStatic(req,res,pathname){
     res.end(req.method==='HEAD'?undefined:content);
   });
 }
+
+const COWART_MAX_BYTES=12*1024*1024;
+const COWART_PROJECT_ID=/^[a-f0-9-]{36}$/;
+function cowartProjectFile(account,id){
+  if(!COWART_PROJECT_ID.test(id))throw Object.assign(Error('项目 ID 不合法'),{status:400});
+  const file=path.join(userDir(account.id),'projects.json');
+  const projects=readJSON(file,{projects:[]}).projects||[];
+  if(!projects.some(p=>p.id===id&&!p.archived))throw Object.assign(Error('项目不存在或不属于当前账号'),{status:404});
+  const dir=path.join(userDir(account.id),'cowart-canvas');
+  fs.mkdirSync(dir,{recursive:true,mode:0o700});
+  return path.join(dir,id+'.json');
+}
+function cowartCanvasResponse(req,res,pathname){
+  const rel=pathname==='/cowart'||pathname==='/cowart/'?'index.html':pathname.slice('/cowart/'.length);
+  if(req.method!=='GET'&&req.method!=='HEAD')return fail(res,405,'不支持的预览请求');
+  if(!/^(?:index\.html|cowart-logo\.svg|assets\/[A-Za-z0-9_.-]+\.(?:js|css|svg|png|jpg|jpeg|webp|woff|woff2|ttf|json))$/.test(rel))return fail(res,404,'预览资源不存在');
+  const file=path.join(ROOT,'cowart-dist',rel);
+  fs.readFile(file,(err,data)=>{
+    if(err)return fail(res,404,'画布预览未构建');
+    const ext=path.extname(file);
+    res.writeHead(200,{'Content-Type':({'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.woff':'font/woff','.woff2':'font/woff2','.ttf':'font/ttf','.json':'application/json; charset=utf-8','.jpg':'image/jpeg','.jpeg':'image/jpeg'})[ext]||'application/octet-stream',
+      'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin',
+      'Content-Security-Policy':"default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+      'Cross-Origin-Resource-Policy':'same-origin'});
+    res.end(req.method==='HEAD'?undefined:data);
+  });
+}
+async function cowartReadJSON(req){
+  if(req.headers['content-type']?.split(';')[0]!=='application/json')throw Object.assign(Error('需要 JSON 数据'),{status:415});
+  const chunks=[];let size=0;
+  for await(const chunk of req){size+=chunk.length;if(size>COWART_MAX_BYTES)throw Object.assign(Error('画布快照超过 12MB 限制，请先压缩或导出素材'),{status:413});chunks.push(chunk)}
+  try{return JSON.parse(Buffer.concat(chunks).toString('utf8'))}catch{throw Object.assign(Error('画布快照格式错误'),{status:400})}
+}
+function cowartSnapshotSafe(snapshot){
+  if(!snapshot||typeof snapshot!=='object'||Array.isArray(snapshot)||!snapshot.store||typeof snapshot.store!=='object'||Array.isArray(snapshot.store)||!snapshot.schema||typeof snapshot.schema!=='object')return false;
+  const entries=Object.values(snapshot.store);
+  if(entries.length>4000)return false;
+  for(const entry of entries){
+    if(!entry||typeof entry!=='object'||typeof entry.id!=='string'||typeof entry.typeName!=='string')return false;
+    if(entry.typeName==='asset'){
+      const src=entry.props?.src;
+      if(typeof src==='string' && src && !/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(src)&& !/^\/api\/media\/[a-f0-9-]{36}\.(?:png|jpg|webp)$/.test(src))return false;
+    }
+  }
+  return true;
+}
+async function handleCowartData(req,res,url,account){
+  const id=url.searchParams.get('projectId')||'';
+  const file=cowartProjectFile(account,id);
+  if(req.method==='GET'){
+    const record=readJSON(file,null);
+    return sendJSON(res,200,record?{snapshot:record.snapshot,revision:record.revision,updatedAt:record.updatedAt}:{snapshot:null,revision:0,updatedAt:null});
+  }
+  if(req.method!=='PUT')return fail(res,405,'不支持的操作');
+  const body=await cowartReadJSON(req);
+  if(!cowartSnapshotSafe(body.snapshot))return fail(res,400,'不合法的画布快照（只允许站内图片）');
+  const previous=readJSON(file,null);
+  const currentRevision=previous?.revision||0;
+  if(body.revision!==currentRevision)return fail(res,409,'画布在其他窗口已修改；当前内容尚未覆盖，请先备份并刷新');
+  const next={revision:currentRevision+1,updatedAt:nowISO(),snapshot:body.snapshot};
+  const payload=JSON.stringify(next);
+  const oldBytes=fs.existsSync(file)?fs.statSync(file).size:0;
+  const incoming=Buffer.byteLength(payload)-oldBytes;
+  const limit=Math.floor(USER_QUOTA_GB*1024**3);
+  if(totalDirBytes(userDir(account.id))+incoming>limit || totalDirBytes(USERS_DIR)+incoming>TOTAL_QUOTA_BYTES)
+    return fail(res,507,'账号图片空间不足，画布未保存，请先清理素材');
+  atomic(file,payload);
+  return sendJSON(res,200,{revision:next.revision,updatedAt:next.updatedAt});
+}
+
 function readBody(req){return new Promise((resolve,reject)=>{const chunks=[];let total=0;req.on('data',chunk=>{total+=chunk.length;if(total>200*1024){reject(Object.assign(Error('请求体过大'),{status:413}));req.destroy();return}chunks.push(chunk)});req.on('end',()=>resolve(Buffer.concat(chunks).toString('utf8')));req.on('error',reject)})}
 async function readJSONBody(req){const raw=await readBody(req);try{return raw?JSON.parse(raw):{}}catch{throw Object.assign(Error('请求 JSON 格式不正确'),{status:400})}}
-function sameOrigin(req){if(req.method==='GET'||req.method==='HEAD')return true;const origin=req.headers.origin;if(origin){let u;try{u=new URL(origin)}catch{return false}if(u.host!==req.headers.host||u.protocol!=='https:')return false}const site=req.headers['sec-fetch-site'];if(site&&site!=='same-origin'&&site!=='none')return false;return true}
+function sameOrigin(req){if(req.method==='GET'||req.method==='HEAD')return true;const origin=req.headers.origin;if(origin){let u;try{u=new URL(origin)}catch{return false}if(u.host!==req.headers.host || (u.protocol!=='https:' && !(process.env.NODE_ENV==='test' && u.protocol==='http:' && ['127.0.0.1','localhost'].includes(u.hostname) && ['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress))))return false}const site=req.headers['sec-fetch-site'];if(site&&site!=='same-origin'&&site!=='none')return false;return true}
 function normalizeName(input){return String(input||'').trim()}
 function normalizedKey(name){return normalizeName(name).toLowerCase()}
 function validUsername(name){return /^[A-Za-z0-9][A-Za-z0-9._-]{1,29}$/.test(name)}
@@ -168,6 +238,21 @@ async function handler(req,res){
     req.url=url.pathname+url.search;
     const handled=await handleAuth(req,res,url);
     if(handled!==false)return;
+    if(url.pathname==='/cowart'||url.pathname.startsWith('/cowart/')){
+      if(process.env.COWART_PREVIEW!=='1')return fail(res,404,'预览未启用');
+      const session=getSession(req);
+      if(!session)return fail(res,401,'请先登录');
+      res.setHeader('Set-Cookie',sessionCookie(session.token));
+      return cowartCanvasResponse(req,res,url.pathname);
+    }
+    if(url.pathname==='/api/cowart/snapshot'){
+      if(process.env.COWART_PREVIEW!=='1')return fail(res,404,'预览未启用');
+      const session=getSession(req);
+      if(!session)return fail(res,401,'请先登录');
+      if(!sameOrigin(req))return fail(res,403,'禁止跨站写入画布');
+      res.setHeader('Set-Cookie',sessionCookie(session.token));
+      return await handleCowartData(req,res,url,session.account);
+    }
     if(!url.pathname.startsWith('/api/'))return serveStatic(req,res,url.pathname);
     const session=getSession(req);
     if(!session)return fail(res,401,'请先登录账号');

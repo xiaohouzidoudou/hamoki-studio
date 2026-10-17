@@ -1,12 +1,16 @@
 services:
   hamoki-studio:
-    build: .
+    build:
+      context: .
+      args:
+        VITE_TLDRAW_LICENSE_KEY: ${VITE_TLDRAW_LICENSE_KEY:-}
     image: hamoki-studio:0.6.33-desktop-polish
     restart: unless-stopped
     ports:
       - "127.0.0.1:${HOST_PORT:-8030}:8028"
     environment:
       NODE_ENV: production
+      COWART_PREVIEW: ${COWART_PREVIEW:-0}
       HOST: 0.0.0.0
       PORT: 8028
       APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:-}
