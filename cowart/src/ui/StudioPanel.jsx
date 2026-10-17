@@ -173,6 +173,9 @@ export default function StudioPanel({ open, onClose, getEditor }) {
         const job = (result.jobs || []).find(j => j.id === jobId)
         if (!job) throw new Error('任务暂时无法查询。请在 Studio 任务队列按任务 ID 核对，不要重新扣费')
         if (job.status === 'failed' || job.status === 'cancelled' || job.status === 'interrupted') {
+          // Terminal failures must not be restored as queued after a browser refresh.
+          sessionStorage.removeItem('hamoki-cowart-active:'+context.projectId)
+          sessionStorage.removeItem('hamoki-cowart-last-request:'+context.projectId)
           setPhase('failed')
           setError(job.error || '任务' + job.status + '，请在 Studio 队列核查费用后决定是否重试')
           return
@@ -220,7 +223,7 @@ export default function StudioPanel({ open, onClose, getEditor }) {
 
   async function submit(event) {
     event.preventDefault()
-    if (!context || !prompt.trim() || ['analyzing','submitting','queued','running'].includes(phase)) return
+    if (!context || !prompt.trim() || ['analyzing','preparing','submitting','queued','running'].includes(phase)) return
     if (phase==='uncertain') {
       setError('上一条请求结果未确认，请先通过任务队列核对，再明确开启下一条任务。')
       return
