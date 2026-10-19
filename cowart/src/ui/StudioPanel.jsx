@@ -436,8 +436,8 @@ export default function StudioPanel({ open, onClose, getEditor }) {
         </label>
       </div>}
     </div>}
-    <p className="hamoki-studio-note">智能模式只在选中真实图片时调用视觉模型；随后文字模型理解图片与标注。讨论不会自动创建图片任务。</p>
     <fieldset disabled={cancelling || (!!jobId && ['failed','cancelled','interrupted'].includes(phase))} style={{display:'contents'}}>
+    <p className="hamoki-studio-note">智能模式只在选中真实图片时调用视觉模型；随后文字模型理解图片与标注。讨论不会自动创建图片任务。</p>
     <form onSubmit={submit}>
       <label className="hamoki-studio-field">图片中转站
         <select value={providerId} onChange={e => setProviderId(e.target.value)}>
