@@ -1,0 +1,36 @@
+name: Cowart task / bug
+description: Shared task entry for Codex Desktop and ChatGPT
+title: "[Cowart] "
+labels: ["cowart"]
+body:
+  - type: textarea
+    id: observed
+    attributes:
+      label: Current behavior or problem
+      description: What actually happens? Include exact interface and project state, without credentials.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior and acceptance
+      description: Describe concrete steps and what should happen.
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options: ["P0 — blocker", "P1 — important", "P2 — enhancement"]
+    validations:
+      required: true
+  - type: textarea
+    id: ownership
+    attributes:
+      label: Owner / working branch
+      description: Codex, ChatGPT, or unclaimed; include working branch and PR after claiming.
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Verification evidence
+      description: Exact SHA, CI run, QA checks and remaining blockers.

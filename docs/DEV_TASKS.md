@@ -1,0 +1,19 @@
+# Cowart task board
+
+**Issues and pull requests are authoritative.** This is a concise milestone snapshot, not an auto-updating live dashboard. Open tasks only when a user-visible acceptance check exists.
+
+| ID | Priority | Owner / state | Acceptance |
+| --- | --- | --- | --- |
+| COW-QA-01 | P0 | Shared / QA needs verification | The isolated QA site serves the latest integration SHA after matching green CI, with health and rollback evidence. |
+| COW-UX-02 | P0 | ChatGPT / code committed | Double-click image opens full image; click outside closes; image/toolbar remain interactive; Space-pan works and existing selection is unchanged. Verify in browser. |
+| COW-E2E-03 | P0 | Unclaimed / blocked on authorized model testing | Real image job completes; new image appears; selection-based edit twice; original image retained; refresh restores assets. |
+| COW-BILL-04 | P0 | Unclaimed | Timeout/unknown charge never silently resubmits paid request; errors and recovery visible. |
+| COW-LICENSE-05 | P0 | Unclaimed | tldraw license reviewed; no prohibited/warning usage in approved production environment. |
+| COW-RELEASE-06 | P1 | Unclaimed | Formal QA, backup, migration and rollback verified before production PR merge. |
+
+## When picking work
+1. Verify Issue and integration PR history first.
+2. Record owner, task branch, test plan and files to touch in the Issue.
+3. Open a task PR into the integration branch, not directly into `main`.
+4. Update row only when status materially changes; link CI and QA evidence in the Issue/PR.
+5. Do not call a mock-provider result a real upstream test.
