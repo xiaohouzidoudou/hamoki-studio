@@ -66,7 +66,7 @@ export async function importLegacyStudioNodes(editor, projectId) {
         shapeMeta: { studioNodeId: node.id, studioHistoryId: node.historyId || null,
           studioProjectId: projectId, studioOrigin: 'legacy-project' }
       })
-      records.assetRecord.props.fileSize = 0
+      delete records.assetRecord.props.fileSize
       records.shapeRecord.x = Number(node.x) || 0
       records.shapeRecord.y = Number(node.y) || 0
       editor.store.put([records.assetRecord, records.shapeRecord])

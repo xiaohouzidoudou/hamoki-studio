@@ -165,8 +165,8 @@ export function buildImageShapeRecords({
   )
   const bounds = choosePlacement({ store, pageId, parentId, anchorShape, width, height, margin, placement })
 
-  const assetId = `asset:${uniqueIdSeed(dataUrl)}`
-  const shapeId = `shape:${uniqueIdSeed(dataUrl, assetId)}`
+  const assetId = `asset:${uniqueIdSeed()}`
+  const shapeId = `shape:${uniqueIdSeed()}`
   const index = chooseIndex(store, parentId)
 
   const finalShapeMeta = { ...shapeMeta }
@@ -218,12 +218,8 @@ export function buildImageShapeRecords({
   return { assetRecord, shapeRecord, bounds, assetId, shapeId, index }
 }
 
-// Derive a short, collision-avoiding id fragment from the data URL so two
-// inserts of the same image do not collide. Falls back to a counter.
-let idCounter = 0
-function uniqueIdSeed(dataUrl, extra = '') {
-  idCounter += 1
-  const hashSource = `${dataUrl?.slice(dataUrl.indexOf(',') + 1, dataUrl.indexOf(',') + 33)}${extra}`
-  const compact = hashSource.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8)
-  return `${compact || 'img'}-${idCounter}`
+// URL prefixes and per-session counters collide after reload and can overwrite
+// saved originals. IDs must remain unique across sessions and devices.
+function uniqueIdSeed() {
+  return crypto.randomUUID()
 }
