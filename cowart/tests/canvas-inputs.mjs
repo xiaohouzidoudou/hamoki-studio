@@ -25,7 +25,7 @@ export async function verifyCanvasInputs({page,projectId,submissions,imageRows,p
   }
   await page.evaluate(ids=>{
     const e=window.__cowartEditor
-    e.createShape({id:'shape:input-holder',type:'frame',x:40,y:1000,meta:{cowartAiImageHolder:true},props:{w:640,h:360,name:'AI 图片'}})
+    e.createShape({id:'shape:input-holder',type:'frame',x:40,y:1000,meta:{cowartAiImageHolder:true,cowartAiAspectLocked:true,cowartAiAspectRatio:16/9},props:{w:640,h:360,name:'AI 图片'}})
     e.select('shape:input-holder',ids[0],ids[1])
   },ids)
   await page.waitForFunction(()=>document.querySelector('[data-testid="cowart-output-ratio"]').value==='16:9')
@@ -34,6 +34,12 @@ export async function verifyCanvasInputs({page,projectId,submissions,imageRows,p
   await ratio.selectOption('9:16')
   const holderSize=await page.evaluate(()=>{const s=window.__cowartEditor.getShape('shape:input-holder');return {w:s.props.w,h:s.props.h}})
   assert.ok(Math.abs(holderSize.w/holderSize.h-9/16)<0.002)
+  const aspect=await page.evaluate(()=>{
+    const e=window.__cowartEditor,s=e.getShape('shape:input-holder')
+    return {ratio:s.meta.cowartAiAspectRatio,locked:e.getShapeUtil(s).isAspectRatioLocked(s)}
+  })
+  assert.equal(aspect.locked,true)
+  assert.equal(aspect.ratio,holderSize.w/holderSize.h,'Output preset must update the native aspect-lock ratio too')
   const filled=await submit('综合两张参考图生成游戏界面，放入占位框')
   assert.equal(filled.payload.sourceId,undefined)
   assert.equal(filled.payload.ratio,'9:16')

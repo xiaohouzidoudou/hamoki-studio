@@ -271,7 +271,9 @@ export default function StudioPanel({ open, onClose, getEditor, canvasEditor }) 
     let w=Math.max(16,Math.min(8192,holder.props.w)),h=w*b/a
     if(h>8192){h=8192;w=h*a/b}
     if(h<16){h=16;w=h*a/b}
-    editor.updateShape({id:holder.id,type:holder.type,props:{w:Math.round(w),h:Math.round(h)}})
+    w=Math.round(w);h=Math.round(h)
+    editor.markHistoryStoppingPoint('change-cowart-output-ratio')
+    editor.updateShape({id:holder.id,type:holder.type,meta:{...holder.meta,cowartAiAspectRatio:w/h},props:{w,h}})
   }
 
   async function submit(event) {
