@@ -14,7 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check shared AI handoff\n        run: node scripts/check-ai-handoff.mjs\n      - name: Validate isolated Cowart QA Compose
+      - name: Check shared AI handoff
+        run: node scripts/check-ai-handoff.mjs
+      - name: Validate isolated Cowart QA Compose
         env:
           QA_ENCRYPTION_KEY: ci-compose-validation-only-32-characters
           QA_INVITE_CODE: ci-compose-validation-only
