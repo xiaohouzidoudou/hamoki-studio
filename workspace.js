@@ -20,7 +20,6 @@ const creativePages=require('./lib/creative-pages');
 const {referenceRatio}=require('./lib/creative-auto-ratio');
 const assistantMemory=require('./lib/assistant-memory');
 const cowartIntent=require('./lib/cowart-intent');
-const {protectedCanvasMedia}=require('./lib/cowart-media-protection');
 const assistantReview=require('./lib/assistant-review');
 const {nextGeneratedPosition,intersects,TILE}=require('./lib/canvas-placement');
 const {retryPlan}=require('./lib/job-retry-policy');
