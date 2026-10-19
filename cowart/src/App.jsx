@@ -60,6 +60,7 @@ import {
   writeViewState,
   subscribeCanvasChanges
 } from './lib/storage.js'
+import { applySavedAssetSources } from './lib/canvasAssets.js'
 import StudioPanel from './ui/StudioPanel.jsx'
 
 const TLDRAW_LICENSE_KEY = import.meta.env.VITE_TLDRAW_LICENSE_KEY
@@ -1126,6 +1127,7 @@ export default function App() {
       isSaving = true
       try {
         const result = await saveCanvasSnapshot(editor.store.getStoreSnapshot())
+        if (result.storage === 'studio') applySavedAssetSources(editor, result.assetReplacements)
         if (result.storage === 'invalid') {
           setSkippedRecords(result.skippedRecords)
         }

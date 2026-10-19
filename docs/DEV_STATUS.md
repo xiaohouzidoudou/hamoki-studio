@@ -14,6 +14,13 @@
 - Double-click/Space-pan focused tests passed, CI succeeded, and QA was rebuilt for `285e88f`.
 - Outside-preview-click handler was committed as `3d2107f` and CI succeeded; deploy still required at snapshot time.
 
+## Codex P0 图片拆分上传（2026-10-19）
+
+- Issue #24，分支 `codex/24-canvas-asset-upload`，基于当前集成 `0559e06`。精确提交及 CI 以任务 PR/Issue 为准。
+- 二进制图片独立落盘，快照只存账号媒体 URL；旧内嵌图在下一次保存迁移。账号内内容去重与重启复用，单图 12MB、账号/全局容量和 4096 索引项有界；不足直接拒绝，不删已有作品。
+- 本机 166 项测试、构建通过。Chromium 验证两张各 5MB 内嵌图片使原快照超过 12MB，失败上传保留原图，重试后快照小于 100KB，移动/刷新无重新上传；权限、配额、索引失败/重启及并发替换测试通过。详情 `docs/cowart-asset-upload-acceptance.md`。
+- 未合并/部署、未调用付费模型。需与 #29 保存版本及 #30 原图保护等待审 PR 组合回归后进入隔离 QA。上传但未入快照的媒体保守保留，后续仍需统一素材生命周期；真实模型请求体和真实 E2E 不由本项证明通过。
+
 ## Open blockers
 1. Confirm latest QA deployment SHA and visually validate outside-click close and keyboard behavior.
 2. Real provider E2E: create an image, select/edit twice, place results, refresh/reload and verify job recovery; obtain user authorization for paid calls.

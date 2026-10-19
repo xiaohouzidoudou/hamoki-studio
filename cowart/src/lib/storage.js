@@ -1,5 +1,6 @@
 import { getStudioSnapshot, putStudioSnapshot, getStudioContext } from './studioBridge.js'
 import { acknowledgeSavedResult } from './jobRecovery.js'
+import { uploadCanvasAssets } from './canvasAssets.js'
 // IndexedDB-backed canvas persistence.
 //
 // Replaces the Vite dev-server middleware that previously stored the tldraw
@@ -11,10 +12,10 @@ import { acknowledgeSavedResult } from './jobRecovery.js'
 //  - A single merged canvas snapshot is stored under the "canvas" key. The old
 //    per-page file split existed to give the Codex MCP server file-level
 //    access; a browser-only, single-user app does not need it.
-//  - Image assets are stored inline as data URLs inside the snapshot so the
-//    JSON is fully self-contained (no separate blob store, no object-URL
-//    lifecycle to manage). blob: URLs from drag-and-drop are captured into
-//    data URLs on save.
+//  - Studio saves local blob/data image bytes separately before the snapshot.
+//    The snapshot contains account-scoped media URLs; legacy inline assets are
+//    migrated during the next successful save without changing live records
+//    before persistence succeeds.
 
 import {
   isCanvasSnapshot,
@@ -127,14 +128,15 @@ export async function loadCanvasSnapshot() {
 
 export async function saveCanvasSnapshot(snapshot) {
   if (!isCanvasSnapshot(snapshot)) return { storage: 'invalid', skippedRecords: [] }
-  const normalized = await normalizeAssetSources(snapshot)
+  const uploaded = await uploadCanvasAssets(snapshot)
+  const normalized = await normalizeAssetSources(uploaded.snapshot)
   const sanitized = sanitizeCanvasSnapshotForTldraw(normalized)
   if (!sanitized.snapshot) return { storage: 'invalid', skippedRecords: sanitized.skippedRecords }
   const response = await putStudioSnapshot(sanitized.snapshot, serverRevision)
   serverRevision = response.revision
   const { projectId } = await getStudioContext()
   acknowledgeSavedResult(projectId, sanitized.snapshot)
-  return { storage: 'studio', skippedRecords: sanitized.skippedRecords }
+  return { storage: 'studio', skippedRecords: sanitized.skippedRecords, assetReplacements: uploaded.replacements }
 }
 
 export async function readSelection() {

@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
+import { verifyCanvasAssets } from './canvas-assets.mjs'
 
 const here=path.dirname(fileURLToPath(import.meta.url))
 const root=path.resolve(here,'../..')
@@ -181,6 +182,10 @@ try{
   await page.screenshot({path:path.join(root,'cowart','test-results','browser-smoke.png'),fullPage:true})
   console.log('PASS: mock generation + two edits, saved versions, failed-save reload recovery; exactly three image submissions')
   console.log('PASS: authenticated Cowart renders, Studio panel responds, tldraw shape persists and survives reload')
+  await verifyCanvasAssets({page,context,base,projectId})
+  assert.equal(errors.length,0,'Large canvas upload/reload must not cause browser page errors')
+  await page.evaluate(()=>{window.__cowartEditor.zoomToFit({animation:{duration:0}})})
+  await page.screenshot({path:path.join(root,'cowart','test-results','browser-smoke.png'),fullPage:true})
 }catch(error){
   const failedPage=browser?.contexts()[0]?.pages()[0]
   if(failedPage){
