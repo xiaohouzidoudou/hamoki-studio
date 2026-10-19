@@ -57,12 +57,15 @@ jobs:
       - name: Test Cowart UI, save and reload in real Chromium
         run: node tests/browser-smoke.mjs
         working-directory: cowart
+      - name: Test Cowart cancellation and original job queries in real Chromium
+        run: node tests/job-controls-smoke.mjs
+        working-directory: cowart
       - name: Keep screenshot for UI review
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: cowart-browser-smoke
-          path: cowart/test-results/browser-smoke.png
+          path: cowart/test-results/*.png
           if-no-files-found: ignore
 
       - name: Summarize handoff and tested SHA

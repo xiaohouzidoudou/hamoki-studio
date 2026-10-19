@@ -21,6 +21,14 @@
 4. Test ambiguous billing outcomes, timeout, refresh and duplicate-submit handling.
 5. Only after user acceptance: stage production promotion with verified data backup and rollback.
 
+## Codex P0 任务取消与请求结果（2026-10-19）
+
+- Issue #24，分支 `codex/24-job-cancel-outcome`，基于集成 `0559e06`。具体提交及 CI 以任务 PR/Issue 为准。
+- Cowart 复用原任务取消，响应丢失重新查询原 ID；明确区分未调用图片上游、HTTP 拒绝、图片已返回与未知，不能据此承诺退款。证据持久保存，新尝试清空旧证据。
+- Cowart 429 不自动重新发起图片生成；失败/取消/中断后需明确开启下一轮，运行取消费用未知时需再次确认。
+- 本机全量 164 项测试、构建通过。真实网关+模拟上游覆盖取消/拒绝/断线/本地失败/重启/重试确认；Chromium 恰好两个任务、一次上游调用、两次取消请求，既有模拟生图/两轮编辑恢复回归通过。详情 `docs/cowart-job-cancel-acceptance.md`。
+- 未合并/部署、未调用付费模型。需与 #26 服务端任务恢复等候审 PR 组合回归；真实模型、计费和跨设备验收、默认模型兼容、许可及回滚仍未完成。
+
 ## Next handoff fields (fill with evidence, not guesses)
 - Responsible agent / linked Issue or PR:
 - Source SHA / branch:

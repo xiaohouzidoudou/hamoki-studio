@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import JobControls from './JobControls.jsx'
 import { buildImageShapeRecords } from '../lib/placement.js'
 import { exportSelectionToDataUrl } from '../lib/selectionExport.js'
 import { getStudioContext, studioJSON } from '../lib/studioBridge.js'
@@ -73,6 +74,8 @@ export default function StudioPanel({ open, onClose, getEditor }) {
   const [jobId, setJobId] = useState(null)
   const [phase, setPhase] = useState('idle')
   const [retryTick, setRetryTick] = useState(0)
+  const [cancelling, setCancelling] = useState(false)
+  const [jobEvidence, setJobEvidence] = useState(null)
   const [error, setError] = useState('')
   const [importing, setImporting] = useState(false)
   const [importNotice, setImportNotice] = useState('')
@@ -173,13 +176,15 @@ export default function StudioPanel({ open, onClose, getEditor }) {
       try {
         const result = await studioJSON('/api/jobs?projectId=' + context.projectId)
         const job = (result.jobs || []).find(j => j.id === jobId)
+        if (job) setJobEvidence(job)
         if (!job) throw new Error('任务暂时无法查询。请在 Studio 任务队列按任务 ID 核对，不要重新扣费')
         if (job.status === 'failed' || job.status === 'cancelled' || job.status === 'interrupted') {
           // Terminal failures must not be restored as queued after a browser refresh.
           sessionStorage.removeItem('hamoki-cowart-active:'+context.projectId)
           sessionStorage.removeItem('hamoki-cowart-last-request:'+context.projectId)
-          setPhase('failed')
-          setError(job.error || '任务' + job.status + '，请在 Studio 队列核查费用后决定是否重试')
+          setPhase(job.status)
+          setMessage(job.status === 'cancelled' ? '任务已取消；取消不保证上游停止或退款' : '原任务已结束，请核对请求结果和中转站记录')
+          setError(job.status === 'cancelled' ? '' : (job.error || '任务已失败或中断，请在 Studio 队列核查费用后决定是否重试'))
           return
         }
         if (job.status !== 'done') {
@@ -233,6 +238,11 @@ export default function StudioPanel({ open, onClose, getEditor }) {
 
   async function submit(event) {
     event.preventDefault()
+    if (cancelling) return
+    if (jobId && ['failed','cancelled','interrupted'].includes(phase)) {
+      setError('请先核对原任务及可能产生的费用，再点击「开启下一轮」。')
+      return
+    }
     if (!context || !prompt.trim() || ['analyzing','preparing','submitting','queued','running'].includes(phase)) return
     if (hasUnsavedResult(context.projectId)) {
       setError('上一张图片尚未保存到服务器，请先解决「画布尚未同步」提示并等待保存成功；刷新会恢复原任务，不会重新生图。')
@@ -332,7 +342,7 @@ export default function StudioPanel({ open, onClose, getEditor }) {
         projectId:context.projectId,prompt:instruction,providerId,model:model.trim(),
         references:refs,sourceId:source||undefined,
         editSpec:editSpec||undefined,
-        ratio,resolution,quality:'auto',count:1,idempotencyKey:requestId
+        ratio,resolution,quality:'auto',count:1,idempotencyKey:requestId,autoRetry:false
       }
       // Keep the same payload and idempotency key available for uncertain-submission diagnosis.
       sessionStorage.setItem('hamoki-cowart-last-request:'+context.projectId,
@@ -454,18 +464,25 @@ export default function StudioPanel({ open, onClose, getEditor }) {
         <textarea rows={5} value={prompt} onChange={e => setPrompt(e.target.value)}
           placeholder="例如：保持所选游戏 UI 布局，把按钮改为亮黄色，背景压暗，不增加前景装饰" />
       </label>
+      <fieldset disabled={cancelling || (!!jobId && ['failed','cancelled','interrupted'].includes(phase))} style={{display:'contents'}}>
       <button className="hamoki-studio-submit" disabled={['analyzing','preparing','submitting','queued','running','uncertain'].includes(phase) || !prompt.trim() || (intentMode==='smart' ? (!textModel.trim()||!textProviderId) : (!model.trim()||!providerId))} type="submit">
         {['analyzing','preparing','submitting','queued','running'].includes(phase) ? 'AI 正在处理…' : intentMode==='smart'?'智能理解并执行':'直接生成 1 张'}
       </button>
+      </fieldset>
     </form>
     {visualNotice && <div className="hamoki-studio-message" aria-live="polite">{visualNotice}</div>}
     {planNotice && <div className="hamoki-studio-message" aria-live="polite">AI 理解：{planNotice}</div>}
     {message && <div className="hamoki-studio-message" aria-live="polite">{message}</div>}
     {error && <div className="hamoki-studio-error" role="alert">{error}</div>}
     {jobId && <small>任务 ID：{jobId} · {phase}</small>}
+    {jobId && <JobControls key={jobId} jobId={jobId} phase={phase}
+      job={jobEvidence?.id === jobId ? jobEvidence : null} onBusyChange={setCancelling}
+      onRefresh={()=>setRetryTick(x=>x+1)} />}
     {phase==='uncertain' && jobId && <button className="hamoki-studio-next" type="button"
       onClick={()=>{setError('');setMessage('正在重新查询原任务，不会提交新生图…');setRetryTick(x=>x+1)}}>重新查询原任务（不扣新费用）</button>}
     {['done','failed','uncertain','answered','cancelled','interrupted'].includes(phase) && <button className="hamoki-studio-next" type="button" onClick={() => {
+      if(cancelling)return
+      if(['cancelled','interrupted'].includes(phase) && jobEvidence?.requestOutcome!=='not_sent' && !window.confirm('确认已核对原任务及中转站记录？上游可能已计费，开启下一轮会创建新的付费请求。'))return
       if(phase==='uncertain'&&!window.confirm('确认已经核对 Studio 任务队列和历史记录？未确认的请求可能已计费，切换到新任务会产生重复费用风险。'))return
       if(context?.projectId && hasUnsavedResult(context.projectId)) {
         setError('上一张图片尚未保存到服务器，暂不能开启下一轮；请先保存画布，或刷新恢复原任务。')

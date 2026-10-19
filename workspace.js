@@ -27,6 +27,7 @@ const generate=(...args)=>options.limiter.run(()=>upstreamGenerate(...args));
 const reverse=(...args)=>options.limiter.run(()=>upstreamReverse(...args));
 const listModels=(...args)=>options.limiter.run(()=>upstreamListModels(...args));
 const {pack}=require('./lib/zip');
+const {requestOutcome,failedOutcome}=require('./lib/job-request-outcome');
 const ROOT=__dirname,PORT=Number(process.env.PORT||8028),HOST=process.env.HOST||'127.0.0.1';
 const PASSWORD=process.env.APP_PASSWORD||'';
 const BASE=(process.env.APP_BASE_PATH||'').replace(/\/$/,'');
@@ -698,7 +699,7 @@ function storePreview(name,pic){mediaPath(name);if(!fs.existsSync(mediaPath(name
 function fetchMedia(name){const bytes=fs.readFileSync(mediaPath(name));return {mime:guessMime(bytes),bytes}}
 function sendMedia(req,res,filename,mime,cache='private, max-age=604800'){const stat=fs.statSync(filename);const tag='"'+stat.size.toString(16)+'-'+Math.round(stat.mtimeMs).toString(16)+'"';if(req.headers['if-none-match']===tag){res.writeHead(304,{'ETag':tag,'Cache-Control':cache});return res.end()}res.writeHead(200,{'Content-Type':mime,'Content-Length':stat.size,'Cache-Control':cache,'ETag':tag,'X-Content-Type-Options':'nosniff'});const stream=fs.createReadStream(filename);stream.on('error',e=>{console.error('[Hamoki media stream]',e.code||'stream');res.destroy(e)});return stream.pipe(res)}
 function publicHistory(h){return {...h,url:BASE+'/api/media/'+h.file,previewUrl:BASE+'/api/previews/'+h.file};}
-function publicJob(j){const {referenceMedia,maskMedia,maskSourceMedia,roleHints,review,submissionKey,submissionFingerprint,...exposed}=j;return {...exposed,referenceRoles:roleHints||[]};}
+function publicJob(j){const {referenceMedia,maskMedia,maskSourceMedia,roleHints,review,submissionKey,submissionFingerprint,...exposed}=j;return {...exposed,requestOutcome:requestOutcome(j),referenceRoles:roleHints||[]};}
 function pngDimensions(bytes){if(!bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))||bytes.length<24)throw Error('蒙版及蒙版原图必须为 PNG');return [bytes.readUInt32BE(16),bytes.readUInt32BE(20)]}
 function saveSourceFiles(refs,mask,maskSource){
  let size=0;const input=[];
@@ -812,7 +813,10 @@ async function execute(job){const abort=new AbortController();controllers.set(jo
   for(const f of job.referenceMedia||[])media.push(fetchMedia(f));
   const mask=job.maskMedia?fetchMedia(job.maskMedia):null;if(mask&&job.maskSourceMedia){const override=fetchMedia(job.maskSourceMedia);if(override.mime!=='image/png'||JSON.stringify(pngDimensions(override.bytes))!==JSON.stringify(pngDimensions(mask.bytes)))throw Error('局部重绘：PNG 源图与蒙版尺寸不一致');if(!media.length)throw Error('局部重绘缺少源图');media[0]=override}
   if(mask&&!(p.mode==='openai'&&(p.imageMode||'images')==='images'))throw Error('当前接口不支持蒙版局部重绘，请使用 OpenAI 图片接口');
+  if(!DEMO_MODE){job.upstreamAttemptedAt=time();job.requestOutcome='unknown';job.upstreamHttpStatus=null;saveJobs()}
   let output=DEMO_MODE ? {mime:'image/webp',bytes:fs.readFileSync(path.join(ROOT,'assets/hamoki-avatar-128.webp'))} : await generate(p,job,media,mask,abort.signal,progress=>{job.upstreamId=progress.id||job.upstreamId;job.progress=Math.max(0,Math.min(100,Number(progress.progress)||0));job.updatedAt=time();saveJobs()});
+  if(job.status==='cancelled')return;
+  job.requestOutcome='result_received';saveJobs();
   if(job.componentItemId){
    const result=require('node:child_process').spawnSync('python3',[path.join(ROOT,'lib/component-png.py')],{input:output.bytes,encoding:null,timeout:35000,maxBuffer:40*1024*1024});
    if(result.error||result.status!==0)throw Error('组件 PNG 标准化失败：'+String(result.stderr||result.error?.message||'转换异常').slice(0,220));
@@ -825,8 +829,9 @@ async function execute(job){const abort=new AbortController();controllers.set(jo
   history.unshift(entry);saveHistory();appendGeneratedNode(entry,job);job.resultId=id;jobStatusOk(job,'done');
   if(job.review&&!DEMO_MODE)setImmediate(()=>{void reviewGenerated(job,entry)});
 }catch(e){if(job.status==='cancelled')return;job.error=String(e?.message||'请求失败').slice(0,380);job.durationMs=Date.now()-t0;
+  job.requestOutcome=failedOutcome(job,e);job.upstreamHttpStatus=Number.isInteger(e.upstreamStatus)?e.upstreamStatus:null;
   diag({source:'queue',level:e.upstreamStatus===429?'warning':'error',action:'image_generation',path:'/api/jobs',method:'POST',model:job.model,status:e.upstreamStatus||undefined,message:job.error});
-  if(e.upstreamStatus===429&&job.attempts<3){
+  if(e.upstreamStatus===429&&job.attempts<3&&job.autoRetry!==false&&!job.cowart){
     const delay=Math.min(30000,e.retryAfterMs||Math.round(1600*2**(job.attempts-1)+Math.random()*600));
     job.status='queued';job.nextRunAt=Date.now()+delay;job.error+='（上游429限流，'+Math.ceil(delay/1000)+' 秒后重试，最多3次）';job.updatedAt=time();saveJobs();schedule();
   }else jobStatusOk(job,'failed');
@@ -934,6 +939,7 @@ function submit(b){
  const groupId=crypto.randomUUID(),created=[];
  for(const t of valid.targets)for(let i=0;i<valid.count;i++)created.push(makeJob({...valid,submissionKey,submissionFingerprint,batchIndex:created.length},store,t.providerId,t.model,groupId));
  const proj=assertProject(valid.projectId);for(const job of created){const slot=nextGeneratedPosition(proj);job.canvasX=slot.x;job.canvasY=slot.y;job.reservedCanvasSlot=true}
+ for(const job of created)if(b.autoRetry===false)job.autoRetry=false;
  jobs.unshift(...created);saveJobs();
  proj.messages.push({id:crypto.randomUUID(),role:'user',content:valid.editInstruction,createdAt:time(),groupId,sourceId:valid.sourceId,referenceRoles:valid.referenceNodes.map(n=>({nodeId:n.nodeId,role:n.role})),providerIds:valid.targets.map(t=>t.providerId)});
  proj.messages=proj.messages.slice(-400);touchProject(proj);schedule();return {jobs:created.map(publicJob),groupId};
@@ -1775,7 +1781,10 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
     if(req.method==='GET'&&route==='/api/jobs')return respond(res,200,{paused,running,concurrency:CONCURRENCY,jobs:jobs.filter(j=>!url.searchParams.get('projectId')||j.projectId===url.searchParams.get('projectId')).slice(0,300).map(publicJob)});
     if(req.method==='POST'&&route==='/api/queue'){const b=await readJSON(req);if(!['pause','resume'].includes(b.action))throw Error('无效队列操作');paused=b.action==='pause';saveJobs();if(!paused)schedule();return respond(res,200,{paused})}
     const jm=route.match(/^\/api\/jobs\/([a-f0-9-]{36})\/(cancel|retry)$/);
-    if(jm&&req.method==='POST'){const j=jobs.find(x=>x.id===jm[1]);if(!j)return fail(res,404,'任务不存在');if(jm[2]==='cancel'){if(!['queued','running','interrupted'].includes(j.status))throw Error('任务当前不可取消');j.status='cancelled';j.updatedAt=time();controllers.get(j.id)?.abort();saveJobs();return respond(res,200,{job:publicJob(j)})}
+    if(jm&&req.method==='POST'){const j=jobs.find(x=>x.id===jm[1]);if(!j)return fail(res,404,'任务不存在');if(jm[2]==='cancel'){
+      if(j.status==='cancelled')return respond(res,200,{job:publicJob(j)});
+      if(!['queued','running','interrupted'].includes(j.status))throw Object.assign(Error('任务当前不可取消，请重新查询原任务'),{status:409});
+      j.requestOutcome=requestOutcome(j);j.status='cancelled';j.updatedAt=time();controllers.get(j.id)?.abort();saveJobs();return respond(res,200,{job:publicJob(j)})}
       const request=await readJSON(req);
       const newProviderId=request.providerId||j.providerId,newModel=assertModel(request.model||j.model);
       const selected=effectiveProvider(provider(newProviderId),j.capability||'image');
@@ -1783,7 +1792,7 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
       const policy=retryPlan(j,jobs,{providerId:newProviderId,model:newModel,mode:selected.mode,acknowledgePotentialCharge:request.acknowledgePotentialCharge});
       if(j.maskMedia&&(selected.mode!=='openai'||(selected.imageMode||'images')!=='images'))throw Error('本次选中的模型接口不支持蒙版，已阻止任务提交');
       if(j.transparentBg&&(selected.mode!=='openai'||(selected.imageMode||'images')!=='images'))throw Error('本次选中的模型接口不支持透明背景，已阻止任务提交');
-      const again={...j,upstreamId:policy.upstreamId,progress:0,providerId:newProviderId,providerName:selected.name,model:newModel,id:crypto.randomUUID(),createdAt:time(),updatedAt:time(),startedAt:null,resultId:null,error:'',status:'queued',attempts:0,retryOf:j.id,canvasX:j.canvasX,canvasY:j.canvasY,submissionKey:null,submissionFingerprint:null};
+      const again={...j,requestOutcome:null,upstreamHttpStatus:null,upstreamAttemptedAt:null,upstreamId:policy.upstreamId,progress:0,providerId:newProviderId,providerName:selected.name,model:newModel,id:crypto.randomUUID(),createdAt:time(),updatedAt:time(),startedAt:null,resultId:null,error:'',status:'queued',attempts:0,retryOf:j.id,canvasX:j.canvasX,canvasY:j.canvasY,submissionKey:null,submissionFingerprint:null};
       jobs.unshift(again);saveJobs();schedule();return respond(res,201,{job:publicJob(again),resumeOriginal:policy.resumeOriginal});
     }
     if(req.method==='GET'&&route==='/api/history'){const q=trim(url.searchParams.get('q'),150).toLowerCase(),favorites=url.searchParams.get('favorite')==='1';let listed=history.filter(h=>(!favorites||h.favorite)&&(!url.searchParams.get('projectId')||h.projectId===url.searchParams.get('projectId')));if(q)listed=listed.filter(h=>[h.prompt,h.model,h.providerName].some(s=>(s||'').toLowerCase().includes(q)));return respond(res,200,{history:listed.slice(0,1500).map(publicHistory),total:listed.length})}
