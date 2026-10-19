@@ -33,6 +33,34 @@ const invite={inviteCode:'hamoki'};
 const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLduAAAAABJRU5ErkJggg==','base64');
 const fakeImg=size=>'data:image/png;base64,'+Buffer.concat([PNG,Buffer.alloc(size-PNG.length)]).toString('base64');
 
+test('Cowart 已保存画布引用的原图不能被容量清理删除',async t=>{
+ const dir=mkdtempSync(path.join(os.tmpdir(),'hamoki-cowart-quota-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));
+ const port=await getPort();const child=await start(port,dir,{COWART_PREVIEW:'1'});t.after(()=>child.kill());
+ const a=makeClient(port),b=makeClient(port);
+ for(const [client,username] of [[a,'canvasowner'],[b,'otherowner']])assert.equal((await client.request('/api/register','POST',{...invite,username,password:'password123'})).status,201);
+ const projectId=(await a.request('/api/projects')).body.defaultId;
+ const old=await a.request(`/api/projects/${projectId}/assets`,'POST',{image:fakeImg(1_500_000),name:'canvas-original.png'});
+ assert.equal(old.status,201);
+ const original=old.body.node.url;
+ const snapshot={schema:{schemaVersion:2,sequences:{}},store:{
+  'asset:protected':{id:'asset:protected',typeName:'asset',type:'image',props:{src:original}}
+ }};
+ assert.equal((await a.request('/api/cowart/snapshot?projectId='+projectId,'PUT',{revision:0,snapshot})).status,200);
+ // Pressure exceeds the global budget. No paid/image upstream is involved.
+ const denied=await a.request(`/api/projects/${projectId}/assets`,'POST',{image:fakeImg(1_800_000),name:'new.png'});
+ assert.equal(denied.status,413,JSON.stringify(denied.body));
+ assert.equal((await a.request(original)).status,200,'已保存画布的原图必须仍可读取');
+ assert.equal((await b.request(original)).status,404,'保护不能扩大跨账号读取权限');
+ assert.equal((await a.request('/api/cowart/snapshot?projectId='+projectId)).body.snapshot.store['asset:protected'].props.src,original);
+ // Removing the reference in a successful save releases protection, so normal
+ // legacy cleanup still works for genuinely unreferenced images.
+ assert.equal((await a.request('/api/cowart/snapshot?projectId='+projectId,'PUT',{revision:1,snapshot:{...snapshot,store:{}}})).status,200);
+ const next=await a.request(`/api/projects/${projectId}/assets`,'POST',{image:fakeImg(1_800_000),name:'new.png'});
+ assert.equal(next.status,201,JSON.stringify(next.body));
+ assert.equal((await a.request(original)).status,404);
+ assert.equal((await a.request(next.body.node.url)).status,200);
+});
+
 test('V0.6.3 logs capture server API errors and redact secrets per account',async t=>{
  const dir=mkdtempSync(path.join(os.tmpdir(),'hamoki-v063-logs-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));
  const port=await getPort();const child=await start(port,dir);t.after(()=>child.kill());

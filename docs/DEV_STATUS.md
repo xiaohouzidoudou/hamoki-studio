@@ -14,6 +14,13 @@
 - Double-click/Space-pan focused tests passed, CI succeeded, and QA was rebuilt for `285e88f`.
 - Outside-preview-click handler was committed as `3d2107f` and CI succeeded; deploy still required at snapshot time.
 
+## Codex P0 已保存画布媒体保护（2026-10-19）
+
+- Issue #24，分支 `codex/24-canvas-media-protection`，基于 `0559e06`。媒体拆分上传仍待处理；本项不扩大快照上限。
+- 已复现容量回收删除已保存画布原图；现在读取当前账号所有落盘画布的媒体引用并保护，引用不可确认则在清理前返回 503。确无容量返回 413，成功保存移除引用后恢复普通回收。
+- 真实临时网关回归先红后绿：已保存引用保留、超额上传拒绝、解除引用后正常回收、跨账号读图拒绝。多快照与损坏数据等回归及全量 163 项测试、构建通过；详情见 `docs/cowart-media-acceptance.md`，具体提交及 CI 以 PR/Issue 为准。
+- 未部署、未调用付费模型。待审 PR 需审查、合入集成后运行组合 CI 和隔离 QA，整体 P0 尚未完成。
+
 ## Open blockers
 1. Confirm latest QA deployment SHA and visually validate outside-click close and keyboard behavior.
 2. Real provider E2E: create an image, select/edit twice, place results, refresh/reload and verify job recovery; obtain user authorization for paid calls.

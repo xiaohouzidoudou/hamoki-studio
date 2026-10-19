@@ -20,12 +20,14 @@ const creativePages=require('./lib/creative-pages');
 const {referenceRatio}=require('./lib/creative-auto-ratio');
 const assistantMemory=require('./lib/assistant-memory');
 const cowartIntent=require('./lib/cowart-intent');
+const {protectedCanvasMedia}=require('./lib/cowart-media-protection');
 const assistantReview=require('./lib/assistant-review');
 const {nextGeneratedPosition,intersects,TILE}=require('./lib/canvas-placement');
 const {retryPlan}=require('./lib/job-retry-policy');
 const generate=(...args)=>options.limiter.run(()=>upstreamGenerate(...args));
 const reverse=(...args)=>options.limiter.run(()=>upstreamReverse(...args));
 const listModels=(...args)=>options.limiter.run(()=>upstreamListModels(...args));
+const {protectedCanvasMedia}=require('./lib/cowart-media-protection');
 const {pack}=require('./lib/zip');
 const ROOT=__dirname,PORT=Number(process.env.PORT||8028),HOST=process.env.HOST||'127.0.0.1';
 const PASSWORD=process.env.APP_PASSWORD||'';
@@ -645,7 +647,7 @@ function removePreviewFiles(name){for(const ext of ['webp','jpg']){const file=pr
 function cleanupMessages(project,removedHistoryId=null,removedNodeIds=new Set()){project.messages=project.messages.filter(m=>m.imageId!==removedHistoryId&&m.sourceId!==removedHistoryId&&!(Array.isArray(m.referenceRoles)&&m.referenceRoles.some(r=>removedNodeIds.has(r.nodeId))))}
 function overSpace(incomingSize){return storageUsage(true).totalBytes+incomingSize>MEDIA_QUOTA_BYTES||(typeof options.globalBytesLeft==='function'&&options.globalBytesLeft()<incomingSize)}
 function releaseForQuota(incomingSize){
- const protectedFiles=new Set();
+ const protectedFiles=protectedCanvasMedia(DATA_DIR);
  // Keep document prototypes and approved style inputs available across sessions.
  for(const current of projects){
   const f=current.creativeWorkflow;
