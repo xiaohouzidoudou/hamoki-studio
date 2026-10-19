@@ -1,0 +1,36 @@
+# 独立使用：不要与正式 compose.yaml 合并。凭据仅由测试专用 env 文件传入。
+services:
+  cowart-qa:
+    build:
+      context: .
+      args:
+        VITE_TLDRAW_LICENSE_KEY: ${QA_TLDRAW_LICENSE_KEY:-}
+    image: hamoki-studio:cowart-qa
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${QA_HOST_PORT:-8031}:8028"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 8028
+      DATA_DIR: /app/data
+      APP_BASE_PATH: ""
+      APP_ENCRYPTION_KEY: ${QA_ENCRYPTION_KEY:?必须设置独立测试密钥，至少32字符}
+      INVITE_CODE: ${QA_INVITE_CODE:?必须设置独立测试邀请码}
+      APP_ALLOWED_HOST: ${QA_ALLOWED_HOST:?必须设置测试入口主机名}
+      COOKIE_SECURE: "1"
+      COWART_PREVIEW: "1"
+      MAX_CONCURRENT: "1"
+      USER_QUOTA_GB: "1"
+      TOTAL_QUOTA_GB: "5"
+    volumes:
+      - cowart_qa_data:/app/data
+    mem_limit: 384m
+    cpus: 1.0
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid
+volumes:
+  cowart_qa_data:

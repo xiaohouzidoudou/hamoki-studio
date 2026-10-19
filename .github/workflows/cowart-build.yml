@@ -2,14 +2,20 @@ name: Cowart experimental build
 on:
   push:
     branches: [feature/cowart-web-canvas-20261016]
-    paths: ['cowart/**', '.github/workflows/cowart-build.yml', 'gateway.js', 'Dockerfile', 'compose.yaml', 'tests/cowart-*.test.js', 'workspace.js', 'lib/cowart-intent.js']
+    paths: ['cowart/**', '.github/workflows/cowart-build.yml', 'gateway.js', 'Dockerfile', 'compose.yaml', 'compose.cowart-qa.yaml', 'tests/cowart-*.test.js', 'workspace.js', 'lib/cowart-intent.js']
   pull_request:
-    paths: ['cowart/**', '.github/workflows/cowart-build.yml', 'gateway.js', 'Dockerfile', 'compose.yaml', 'tests/cowart-preview.test.js']
+    paths: ['cowart/**', '.github/workflows/cowart-build.yml', 'gateway.js', 'Dockerfile', 'compose.yaml', 'compose.cowart-qa.yaml', 'tests/cowart-preview.test.js']
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Validate isolated Cowart QA Compose
+        env:
+          QA_ENCRYPTION_KEY: ci-compose-validation-only-32-characters
+          QA_INVITE_CODE: ci-compose-validation-only
+          QA_ALLOWED_HOST: cowart-qa.invalid
+        run: docker compose -p hamoki-cowart-qa -f compose.cowart-qa.yaml config --quiet
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
