@@ -124,6 +124,7 @@ try{
   await page.screenshot({path:path.join(root,'cowart','test-results','browser-smoke.png'),fullPage:true})
   // Mock only image/provider APIs: authentication, canvas persistence and reload
   // still use the real gateway. These are not paid-provider E2E claims.
+  assert.equal(await page.evaluate(()=>window.__cowartEditor.getShape('shape:smoke-green-card').x),480)
   const imageRows=[], imageJobs=[], submissions=[]
   let rejectSave=false
   const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLduAAAAABJRU5ErkJggg==','base64')
