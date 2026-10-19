@@ -102,6 +102,11 @@ test('Cowart per-image roles reach existing adapters, history ownership is enfor
   assert.deepEqual(reversed.referenceRoles,['style','color'])
   aOffset=seen.at(-1).bytes.indexOf(Buffer.from(blue,'base64'));bOffset=seen.at(-1).bytes.indexOf(Buffer.from(png,'base64'))
   assert.ok(aOffset>=0&&bOffset>=0&&bOffset<aOffset)
+  const firstNode=(await a('/api/projects/'+projectId)).data.project.nodes.find(n=>n.historyId===first.resultId)
+  assert.equal((await a('/api/projects/'+projectId+'/memory/feedback','POST',{nodeId:firstNode.id,historyId:first.resultId,kind:'approved'})).status,200)
+  const approvedReference=await complete({...payload,editMode:'new',referenceHistory:[{sourceId:first.resultId,role:'color'}],referenceOrder:[{kind:'history',index:0}]})
+  assert.deepEqual(approvedReference.referenceRoles,['color'],'a selected image must not be silently duplicated as another project-style reference')
+  assert.equal((seen.at(-1).text.match(/filename=/g)||[]).length,1)
   const before=seen.length
   for(const invalid of [
     {...payload,references:[],referenceRoles:['shape']},

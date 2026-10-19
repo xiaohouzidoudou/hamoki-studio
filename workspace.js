@@ -859,7 +859,8 @@ function validateCreation(b){
   if(typeof role!=='string'||!Object.hasOwn(REFERENCE_ROLES,role))throw Error('参考图用途不支持');
   const h=history.find(h=>h.id===item.sourceId&&h.projectId===targetProject.id);
   if(!h)throw Error('找不到当前项目中的参考图片');
-  images.push({file:h.file,role,nodeId:null,historyId:h.id});
+  const node=targetProject.nodes.find(n=>n.kind==='generated'&&n.historyId===h.id);
+  images.push({file:h.file,role,nodeId:node?.id||null,historyId:h.id});
  }
  const referenceOrder=b.referenceOrder;
  if(referenceOrder!==undefined){
@@ -885,6 +886,7 @@ function validateCreation(b){
    if(node?.kind==='generated'&&node.historyId===b.sourceId)continue;
    if(!node)continue;
    const h=node.kind==='generated'?history.find(x=>x.id===node.historyId&&x.projectId===targetProject.id):null;
+   if(h&&images.some(x=>x.historyId===h.id))continue;
    const file=node.kind==='reference'?node.assetFile:h?.file;
    if(file)images.push({file,role:'style',nodeId:id,historyId:h?.id||null});
   }
@@ -895,7 +897,7 @@ function validateCreation(b){
   for(const a of approved){
    const node=targetProject.nodes.find(n=>n.id===a.nodeId&&n.kind==='generated'&&n.historyId===a.historyId);
    const h=node&&history.find(x=>x.id===a.historyId&&x.projectId===targetProject.id);
-   if(h&&a.historyId!==b.sourceId&&!images.some(x=>x.nodeId===node.id)){
+   if(h&&a.historyId!==b.sourceId&&!images.some(x=>x.nodeId===node.id||x.historyId===h.id)){
     images.push({file:h.file,role:'style',nodeId:node.id,historyId:h.id});
     break;
    }
