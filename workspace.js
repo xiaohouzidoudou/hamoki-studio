@@ -1801,7 +1801,7 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
     const msg=String(e?.message||'服务错误').slice(0,450);
     // Most 404s are normal navigation/missing thumbnails; record actionable failures only.
     if(!(e.status===404||route.startsWith('/api/previews/')))diag({source:e.upstreamStatus?'upstream':'backend',action:'api_request',method:req.method,path:route,status:e.upstreamStatus||e.status||400,message:msg});
-    if(!res.headersSent){const code=[400,401,403,404,409,413,415].includes(e.status)?e.status:400;return fail(res,code,msg)}console.error('[Hamoki]',route,msg);
+    if(!res.headersSent){const code=[400,401,403,404,409,413,415,503].includes(e.status)?e.status:400;return fail(res,code,msg)}console.error('[Hamoki]',route,msg);
   }
 }
 

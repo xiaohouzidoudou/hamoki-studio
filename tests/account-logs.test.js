@@ -2,7 +2,7 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {spawn}=require('node:child_process');
-const {mkdtempSync,rmSync,readFileSync,existsSync}=require('node:fs');
+const {mkdtempSync,rmSync,readFileSync,writeFileSync,existsSync}=require('node:fs');
 const path=require('node:path');
 const os=require('node:os');
 const http=require('node:http');
@@ -46,6 +46,15 @@ test('Cowart 已保存画布引用的原图不能被容量清理删除',async t=
   'asset:protected':{id:'asset:protected',typeName:'asset',type:'image',props:{src:original}}
  }};
  assert.equal((await a.request('/api/cowart/snapshot?projectId='+projectId,'PUT',{revision:0,snapshot})).status,200);
+ const accountId=(await a.request('/api/status')).body.user.id;
+ const snapshotFile=path.join(dir,'users',accountId,'cowart-canvas',projectId+'.json');
+ const savedBytes=readFileSync(snapshotFile);
+ try{
+  writeFileSync(snapshotFile,'{broken');
+  const unavailable=await a.request(`/api/projects/${projectId}/assets`,'POST',{image:fakeImg(1_800_000),name:'unavailable.png'});
+  assert.equal(unavailable.status,503,'无法确认画布引用时应返回服务暂不可用，而非输入错误');
+  assert.equal((await a.request(original)).status,200,'引用不可确认时不得删除原图');
+ }finally{writeFileSync(snapshotFile,savedBytes)}
  // Pressure exceeds the global budget. No paid/image upstream is involved.
  const denied=await a.request(`/api/projects/${projectId}/assets`,'POST',{image:fakeImg(1_800_000),name:'new.png'});
  assert.equal(denied.status,413,JSON.stringify(denied.body));
