@@ -27,7 +27,7 @@ const generate=(...args)=>options.limiter.run(()=>upstreamGenerate(...args));
 const reverse=(...args)=>options.limiter.run(()=>upstreamReverse(...args));
 const listModels=(...args)=>options.limiter.run(()=>upstreamListModels(...args));
 const {pack}=require('./lib/zip');
-const {requestOutcome,failedOutcome}=require('./lib/job-request-outcome');
+const {requestOutcome,failedOutcome,resetQueuedRetryEvidence}=require('./lib/job-request-outcome');
 const ROOT=__dirname,PORT=Number(process.env.PORT||8028),HOST=process.env.HOST||'127.0.0.1';
 const PASSWORD=process.env.APP_PASSWORD||'';
 const BASE=(process.env.APP_BASE_PATH||'').replace(/\/$/,'');
@@ -609,7 +609,7 @@ function importProject(b){
 }
 
 
-function saveJobs(){atomic(jobsFile,JSON.stringify({jobs:jobs.slice(0,1000),paused}))}
+function saveJobs(){resetQueuedRetryEvidence(jobs);atomic(jobsFile,JSON.stringify({jobs:jobs.slice(0,1000),paused}))}
 function saveHistory(){atomic(historyFile,JSON.stringify(history.slice(0,2500)))}
 saveJobs();if(!paused&&jobs.some(j=>j.status==='queued'))schedule();
 const respond=(res,code,obj)=>{res.writeHead(code,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(obj))};
@@ -1792,7 +1792,7 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
       const policy=retryPlan(j,jobs,{providerId:newProviderId,model:newModel,mode:selected.mode,acknowledgePotentialCharge:request.acknowledgePotentialCharge});
       if(j.maskMedia&&(selected.mode!=='openai'||(selected.imageMode||'images')!=='images'))throw Error('本次选中的模型接口不支持蒙版，已阻止任务提交');
       if(j.transparentBg&&(selected.mode!=='openai'||(selected.imageMode||'images')!=='images'))throw Error('本次选中的模型接口不支持透明背景，已阻止任务提交');
-      const again={...j,requestOutcome:null,upstreamHttpStatus:null,upstreamAttemptedAt:null,upstreamId:policy.upstreamId,progress:0,providerId:newProviderId,providerName:selected.name,model:newModel,id:crypto.randomUUID(),createdAt:time(),updatedAt:time(),startedAt:null,resultId:null,error:'',status:'queued',attempts:0,retryOf:j.id,canvasX:j.canvasX,canvasY:j.canvasY,submissionKey:null,submissionFingerprint:null};
+      const again={...j,upstreamId:policy.upstreamId,progress:0,providerId:newProviderId,providerName:selected.name,model:newModel,id:crypto.randomUUID(),createdAt:time(),updatedAt:time(),startedAt:null,resultId:null,error:'',status:'queued',attempts:0,retryOf:j.id,canvasX:j.canvasX,canvasY:j.canvasY,submissionKey:null,submissionFingerprint:null};
       jobs.unshift(again);saveJobs();schedule();return respond(res,201,{job:publicJob(again),resumeOriginal:policy.resumeOriginal});
     }
     if(req.method==='GET'&&route==='/api/history'){const q=trim(url.searchParams.get('q'),150).toLowerCase(),favorites=url.searchParams.get('favorite')==='1';let listed=history.filter(h=>(!favorites||h.favorite)&&(!url.searchParams.get('projectId')||h.projectId===url.searchParams.get('projectId')));if(q)listed=listed.filter(h=>[h.prompt,h.model,h.providerName].some(s=>(s||'').toLowerCase().includes(q)));return respond(res,200,{history:listed.slice(0,1500).map(publicHistory),total:listed.length})}
