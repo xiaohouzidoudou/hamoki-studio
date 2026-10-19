@@ -62,7 +62,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cowart-browser-smoke
-          path: cowart/test-results/browser-smoke.png
+          path: cowart/test-results/*.png
           if-no-files-found: ignore
 
       - name: Summarize handoff and tested SHA

@@ -5,6 +5,7 @@ import { mkdtempSync, rmSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { verifyCanvasInputs } from './canvas-inputs.mjs'
 import { chromium } from 'playwright'
 
 const here=path.dirname(fileURLToPath(import.meta.url))
@@ -181,6 +182,8 @@ try{
   await page.screenshot({path:path.join(root,'cowart','test-results','browser-smoke.png'),fullPage:true})
   console.log('PASS: mock generation + two edits, saved versions, failed-save reload recovery; exactly three image submissions')
   console.log('PASS: authenticated Cowart renders, Studio panel responds, tldraw shape persists and survives reload')
+  await verifyCanvasInputs({page,projectId,submissions,imageRows,png,screenshotPath:path.join(root,'cowart','test-results','canvas-inputs.png')})
+  assert.equal(errors.length,0,'Holder and reference workflow must not cause browser errors')
 }catch(error){
   const failedPage=browser?.contexts()[0]?.pages()[0]
   if(failedPage){

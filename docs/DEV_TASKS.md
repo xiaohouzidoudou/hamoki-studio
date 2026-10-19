@@ -10,6 +10,7 @@
 | COW-BILL-04 | P0 | Unclaimed | Timeout/unknown charge never silently resubmits paid request; errors and recovery visible. |
 | COW-LICENSE-05 | P0 | Unclaimed | tldraw license reviewed; no prohibited/warning usage in approved production environment. |
 | COW-RELEASE-06 | P1 | Unclaimed | Formal QA, backup, migration and rollback verified before production PR merge. |
+| COW-INPUT-07 | P0 | Codex / 本机已验证，待 QA | 空 Holder 填入与比例同步、非空内容保留、逐图综合/造型/配色/风格参考、明确主图及导入图片编辑。[验收记录](cowart-inputs-acceptance.md)。 |
 
 ## When picking work
 1. Verify Issue and integration PR history first.

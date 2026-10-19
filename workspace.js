@@ -838,9 +838,14 @@ function validateCreation(b){
  if(!instruction)throw Error('请输入创作描述');
  const targetProject=assertProject(b.projectId||defaultProject()?.id);
  const sourceNodeId=typeof b.sourceNodeId==='string'&&targetProject.nodes.some(x=>x.id===b.sourceNodeId)?b.sourceNodeId:null;
+ const uploadRoles=b.referenceRoles===undefined?refs.map(()=>'general'):b.referenceRoles;
+ if(!Array.isArray(uploadRoles)||uploadRoles.length!==refs.length||uploadRoles.some(role=>typeof role!=='string'||!Object.hasOwn(REFERENCE_ROLES,role)))throw Error('上传参考图用途需要与图片逐项对应');
+ const referenceHistory=b.referenceHistory===undefined?[]:b.referenceHistory;
+ if(!Array.isArray(referenceHistory)||referenceHistory.length>8)throw Error('历史参考图格式错误或超过 8 张');
+ const rawEdit=b.editMode==='edit'&&!b.sourceId&&refs.length>0;
  if(refs.length>8)throw Error('最多 8 张本地上传参考图');
  const referenceNodes=Array.isArray(b.referenceNodes)?b.referenceNodes:[];
- if(referenceNodes.length>8||refs.length+referenceNodes.length>8)throw Error('最多使用 8 张参考图');
+ if(referenceNodes.length>8||refs.length+referenceNodes.length+referenceHistory.length>8)throw Error('最多使用 8 张参考图');
  const images=referenceNodes.map(item=>{
    const node=targetProject.nodes.find(n=>n.id===item.nodeId&&n.kind!=='note');if(!node)throw Error('选中的参考图不在当前项目');
    const role=REFERENCE_ROLES[item.role]?item.role:'general';let file,historyId=null;
@@ -848,11 +853,31 @@ function validateCreation(b){
    else {const h=history.find(h=>h.id===node.historyId&&h.projectId===targetProject.id);if(!h)throw Error('画布图片没有对应的历史记录');file=h.file;historyId=h.id}
    return {file,role,nodeId:node.id,historyId};
  });
+ for(const item of referenceHistory){
+  if(!item||typeof item!=='object'||Array.isArray(item)||typeof item.sourceId!=='string')throw Error('历史参考图片编号无效');
+  const role=item.role===undefined?'general':item.role;
+  if(typeof role!=='string'||!Object.hasOwn(REFERENCE_ROLES,role))throw Error('参考图用途不支持');
+  const h=history.find(h=>h.id===item.sourceId&&h.projectId===targetProject.id);
+  if(!h)throw Error('找不到当前项目中的参考图片');
+  images.push({file:h.file,role,nodeId:null,historyId:h.id});
+ }
+ const referenceOrder=b.referenceOrder;
+ if(referenceOrder!==undefined){
+  const count=refs.length+referenceHistory.length;
+  if(referenceNodes.length||!Array.isArray(referenceOrder)||referenceOrder.length!==count)throw Error('逐图顺序必须覆盖当前全部参考图片');
+  const seen=new Set();
+  for(const item of referenceOrder){
+   if(!item||!['upload','history'].includes(item.kind)||!Number.isInteger(item.index)||item.index<0||item.index>=(item.kind==='upload'?refs.length:referenceHistory.length))throw Error('逐图参考顺序无效');
+   const key=item.kind+':'+item.index;if(seen.has(key))throw Error('逐图参考顺序不能重复');seen.add(key);
+  }
+  if(rawEdit&&(referenceOrder[0]?.kind!=='upload'||referenceOrder[0]?.index!==0))throw Error('导入的修改主图必须排第一');
+  if(b.sourceId&&referenceHistory.some(h=>h.sourceId===b.sourceId))throw Error('修改主图无需重复作为参考');
+ }
  // Reuse the STYLE references analyzed for this project when editing, even before
  // an explicit style lock. The lock remains an independent user approval flag.
  // This is the original creativeWorkflow source of truth, NOT a second style collection.
  const flow=targetProject.creativeWorkflow;
- if((b.sourceId||b.mask)&&b.useProjectStyle!==false&&flow?.styleDNA&&Array.isArray(flow.styleNodeIds)){
+ if((b.sourceId||b.mask||rawEdit)&&b.useProjectStyle!==false&&flow?.styleDNA&&Array.isArray(flow.styleNodeIds)){
   for(const id of flow.styleNodeIds.slice(0,2)){
    if(refs.length+images.length>=8)break;
    if(images.some(x=>x.nodeId===id))continue;
@@ -878,7 +903,7 @@ function validateCreation(b){
  }
  const count=Number(b.count||1);
  if(!Number.isInteger(count)||count<1||count>8)throw Error('单次最多 8 张，建议先试 1 张');
- const capability=b.sourceId||b.mask?'edit':'image';
+ const capability=b.sourceId||b.mask||rawEdit?'edit':'image';
  const targets=Array.isArray(b.targets)&&b.targets.length?b.targets:[{providerId:b.providerId||state.activeId,model:b.model||''}];
  if(targets.length>2||targets.length*count>12)throw Error('每批最多 2 个模型、合计 12 个任务');
  if(jobs.filter(j=>['queued','running'].includes(j.status)).length+targets.length*count>MAX_QUEUED)throw Error('待处理任务最多 '+MAX_QUEUED+' 个，请稍后再提交');
@@ -886,7 +911,7 @@ function validateCreation(b){
  if(!['1:1','3:2','2:3','16:9','9:16','4:3','3:4'].includes(ratio))throw Error('比例不支持');
  if(!['1K','2K','4K'].includes(resolution))throw Error('分辨率不支持');
  if(!['auto','low','medium','high'].includes(quality))throw Error('画质参数不支持');
- const candidate=b.sourceId||images.find(n=>n.historyId&&n.role!=='style')?.historyId;
+ const candidate=b.sourceId||((rawEdit||(b.editMode==='new'&&b.referenceHistory!==undefined))?null:images.find(n=>n.historyId&&n.role!=='style')?.historyId);
  const source=candidate?history.find(h=>h.id===candidate&&h.projectId===targetProject.id):null;
  if(candidate&&!source)throw Error('找不到当前项目中的源图片');
  if(b.mask&&!source)throw Error('局部蒙版必须先选择一张已生成图片');
@@ -905,11 +930,11 @@ function validateCreation(b){
      rules:assistantMemory.guide(targetProject.assistantMemory,f.styleDNA||'',page?.requirements||'').slice(0,6500),
      requirements:String(page?.requirements||'').slice(0,2500)};
   })():null;
- const editMode=!!source&&b.editMode!=='new';
+ const editMode=(!!source||rawEdit)&&b.editMode!=='new';
  const styleGuide=editMode?creativeUpstream.styleFeedbackGuide(targetProject.creativeWorkflow?.styleDNA||'',b.editSpec):'';
- const draftPrompt=editMode?('根据第一张参考原图精确编辑。除本轮明确要求改变的内容外，保持原画构图、人物身份、页面文字、按钮位置与项目风格一致。\n历史创作描述：'+(source.editInstruction||source.prompt).slice(0,1450)+'\n本轮用户中文修改要求（原文，不得擅自翻译或反转）：'+instruction+'\n'+styleGuide):instruction;
+ const draftPrompt=editMode?('根据第一张参考原图精确编辑。除本轮明确要求改变的内容外，保持原画构图、人物身份、页面文字、按钮位置与项目风格一致。\n历史创作描述：'+(source?.editInstruction||source?.prompt||'用户选中的画布原图').slice(0,1450)+'\n本轮用户中文修改要求（原文，不得擅自翻译或反转）：'+instruction+'\n'+styleGuide):instruction;
  const prompt=assistantMemory.generationPrompt(draftPrompt,targetProject.assistantMemory,targetProject.creativeWorkflow?.styleDNA||'',(targetProject.creativeWorkflow?.pages||[]).find(x=>x.id===targetProject.creativeWorkflow?.activePageId)?.requirements||'');
- return {capability,prompt,editInstruction:instruction,refs,referenceNodes:images,count,targets,ratio,resolution,quality,review,transparentBg,sourceId:source?.id||null,sourceNodeId,projectId:targetProject.id,canvasX:num(b.canvasX,180),canvasY:num(b.canvasY,170),mask:b.mask||null,maskSourceImage:b.maskSourceImage||null};
+ return {capability,prompt,editInstruction:instruction,refs,uploadRoles,rawEdit,referenceOrder,historyReferenceCount:referenceHistory.length,referenceNodes:images,count,targets,ratio,resolution,quality,review,transparentBg,sourceId:source?.id||null,sourceNodeId,projectId:targetProject.id,canvasX:num(b.canvasX,180),canvasY:num(b.canvasY,170),mask:b.mask||null,maskSourceImage:b.maskSourceImage||null};
 }
 function submit(b){
  const key=b.idempotencyKey;
@@ -929,8 +954,17 @@ function submit(b){
  const uploadMedia=store.input.splice(0);store.roleHints=[];
  const source=valid.sourceId?history.find(h=>h.id===valid.sourceId):null;
  const effectiveRefs=valid.referenceNodes.filter(item=>!source||item.historyId!==source.id);
- for(const r of effectiveRefs){store.input.push(r.file);store.roleHints.push(r.role)}
- store.input.push(...uploadMedia);store.roleHints.push(...valid.refs.map(()=> 'general'));
+ if(valid.referenceOrder){
+  for(const item of valid.referenceOrder){
+   const r=item.kind==='history'?valid.referenceNodes[item.index]:{file:uploadMedia[item.index],role:valid.uploadRoles[item.index]};
+   store.input.push(r.file);store.roleHints.push(r.role);
+  }
+  for(const r of valid.referenceNodes.slice(valid.historyReferenceCount)){if(!source||r.historyId!==source.id){store.input.push(r.file);store.roleHints.push(r.role)}}
+ }else{
+  if(valid.rawEdit){store.input.push(...uploadMedia);store.roleHints.push(...valid.uploadRoles)}
+  for(const r of effectiveRefs){store.input.push(r.file);store.roleHints.push(r.role)}
+  if(!valid.rawEdit){store.input.push(...uploadMedia);store.roleHints.push(...valid.uploadRoles)}
+ }
  const groupId=crypto.randomUUID(),created=[];
  for(const t of valid.targets)for(let i=0;i<valid.count;i++)created.push(makeJob({...valid,submissionKey,submissionFingerprint,batchIndex:created.length},store,t.providerId,t.model,groupId));
  const proj=assertProject(valid.projectId);for(const job of created){const slot=nextGeneratedPosition(proj);job.canvasX=slot.x;job.canvasY=slot.y;job.reservedCanvasSlot=true}

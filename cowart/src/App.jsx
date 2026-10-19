@@ -1001,6 +1001,7 @@ export default function App() {
   const [skippedRecords, setSkippedRecords] = useState([])
   const [aiPanelOpen, setAiPanelOpen] = useState(true)
   const [saveError, setSaveError] = useState('')
+  const [canvasEditor, setCanvasEditor] = useState(null)
   const editorRef = useRef(null)
   const getEditor = useCallback(() => editorRef.current, [])
 
@@ -1033,6 +1034,7 @@ export default function App() {
   const handleMount = useCallback((editor) => {
     editor.user.updateUserPreferences({ colorScheme: 'dark' })
     editorRef.current = editor
+    setCanvasEditor(editor)
     window.__cowartEditor = editor
     window.__cowartSelection = () => getCowartSelection(editor)
     window.__cowartViewState = () => getCowartViewState(editor)
@@ -1340,7 +1342,7 @@ export default function App() {
         </button>
         <a className="hamoki-back-link" href="/" target="_blank" rel="noopener noreferrer">管理后台 ↗</a>
       </div>
-      <StudioPanel open={aiPanelOpen} onClose={() => setAiPanelOpen(false)} getEditor={getEditor} />
+      <StudioPanel open={aiPanelOpen} onClose={() => setAiPanelOpen(false)} getEditor={getEditor} canvasEditor={canvasEditor} />
     </main>
   )
 }
