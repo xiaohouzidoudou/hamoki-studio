@@ -56,3 +56,5 @@ curl --fail --show-error -H 'Host: <QA_ALLOWED_HOST>' http://127.0.0.1:8031/heal
 - 使用已有 Python 运行时补齐本机测试 PATH 后，全量 156 项测试通过，无失败、无跳过；未改动产品的 Python 调用方式。
 - Cowart Vite 生产构建成功；QA YAML 结构及独立卷、回环监听、安全 Cookie、预览开关检查通过。Docker Compose 原生校验已加入 CI，本机因无 Docker 未执行。
 - 随机测试密钥与独立临时目录启动本机 gateway：`/healthz` 实测 200，匿名 `/cowart/` 实测 401。此结果不是 VPS/Docker 或 HTTPS 验收。
+- 本机真实 Chromium 冒烟测试通过：测试账号鉴权进入、项目读取、Studio 面板交互、画布形状保存及刷新恢复；截图已人工查看。页面仍显示 tldraw 许可提示，正式使用前需核实合法许可。
+- 提交 `28d1bf8` 的 GitHub CI 已通过 Docker Compose 原生配置校验；完整 CI 结果另行检查，不能将配置校验等同于容器启动验收。
