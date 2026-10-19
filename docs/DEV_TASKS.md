@@ -5,7 +5,7 @@
 | ID | Priority | Owner / state | Acceptance |
 | --- | --- | --- | --- |
 | COW-QA-01 | P0 | Shared / QA needs verification | The isolated QA site serves the latest integration SHA after matching green CI, with health and rollback evidence. |
-| COW-UX-02 | P0 | ChatGPT / code committed | Double-click image opens full image; click outside closes; image/toolbar remain interactive; Space-pan works and existing selection is unchanged. Verify in browser. |
+| COW-UX-02 | P0 | Codex / Cowart 本机已验证，待独立 QA | Cowart 单击选择、双击原图、外部点击/Escape 关闭、就地修改、中键/空格平移、框选、右键菜单与文本输入安全。[验收记录](cowart-interaction-acceptance.md)。 |
 | COW-E2E-03 | P0 | Unclaimed / blocked on authorized model testing | Real image job completes; new image appears; selection-based edit twice; original image retained; refresh restores assets. |
 | COW-BILL-04 | P0 | Unclaimed | Timeout/unknown charge never silently resubmits paid request; errors and recovery visible. |
 | COW-LICENSE-05 | P0 | Unclaimed | tldraw license reviewed; no prohibited/warning usage in approved production environment. |

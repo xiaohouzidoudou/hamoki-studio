@@ -61,6 +61,7 @@ import {
   subscribeCanvasChanges
 } from './lib/storage.js'
 import StudioPanel from './ui/StudioPanel.jsx'
+import CanvasImageActions, { CowartImageShapeUtil } from './ui/CanvasImageActions.jsx'
 
 const TLDRAW_LICENSE_KEY = import.meta.env.VITE_TLDRAW_LICENSE_KEY
 // Bundle tldraw icons/fonts/translations locally: strict same-origin CSP, offline-friendly.
@@ -541,7 +542,7 @@ class CowartFrameShapeUtil extends FrameShapeUtil {
   }
 }
 
-const cowartShapeUtils = [CowartFrameShapeUtil]
+const cowartShapeUtils = [CowartFrameShapeUtil, CowartImageShapeUtil]
 
 const cowartUiOverrides = {
   translations: {
@@ -605,7 +606,8 @@ const cowartUiOverrides = {
 
 const cowartComponents = {
   Toolbar: CowartToolbar,
-  StylePanel: CowartStylePanel
+  StylePanel: CowartStylePanel,
+  InFrontOfTheCanvas: CanvasImageActions
 }
 
 function CowartStylePanel(props) {
@@ -1031,6 +1033,12 @@ export default function App() {
   }, [])
 
   const handleMount = useCallback((editor) => {
+    const container = editor.getContainer()
+    const focusAssistant = () => {
+      setAiPanelOpen(true)
+      window.requestAnimationFrame(() => document.querySelector('.hamoki-studio-panel textarea')?.focus())
+    }
+    container.addEventListener('cowart:edit-selection', focusAssistant)
     editor.user.updateUserPreferences({ colorScheme: 'dark' })
     editorRef.current = editor
     window.__cowartEditor = editor
@@ -1268,6 +1276,7 @@ export default function App() {
     )
 
     return () => {
+      container.removeEventListener('cowart:edit-selection', focusAssistant)
       window.clearTimeout(saveTimer)
       window.clearInterval(selectionStateTimer)
       window.clearInterval(viewStateTimer)

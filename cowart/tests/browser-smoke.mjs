@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
+import { verifyCanvasInteractions } from './canvas-interactions.mjs'
 
 const here=path.dirname(fileURLToPath(import.meta.url))
 const root=path.resolve(here,'../..')
@@ -87,6 +88,7 @@ try{
   assert.equal(stored,true,'Document was not saved to authenticated Studio snapshot')
   await page.reload({waitUntil:'domcontentloaded'})
   await page.waitForFunction(()=>!!window.__cowartEditor?.getShape('shape:smoke-green-card'),{timeout:25000})
+  await verifyCanvasInteractions({page,context,base,projectId,screenshotPath:path.join(root,'cowart','test-results','canvas-interactions.png')})
   if(errors.length)console.error('Browser resources diagnostic:',JSON.stringify({errors,failedRequests,consoleErrors}))
   assert.equal(errors.length,0,'Browser page errors: '+errors.map(x=>x.message).join(' | '))
   mkdirSync(path.join(root,'cowart','test-results'),{recursive:true})
@@ -120,7 +122,7 @@ try{
   await page.reload({waitUntil:'domcontentloaded'})
   await page.waitForFunction(()=>!!window.__cowartEditor)
   await page.getByLabel('执行方式').selectOption('direct')
-  await page.evaluate(()=>window.__cowartEditor.selectNone())
+  await page.evaluate(()=>{window.__cowartEditor.selectNone()})
   const recoveryKey='hamoki-cowart-active:'+projectId
   for(let round=0;round<3;round++){
     if(round>0){
