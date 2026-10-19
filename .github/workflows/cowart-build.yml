@@ -54,6 +54,9 @@ jobs:
           npm install --no-save --package-lock=false playwright
           npx playwright install --with-deps chromium
         working-directory: cowart
+      - name: Test large canvas asset upload in real Chromium
+        run: node tests/asset-upload-smoke.mjs
+        working-directory: cowart
       - name: Test Cowart UI, save and reload in real Chromium
         run: node tests/browser-smoke.mjs
         working-directory: cowart
@@ -62,7 +65,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cowart-browser-smoke
-          path: cowart/test-results/browser-smoke.png
+          path: cowart/test-results/*.png
           if-no-files-found: ignore
 
       - name: Summarize handoff and tested SHA
