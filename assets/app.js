@@ -216,6 +216,13 @@ function closeCanvasOriginal(){
  hide('canvasOriginalModal');
  $('canvasOriginalImage').removeAttribute('src');
 }
+function handleCanvasOriginalOutsidePointerDown(e){
+ // A click on the picture or the toolbar belongs to that control; any other
+ // part of the fullscreen viewer (including empty stage space) dismisses it.
+ if(e.target.closest('#canvasOriginalImage,#canvasOriginalFit,#canvasOriginalClose'))return;
+ e.stopPropagation();
+ closeCanvasOriginal();
+}
 function renderNodes(){const layer=$('nodeLayer');layer.replaceChildren();const all=currentProject?.nodes||[];const bounds=worldViewBounds(),nodes=all.filter(n=>nodeVisible(n,bounds));const depth=new Map(all.map((n,i)=>[n.id,i+1]));visibleNodeSignature=nodes.map(n=>n.id).join('|');$('emptyStage').classList.toggle('hidden',all.length>0);
  for(const n of nodes){const card=el('article','canvas-node'+(multiNodeIds.has(n.id)?' selected':'')+(referenceNodeRoles.some(r=>r.nodeId===n.id)?' multi-reference':'')+(n.kind==='note'?' note-node':''));card.dataset.id=n.id;card.style.left=n.x+'px';card.style.top=n.y+'px';card.style.width=n.w+'px';card.style.height=n.h+'px';card.style.zIndex=String(depth.get(n.id));
   if(n.kind==='note'){
@@ -1633,7 +1640,7 @@ function bindEvents(){
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('smartComponentModal').classList.contains('hidden')){e.preventDefault();e.stopImmediatePropagation();closeSmartComponents()}},true);
 
  $('canvasOriginalClose').onclick=closeCanvasOriginal;
- $('canvasOriginalModal').addEventListener('pointerdown',e=>{if(e.target.id==='canvasOriginalModal')closeCanvasOriginal()});
+ $('canvasOriginalModal').addEventListener('pointerdown',handleCanvasOriginalOutsidePointerDown);
  $('canvasOriginalFit').onclick=()=>{
   const img=$('canvasOriginalImage');img.classList.toggle('actual-size');
   $('canvasOriginalFit').textContent=img.classList.contains('actual-size')?'适应屏幕':'查看原始尺寸';
