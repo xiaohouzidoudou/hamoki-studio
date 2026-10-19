@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import JobControls from './JobControls.jsx'
 import { buildImageShapeRecords } from '../lib/placement.js'
 import { exportSelectionToDataUrl } from '../lib/selectionExport.js'
 import { getStudioContext, studioJSON } from '../lib/studioBridge.js'
+import JobControls from './JobControls.jsx'
 import { importLegacyStudioNodes } from '../lib/legacyImport.js'
 import { summarizeCanvasSelection } from '../lib/selectionContext.js'
 import { acknowledgeSavedResult, hasUnsavedResult } from '../lib/jobRecovery.js'
@@ -74,11 +74,11 @@ export default function StudioPanel({ open, onClose, getEditor }) {
   const [jobId, setJobId] = useState(null)
   const [phase, setPhase] = useState('idle')
   const [retryTick, setRetryTick] = useState(0)
-  const [cancelling, setCancelling] = useState(false)
-  const [jobEvidence, setJobEvidence] = useState(null)
   const [error, setError] = useState('')
   const [importing, setImporting] = useState(false)
   const [importNotice, setImportNotice] = useState('')
+  const [cancelling, setCancelling] = useState(false)
+  const [jobEvidence, setJobEvidence] = useState(null)
   const [message, setMessage] = useState('')
   const active = useRef(null)
   const jobIdRef = useRef(null)
@@ -238,11 +238,6 @@ export default function StudioPanel({ open, onClose, getEditor }) {
 
   async function submit(event) {
     event.preventDefault()
-    if (cancelling) return
-    if (jobId && ['failed','cancelled','interrupted'].includes(phase)) {
-      setError('请先核对原任务及可能产生的费用，再点击「开启下一轮」。')
-      return
-    }
     if (!context || !prompt.trim() || ['analyzing','preparing','submitting','queued','running'].includes(phase)) return
     if (hasUnsavedResult(context.projectId)) {
       setError('上一张图片尚未保存到服务器，请先解决「画布尚未同步」提示并等待保存成功；刷新会恢复原任务，不会重新生图。')
@@ -253,6 +248,11 @@ export default function StudioPanel({ open, onClose, getEditor }) {
       return
     }
     const editor = getEditor()
+    if (cancelling) return
+    if (jobId && ['failed','cancelled','interrupted'].includes(phase)) {
+      setError('请先核对原任务及可能产生的费用，再点击「开启下一轮」。')
+      return
+    }
     const selected = editor?.getSelectedShapes() || []
     const selectedImage = selected.filter(s=>s.type==='image' && s.meta?.studioHistoryId)
     if (selectedImage.length > 1) {
@@ -339,10 +339,11 @@ export default function StudioPanel({ open, onClose, getEditor }) {
       const requestId=crypto.randomUUID()
       active.current={anchorId:anchor?.id||null,ratio,requestId}
       const payload={
+        autoRetry:false,
         projectId:context.projectId,prompt:instruction,providerId,model:model.trim(),
         references:refs,sourceId:source||undefined,
         editSpec:editSpec||undefined,
-        ratio,resolution,quality:'auto',count:1,idempotencyKey:requestId,autoRetry:false
+        ratio,resolution,quality:'auto',count:1,idempotencyKey:requestId
       }
       // Keep the same payload and idempotency key available for uncertain-submission diagnosis.
       sessionStorage.setItem('hamoki-cowart-last-request:'+context.projectId,
@@ -436,6 +437,7 @@ export default function StudioPanel({ open, onClose, getEditor }) {
       </div>}
     </div>}
     <p className="hamoki-studio-note">智能模式只在选中真实图片时调用视觉模型；随后文字模型理解图片与标注。讨论不会自动创建图片任务。</p>
+    <fieldset disabled={cancelling || (!!jobId && ['failed','cancelled','interrupted'].includes(phase))} style={{display:'contents'}}>
     <form onSubmit={submit}>
       <label className="hamoki-studio-field">图片中转站
         <select value={providerId} onChange={e => setProviderId(e.target.value)}>
@@ -464,26 +466,25 @@ export default function StudioPanel({ open, onClose, getEditor }) {
         <textarea rows={5} value={prompt} onChange={e => setPrompt(e.target.value)}
           placeholder="例如：保持所选游戏 UI 布局，把按钮改为亮黄色，背景压暗，不增加前景装饰" />
       </label>
-      <fieldset disabled={cancelling || (!!jobId && ['failed','cancelled','interrupted'].includes(phase))} style={{display:'contents'}}>
       <button className="hamoki-studio-submit" disabled={['analyzing','preparing','submitting','queued','running','uncertain'].includes(phase) || !prompt.trim() || (intentMode==='smart' ? (!textModel.trim()||!textProviderId) : (!model.trim()||!providerId))} type="submit">
         {['analyzing','preparing','submitting','queued','running'].includes(phase) ? 'AI 正在处理…' : intentMode==='smart'?'智能理解并执行':'直接生成 1 张'}
       </button>
-      </fieldset>
     </form>
+    </fieldset>
+    {jobId && <JobControls key={jobId} jobId={jobId} phase={phase}
+      job={jobEvidence?.id === jobId ? jobEvidence : null} onBusyChange={setCancelling}
+      onRefresh={()=>setRetryTick(x=>x+1)} />}
     {visualNotice && <div className="hamoki-studio-message" aria-live="polite">{visualNotice}</div>}
     {planNotice && <div className="hamoki-studio-message" aria-live="polite">AI 理解：{planNotice}</div>}
     {message && <div className="hamoki-studio-message" aria-live="polite">{message}</div>}
     {error && <div className="hamoki-studio-error" role="alert">{error}</div>}
     {jobId && <small>任务 ID：{jobId} · {phase}</small>}
-    {jobId && <JobControls key={jobId} jobId={jobId} phase={phase}
-      job={jobEvidence?.id === jobId ? jobEvidence : null} onBusyChange={setCancelling}
-      onRefresh={()=>setRetryTick(x=>x+1)} />}
     {phase==='uncertain' && jobId && <button className="hamoki-studio-next" type="button"
       onClick={()=>{setError('');setMessage('正在重新查询原任务，不会提交新生图…');setRetryTick(x=>x+1)}}>重新查询原任务（不扣新费用）</button>}
     {['done','failed','uncertain','answered','cancelled','interrupted'].includes(phase) && <button className="hamoki-studio-next" type="button" onClick={() => {
+      if(phase==='uncertain'&&!window.confirm('确认已经核对 Studio 任务队列和历史记录？未确认的请求可能已计费，切换到新任务会产生重复费用风险。'))return
       if(cancelling)return
       if(['cancelled','interrupted'].includes(phase) && jobEvidence?.requestOutcome!=='not_sent' && !window.confirm('确认已核对原任务及中转站记录？上游可能已计费，开启下一轮会创建新的付费请求。'))return
-      if(phase==='uncertain'&&!window.confirm('确认已经核对 Studio 任务队列和历史记录？未确认的请求可能已计费，切换到新任务会产生重复费用风险。'))return
       if(context?.projectId && hasUnsavedResult(context.projectId)) {
         setError('上一张图片尚未保存到服务器，暂不能开启下一轮；请先保存画布，或刷新恢复原任务。')
         return
