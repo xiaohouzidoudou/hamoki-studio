@@ -1,3 +1,4 @@
+import { createSaveState } from './lib/saveState.js'
 import {
   ArrowDownToolbarItem,
   ArrowLeftToolbarItem,
@@ -1111,12 +1112,12 @@ export default function App() {
     let saveTimer = null
     let isSaving = false
     let hasPendingSave = false
-    let hasUnsavedChanges = false
+    const saveState = createSaveState()
     let isSyncingAnnotationShape = false
     let remoteLoadController = null
 
     async function saveCanvas() {
-      if (!hasUnsavedChanges) return
+      if (!saveState.dirty) return
 
       if (isSaving) {
         hasPendingSave = true
@@ -1124,12 +1125,14 @@ export default function App() {
       }
 
       isSaving = true
+      const capturedVersion = saveState.capture()
       try {
         const result = await saveCanvasSnapshot(editor.store.getStoreSnapshot())
         if (result.storage === 'invalid') {
           setSkippedRecords(result.skippedRecords)
+          throw new Error('画布数据无效，当前修改尚未保存')
         }
-        hasUnsavedChanges = false
+        saveState.acknowledge(capturedVersion)
         setSaveError('')
       } catch (error) {
         setSaveError(error.message || '保存失败，当前修改尚未同步到服务器')
@@ -1144,7 +1147,7 @@ export default function App() {
     }
 
     function scheduleSave() {
-      hasUnsavedChanges = true
+      saveState.changed()
       window.clearTimeout(saveTimer)
       saveTimer = window.setTimeout(saveCanvas, 500)
     }
@@ -1158,7 +1161,7 @@ export default function App() {
       const controller = new AbortController()
       remoteLoadController = controller
 
-      const preserveLocalChanges = hasUnsavedChanges || isSaving
+      const preserveLocalChanges = saveState.dirty || isSaving
       const preFetchStore = preserveLocalChanges ? null : editor.store.getStoreSnapshot().store
 
       try {
@@ -1175,7 +1178,7 @@ export default function App() {
         setSkippedRecords(nextSkippedRecords)
 
         if (changedRecords > 0 && effectivePreserve) {
-          hasUnsavedChanges = true
+          saveState.changed()
           if (isSaving) {
             hasPendingSave = true
           } else {

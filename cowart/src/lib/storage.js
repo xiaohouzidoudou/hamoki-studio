@@ -1,3 +1,4 @@
+import { normalizeAssetSources } from './assetCapture.js'
 import { getStudioSnapshot, putStudioSnapshot, getStudioContext } from './studioBridge.js'
 import { acknowledgeSavedResult } from './jobRecovery.js'
 // IndexedDB-backed canvas persistence.
@@ -78,39 +79,6 @@ async function kvSet(key, value) {
     tx.onabort = () => reject(tx.error)
   })
 }
-
-function blobToDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result)
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(blob)
-  })
-}
-
-// Capture blob: asset sources (e.g. from drag-and-drop uploads) into stable
-// data URLs so the persisted snapshot is self-contained. Remote http(s) URLs
-// and existing data URLs are left untouched.
-async function normalizeAssetSources(snapshot) {
-  const store = snapshot.store
-  for (const id of Object.keys(store)) {
-    const record = store[id]
-    if (record?.typeName !== 'asset' || record.type !== 'image') continue
-    const src = record.props?.src
-    if (typeof src !== 'string' || !src.startsWith('blob:')) continue
-    try {
-      const response = await fetch(src)
-      const blob = await response.blob()
-      record.props.src = await blobToDataUrl(blob)
-    } catch (error) {
-      // A revoked blob URL cannot be recovered; warn but keep going so the
-      // rest of the snapshot still saves.
-      console.warn('Cowart could not capture asset blob, skipping:', src, error)
-    }
-  }
-  return snapshot
-}
-
 
 let serverRevision = 0
 let sessionSelection = { selectedShapes: [], updatedAt: null }

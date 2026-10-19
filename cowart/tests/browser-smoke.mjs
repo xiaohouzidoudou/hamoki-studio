@@ -85,8 +85,38 @@ try{
     console.error('Browser save diagnostic:',JSON.stringify({saveAlert,apiResponses,errors,appLogs:output.slice(-1400)}))
   }
   assert.equal(stored,true,'Document was not saved to authenticated Studio snapshot')
+  // Hold the first PUT response, then edit while its older snapshot is in flight.
+  // Release before the second edit's debounce fires: the old implementation
+  // cleared dirty state and silently skipped that second save.
+  let releaseSave, signalCaptured
+  const captured = new Promise(resolve => { signalCaptured = resolve })
+  const held = new Promise(resolve => { releaseSave = resolve })
+  let holdNext = true
+  await page.route('**/api/cowart/snapshot?*', async route => {
+    if (route.request().method() === 'PUT' && holdNext) {
+      holdNext = false
+      const response = await route.fetch()
+      signalCaptured()
+      await held
+      return route.fulfill({ response })
+    }
+    return route.continue()
+  })
+  await page.evaluate(() => { window.__cowartEditor.updateShape({id:'shape:smoke-green-card',type:'geo',x:360}) })
+  await Promise.race([captured, new Promise((_, reject) => setTimeout(() => reject(Error('No save captured')), 10000))])
+  await page.evaluate(() => { window.__cowartEditor.updateShape({id:'shape:smoke-green-card',type:'geo',x:480}) })
+  releaseSave()
+  let latestSaved = false
+  for (let i=0;i<80;i++) {
+    await new Promise(resolve=>setTimeout(resolve,120))
+    const obj = await (await context.request.get(base+'/api/cowart/snapshot?projectId='+projectId)).json()
+    if (obj.snapshot?.store?.['shape:smoke-green-card']?.x === 480) { latestSaved = true; break }
+  }
+  assert.equal(latestSaved,true,'Edit during an older save must also reach the server')
+  await page.unroute('**/api/cowart/snapshot?*')
   await page.reload({waitUntil:'domcontentloaded'})
   await page.waitForFunction(()=>!!window.__cowartEditor?.getShape('shape:smoke-green-card'),{timeout:25000})
+  assert.equal(await page.evaluate(()=>window.__cowartEditor.getShape('shape:smoke-green-card').x),480)
   if(errors.length)console.error('Browser resources diagnostic:',JSON.stringify({errors,failedRequests,consoleErrors}))
   assert.equal(errors.length,0,'Browser page errors: '+errors.map(x=>x.message).join(' | '))
   mkdirSync(path.join(root,'cowart','test-results'),{recursive:true})
