@@ -104,6 +104,7 @@ async function handleCowartData(req,res,url,account){
   const file=cowartProjectFile(account,id);
   if(req.method==='GET'){
     const record=readJSON(file,null);
+    if(record?.snapshot)handlerFor(account).acknowledgeCowartSnapshot(id,record.snapshot);
     return sendJSON(res,200,record?{snapshot:record.snapshot,revision:record.revision,updatedAt:record.updatedAt}:{snapshot:null,revision:0,updatedAt:null});
   }
   if(req.method!=='PUT')return fail(res,405,'不支持的操作');
@@ -120,6 +121,7 @@ async function handleCowartData(req,res,url,account){
   if(totalDirBytes(userDir(account.id))+incoming>limit || totalDirBytes(USERS_DIR)+incoming>TOTAL_QUOTA_BYTES)
     return fail(res,507,'账号图片空间不足，画布未保存，请先清理素材');
   atomic(file,payload);
+  handlerFor(account).acknowledgeCowartSnapshot(id,body.snapshot);
   return sendJSON(res,200,{revision:next.revision,updatedAt:next.updatedAt});
 }
 

@@ -20,6 +20,7 @@ const creativePages=require('./lib/creative-pages');
 const {referenceRatio}=require('./lib/creative-auto-ratio');
 const assistantMemory=require('./lib/assistant-memory');
 const cowartIntent=require('./lib/cowart-intent');
+const cowartJobState=require('./lib/cowart-job-state');
 const assistantReview=require('./lib/assistant-review');
 const {nextGeneratedPosition,intersects,TILE}=require('./lib/canvas-placement');
 const {retryPlan}=require('./lib/job-retry-policy');
@@ -923,7 +924,14 @@ function submit(b){
    return {jobs:previous.map(publicJob),groupId:previous[0].groupId,idempotent:true};
   }
  }
+ const cowart=cowartJobState.normalizeCowartJob(b.cowart,key);
+ if(cowart){
+  if(process.env.COWART_PREVIEW!=='1')throw Error('Cowart 开发预览未开启');
+  assertProject(b.projectId);
+  if(cowartJobState.pendingCowartJobs(jobs,b.projectId).length)throw Object.assign(Error('当前项目有尚未处理的 Cowart 原任务，请先恢复或核对该任务，未新建生图'),{status:409});
+ }
  const valid=validateCreation(b);
+ if(cowart&&(valid.count!==1||valid.targets.length!==1))throw Error('Cowart 每次只能提交一个图片任务');
  for(const t of valid.targets){const p=effectiveProvider(provider(t.providerId),valid.capability);emptyProvider(p);t.model=assertModel(t.model||p.imageModel)}
  const store=saveSourceFiles(valid.refs,valid.mask,valid.maskSourceImage);
  const uploadMedia=store.input.splice(0);store.roleHints=[];
@@ -932,7 +940,11 @@ function submit(b){
  for(const r of effectiveRefs){store.input.push(r.file);store.roleHints.push(r.role)}
  store.input.push(...uploadMedia);store.roleHints.push(...valid.refs.map(()=> 'general'));
  const groupId=crypto.randomUUID(),created=[];
- for(const t of valid.targets)for(let i=0;i<valid.count;i++)created.push(makeJob({...valid,submissionKey,submissionFingerprint,batchIndex:created.length},store,t.providerId,t.model,groupId));
+ for(const t of valid.targets)for(let i=0;i<valid.count;i++){
+  const job=makeJob({...valid,submissionKey,submissionFingerprint,batchIndex:created.length},store,t.providerId,t.model,groupId);
+  if(cowart)job.cowart=cowart;
+  created.push(job);
+ }
  const proj=assertProject(valid.projectId);for(const job of created){const slot=nextGeneratedPosition(proj);job.canvasX=slot.x;job.canvasY=slot.y;job.reservedCanvasSlot=true}
  jobs.unshift(...created);saveJobs();
  proj.messages.push({id:crypto.randomUUID(),role:'user',content:valid.editInstruction,createdAt:time(),groupId,sourceId:valid.sourceId,referenceRoles:valid.referenceNodes.map(n=>({nodeId:n.nodeId,role:n.role})),providerIds:valid.targets.map(t=>t.providerId)});
@@ -1771,6 +1783,23 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
     }
     if(req.method==='GET'&&route==='/api/models'){const cap=CAPABILITIES.includes(url.searchParams.get('capability'))?url.searchParams.get('capability'):'image';const p=effectiveProvider(provider(url.searchParams.get('providerId')||state.activeId),cap);emptyProvider(p);return respond(res,200,{models:await listModels(p)})}
     if(req.method==='POST'&&route==='/api/reverse'){const b=await readJSON(req),p=effectiveProvider(provider(b.providerId||state.activeId),'vision');emptyProvider(p);const pic=imageFromDataURL(b.image),model=assertModel(b.model||p.visionModel);const start=Date.now(),prompt=await reverse(p,pic,model,b.kind);recordCapability(p,'imageReverse',true,model,{durationMs:Date.now()-start});return respond(res,200,{prompt,providerName:p.name,model})}
+    if(route==='/api/cowart/jobs'&&req.method==='GET'){
+      if(process.env.COWART_PREVIEW!=='1')return fail(res,404,'Cowart 开发预览未开启');
+      const p=assertProject(url.searchParams.get('projectId'));
+      return respond(res,200,{jobs:cowartJobState.pendingCowartJobs(jobs,p.id).map(publicJob)});
+    }
+    const cowartAck=route.match(/^\/api\/cowart\/jobs\/([a-f0-9-]{36})\/ack$/);
+    if(cowartAck&&req.method==='POST'){
+      if(process.env.COWART_PREVIEW!=='1')return fail(res,404,'Cowart 开发预览未开启');
+      const b=await readJSON(req),p=assertProject(b.projectId),job=jobs.find(j=>j.id===cowartAck[1]&&j.projectId===p.id&&j.cowart);
+      if(!job)return fail(res,404,'当前项目中找不到该 Cowart 任务');
+      if(!job.cowart.acknowledgedAt){
+        if(!['failed','cancelled','interrupted'].includes(job.status))return fail(res,409,'任务尚未结束或结果尚未保存，不能丢弃恢复记录');
+        if(b.confirmed!==true)return fail(res,400,'请明确确认已核对原任务及可能产生的费用');
+        job.cowart.acknowledgedAt=time();saveJobs();
+      }
+      return respond(res,200,{ok:true});
+    }
     if(req.method==='POST'&&route==='/api/jobs'){const b=await readJSON(req);const result=submit(b);return respond(res,201,result)}
     if(req.method==='GET'&&route==='/api/jobs')return respond(res,200,{paused,running,concurrency:CONCURRENCY,jobs:jobs.filter(j=>!url.searchParams.get('projectId')||j.projectId===url.searchParams.get('projectId')).slice(0,300).map(publicJob)});
     if(req.method==='POST'&&route==='/api/queue'){const b=await readJSON(req);if(!['pause','resume'].includes(b.action))throw Error('无效队列操作');paused=b.action==='pause';saveJobs();if(!paused)schedule();return respond(res,200,{paused})}
@@ -1784,6 +1813,8 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
       if(j.maskMedia&&(selected.mode!=='openai'||(selected.imageMode||'images')!=='images'))throw Error('本次选中的模型接口不支持蒙版，已阻止任务提交');
       if(j.transparentBg&&(selected.mode!=='openai'||(selected.imageMode||'images')!=='images'))throw Error('本次选中的模型接口不支持透明背景，已阻止任务提交');
       const again={...j,upstreamId:policy.upstreamId,progress:0,providerId:newProviderId,providerName:selected.name,model:newModel,id:crypto.randomUUID(),createdAt:time(),updatedAt:time(),startedAt:null,resultId:null,error:'',status:'queued',attempts:0,retryOf:j.id,canvasX:j.canvasX,canvasY:j.canvasY,submissionKey:null,submissionFingerprint:null};
+      if(j.cowart&&cowartJobState.pendingCowartJobs(jobs,j.projectId).some(other=>other.id!==j.id))return fail(res,409,'当前项目已有另一个待处理 Cowart 任务，不能叠加重试');
+      if(j.cowart){again.cowart={...j.cowart,acknowledgedAt:null};j.cowart={...j.cowart,acknowledgedAt:time()}}
       jobs.unshift(again);saveJobs();schedule();return respond(res,201,{job:publicJob(again),resumeOriginal:policy.resumeOriginal});
     }
     if(req.method==='GET'&&route==='/api/history'){const q=trim(url.searchParams.get('q'),150).toLowerCase(),favorites=url.searchParams.get('favorite')==='1';let listed=history.filter(h=>(!favorites||h.favorite)&&(!url.searchParams.get('projectId')||h.projectId===url.searchParams.get('projectId')));if(q)listed=listed.filter(h=>[h.prompt,h.model,h.providerName].some(s=>(s||'').toLowerCase().includes(q)));return respond(res,200,{history:listed.slice(0,1500).map(publicHistory),total:listed.length})}
@@ -1804,6 +1835,8 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
   }
 }
 
-return {handler,storageUsage};
+return {handler,storageUsage,acknowledgeCowartSnapshot(projectId,snapshot){
+ if(cowartJobState.acknowledgeCowartSnapshot(jobs,projectId,snapshot,time()))saveJobs();
+}};
 };
 

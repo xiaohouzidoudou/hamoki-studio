@@ -35,7 +35,7 @@ try{
   const projects=await (await context.request.get(base+'/api/projects')).json()
   const projectId=projects.defaultId
   assert.match(projectId,/^[a-f0-9-]{36}$/)
-  const page=await context.newPage()
+  let page=await context.newPage()
   const errors=[],apiResponses=[],failedRequests=[],consoleErrors=[]
   page.on('pageerror',e=>errors.push({message:e.message,stack:e.stack?.slice(0,750)}))
   page.on('requestfailed',r=>failedRequests.push({url:r.url(),failure:r.failure()}))
@@ -95,27 +95,40 @@ try{
   // still use the real gateway. These are not paid-provider E2E claims.
   const imageRows=[], imageJobs=[], submissions=[]
   let rejectSave=false
+  let rejectRecovery=false
   const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLduAAAAABJRU5ErkJggg==','base64')
-  await page.route('**/api/providers',route=>route.fulfill({json:{activeId:'mock',providers:[
+  await context.route('**/api/providers',route=>route.fulfill({json:{activeId:'mock',providers:[
     {id:'mock',name:'Mock image provider',hasKey:true,imageModel:'mock-image'}
   ]}}))
-  await page.route('**/api/media/*.png',route=>route.fulfill({contentType:'image/png',body:png}))
-  await page.route('**/api/history?*',route=>route.fulfill({json:{history:imageRows}}))
-  await page.route('**/api/jobs**',async route=>{
+  await context.route('**/api/media/*.png',route=>route.fulfill({contentType:'image/png',body:png}))
+  await context.route('**/api/history?*',route=>route.fulfill({json:{history:imageRows}}))
+  await context.route('**/api/cowart/jobs?*',route=>rejectRecovery?
+    route.fulfill({status:503,json:{error:'模拟恢复查询断线'}}):
+    route.fulfill({json:{jobs:imageJobs.filter(j=>!j.cowart.acknowledgedAt)}}))
+  await context.route('**/api/cowart/jobs/*/ack',route=>route.fulfill({json:{ok:true}}))
+  await context.route('**/api/jobs**',async route=>{
     if(route.request().method()==='POST'){
       const payload=route.request().postDataJSON()
       submissions.push(payload)
       const id=crypto.randomUUID(),resultId=crypto.randomUUID()
       imageRows.push({id:resultId,projectId,prompt:payload.prompt,url:'/api/media/'+resultId+'.png'})
-      const job={id,resultId,status:'done'}
+      const job={id,resultId,status:'done',ratio:payload.ratio,cowart:{...payload.cowart,requestId:payload.idempotencyKey,acknowledgedAt:null}}
       imageJobs.push(job)
+      if(submissions.length===1){await route.abort('connectionreset');return}
       await route.fulfill({json:{jobs:[job]}})
     }else await route.fulfill({json:{jobs:imageJobs}})
   })
-  await page.route('**/api/cowart/snapshot?*',route=>{
+  await context.route('**/api/cowart/snapshot?*',async route=>{
     if(rejectSave && route.request().method()==='PUT')
       return route.fulfill({status:503,json:{error:'模拟保存失败'}})
-    return route.continue()
+    const response=await route.fetch()
+    if(response.ok()&&route.request().method()==='PUT'){
+      const records=Object.values(route.request().postDataJSON().snapshot.store)
+      for(const job of imageJobs){
+        if(records.some(r=>r.meta?.studioHistoryId===job.resultId))job.cowart.acknowledgedAt='saved'
+      }
+    }
+    return route.fulfill({response})
   })
   await page.reload({waitUntil:'domcontentloaded'})
   await page.waitForFunction(()=>!!window.__cowartEditor)
@@ -134,8 +147,18 @@ try{
     rejectSave=round===1
     await page.locator('.hamoki-studio-panel textarea').fill(round===0?'生成游戏按钮':'保持布局，调整按钮颜色 '+round)
     await page.getByRole('button',{name:'直接生成 1 张',exact:true}).click()
+    if(round===0){
+      await page.getByRole('alert').filter({hasText:'付费请求结果未确认'}).waitFor()
+      await page.evaluate(()=>{
+        const editor=window.__cowartEditor
+        editor.createPage({id:'page:while-generating',name:'临时切换页面'})
+        editor.setCurrentPage('page:while-generating')
+      })
+      await page.getByRole('button',{name:'重新查询原任务（不扣新费用）',exact:true}).click()
+    }
     await page.waitForFunction(n=>window.__cowartEditor.getCurrentPageShapes().filter(s=>s.meta?.studioHistoryId).length===n,round+1)
     assert.equal(submissions.length,round+1)
+    assert.equal(await page.evaluate(()=>window.__cowartEditor.getCurrentPageId()),submissions[round].cowart.pageId,'Results return to the submitted page after switching pages')
     assert.equal(submissions[round].sourceId,round===0?undefined:imageRows[round-1].id)
     if(rejectSave){
       await page.locator('.hamoki-save-error').waitFor()
@@ -146,9 +169,20 @@ try{
       assert.equal(await page.evaluate(key=>!!sessionStorage.getItem(key),recoveryKey),true)
       await page.getByRole('button',{name:'直接生成 1 张',exact:true}).click()
       assert.equal(submissions.length,round+1,'Unsaved result must block a new image submission')
-      // Reload before result was saved: recover by polling the same job, never POST again.
+      // Close the tab before saving. A new tab has no sessionStorage identity.
       rejectSave=false
-      await page.reload({waitUntil:'domcontentloaded'})
+      await page.close()
+      page=await context.newPage()
+      page.on('pageerror',e=>errors.push({message:e.message}))
+      await page.goto(base+'/healthz')
+      assert.equal(await page.evaluate(key=>sessionStorage.getItem(key),recoveryKey),null)
+      rejectRecovery=true
+      await page.goto(entry,{waitUntil:'domcontentloaded'})
+      await page.getByRole('alert').filter({hasText:'无法核对服务器原任务'}).waitFor()
+      assert.equal(await page.getByRole('button',{name:'直接生成 1 张',exact:true}).isDisabled(),true)
+      assert.equal(submissions.length,round+1,'Offline recovery cannot silently submit another image job')
+      rejectRecovery=false
+      await page.getByRole('button',{name:'重新查询原任务（不扣新费用）',exact:true}).click()
       await page.waitForFunction(n=>window.__cowartEditor?.getCurrentPageShapes().filter(s=>s.meta?.studioHistoryId).length===n,round+1)
       assert.equal(submissions.length,round+1,'Recovery must not submit another image job')
     }
@@ -179,7 +213,7 @@ try{
   await page.evaluate(()=>{window.__cowartEditor.zoomToFit({animation:{duration:0}})})
   assert.equal(errors.length,0,'Image workflow must not cause browser page errors')
   await page.screenshot({path:path.join(root,'cowart','test-results','browser-smoke.png'),fullPage:true})
-  console.log('PASS: mock generation + two edits, saved versions, failed-save reload recovery; exactly three image submissions')
+  console.log('PASS: mock generation + two edits, lost POST response recovery, tab-close recovery, offline query safety; exactly three image submissions')
   console.log('PASS: authenticated Cowart renders, Studio panel responds, tldraw shape persists and survives reload')
 }catch(error){
   const failedPage=browser?.contexts()[0]?.pages()[0]
