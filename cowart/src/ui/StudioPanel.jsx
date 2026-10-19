@@ -4,6 +4,7 @@ import { exportSelectionToDataUrl } from '../lib/selectionExport.js'
 import { getStudioContext, studioJSON } from '../lib/studioBridge.js'
 import { importLegacyStudioNodes } from '../lib/legacyImport.js'
 import { summarizeCanvasSelection } from '../lib/selectionContext.js'
+import { acknowledgeSavedResult, hasUnsavedResult } from '../lib/jobRecovery.js'
 
 const RATIOS = [[1, 1], [3, 2], [2, 3], [16, 9], [9, 16], [4, 3], [3, 4]]
 const RATIO_NAMES = RATIOS.map(([a, b]) => a + ':' + b)
@@ -44,7 +45,8 @@ function insertStudioResult(editor, image, anchorId, ratio) {
     shapeMeta: { studioHistoryId: image.id, studioProjectId: image.projectId, studioOrigin: 'image-job' }
   })
   // Server-owned same-origin media URL; do not embed large base64 images in the canvas snapshot.
-  records.assetRecord.props.fileSize = 0
+  // tldraw requires a positive size when present; a remote URL has no known byte size.
+  delete records.assetRecord.props.fileSize
   records.assetRecord.props.name = 'hamoki-' + image.id + '.png'
   editor.store.put([records.assetRecord, records.shapeRecord])
   editor.select(records.shapeId)
@@ -193,9 +195,15 @@ export default function StudioPanel({ open, onClose, getEditor }) {
         if (!found) throw new Error('图片已生成，但历史记录暂未同步；请前往 Studio 历史记录查看')
         const dimensions = await imageDimensions(found.url)
         if (cancelled) return
+        // Persist identity before insertion triggers the debounced snapshot save.
+        sessionStorage.setItem('hamoki-cowart-active:'+context.projectId,
+          JSON.stringify({jobId,anchorId:active.current?.anchorId||null,ratio:active.current?.ratio||'1:1',resultId:found.id}))
         const added = insertStudioResult(getEditor(), { ...found, dimensions }, active.current?.anchorId, active.current?.ratio || '1:1')
-        sessionStorage.removeItem('hamoki-cowart-active:'+context.projectId)
-        sessionStorage.removeItem('hamoki-cowart-last-request:'+context.projectId)
+        if (!added) {
+          const saved = await studioJSON('/api/cowart/snapshot?projectId='+encodeURIComponent(context.projectId))
+          if (cancelled) return
+          acknowledgeSavedResult(context.projectId, saved.snapshot)
+        }
         setPhase('done')
         setMessage(added ? '已完成，并放置在所选图片旁边' : '已完成，画布已存在此图片，无须重复插入')
       } catch (e) {
@@ -226,6 +234,10 @@ export default function StudioPanel({ open, onClose, getEditor }) {
   async function submit(event) {
     event.preventDefault()
     if (!context || !prompt.trim() || ['analyzing','preparing','submitting','queued','running'].includes(phase)) return
+    if (hasUnsavedResult(context.projectId)) {
+      setError('上一张图片尚未保存到服务器，请先解决「画布尚未同步」提示并等待保存成功；刷新会恢复原任务，不会重新生图。')
+      return
+    }
     if (phase==='uncertain') {
       setError('上一条请求结果未确认，请先通过任务队列核对，再明确开启下一条任务。')
       return
@@ -455,6 +467,10 @@ export default function StudioPanel({ open, onClose, getEditor }) {
       onClick={()=>{setError('');setMessage('正在重新查询原任务，不会提交新生图…');setRetryTick(x=>x+1)}}>重新查询原任务（不扣新费用）</button>}
     {['done','failed','uncertain','answered','cancelled','interrupted'].includes(phase) && <button className="hamoki-studio-next" type="button" onClick={() => {
       if(phase==='uncertain'&&!window.confirm('确认已经核对 Studio 任务队列和历史记录？未确认的请求可能已计费，切换到新任务会产生重复费用风险。'))return
+      if(context?.projectId && hasUnsavedResult(context.projectId)) {
+        setError('上一张图片尚未保存到服务器，暂不能开启下一轮；请先保存画布，或刷新恢复原任务。')
+        return
+      }
       if(context?.projectId){
         sessionStorage.removeItem('hamoki-cowart-active:'+context.projectId)
         sessionStorage.removeItem('hamoki-cowart-last-request:'+context.projectId)

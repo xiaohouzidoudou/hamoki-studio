@@ -1,4 +1,5 @@
 import { getStudioSnapshot, putStudioSnapshot, getStudioContext } from './studioBridge.js'
+import { acknowledgeSavedResult } from './jobRecovery.js'
 // IndexedDB-backed canvas persistence.
 //
 // Replaces the Vite dev-server middleware that previously stored the tldraw
@@ -119,6 +120,8 @@ let sessionViewState = { version: 1, currentPageId: null, camera: { x: 0, y: 0, 
 export async function loadCanvasSnapshot() {
   const response = await getStudioSnapshot()
   serverRevision = response.revision || 0
+  const { projectId } = await getStudioContext()
+  acknowledgeSavedResult(projectId, response.snapshot)
   return { snapshot: response.snapshot, storage: response.snapshot ? 'studio' : 'empty' }
 }
 
@@ -129,6 +132,8 @@ export async function saveCanvasSnapshot(snapshot) {
   if (!sanitized.snapshot) return { storage: 'invalid', skippedRecords: sanitized.skippedRecords }
   const response = await putStudioSnapshot(sanitized.snapshot, serverRevision)
   serverRevision = response.revision
+  const { projectId } = await getStudioContext()
+  acknowledgeSavedResult(projectId, sanitized.snapshot)
   return { storage: 'studio', skippedRecords: sanitized.skippedRecords }
 }
 
