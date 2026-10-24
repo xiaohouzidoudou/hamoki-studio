@@ -24,7 +24,7 @@ function near(a,b,pad=90){
   if(!a||!b)return false;
   return !(a.x+a.w+pad<b.x||b.x+b.w+pad<a.x||a.y+a.h+pad<b.y||b.y+b.h+pad<a.y);
 }
-export function summarizeCanvasSelection(editor) {
+export function summarizeCanvasSelection(editor, { primaryId = null, roles = {} } = {}) {
   if(!editor)return [];
   const selected=editor.getSelectedShapes().slice(0,8);
   const ids=new Set(selected.map(s=>s.id));
@@ -40,6 +40,8 @@ export function summarizeCanvasSelection(editor) {
       selected:true,
       isHolder:!!s.meta?.cowartAiImageHolder,
       isGenerated:!!s.meta?.studioHistoryId,
+      isPrimary:s.id===primaryId,
+      referenceRole:roles[s.id]||'general',
       width:Math.round(Number(s.props?.w)||b?.w||0),
       height:Math.round(Number(s.props?.h)||b?.h||0),
       text:textOf(s.props?.richText||s.props?.text||s.props?.name),

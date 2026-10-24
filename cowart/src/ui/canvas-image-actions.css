@@ -1,0 +1,8 @@
+.cowart-image-actions{position:absolute;z-index:300;display:flex;gap:6px;padding:5px;background:#10231e;border:1px solid #427763;border-radius:10px;box-shadow:0 4px 18px #0006;pointer-events:auto}
+.cowart-image-actions button{border:0;background:#234a3b;color:#e1f6e9;padding:7px 10px;border-radius:6px;font:600 12px/1.3 system-ui,sans-serif;cursor:pointer}
+.cowart-image-actions button:hover{background:#34674e}
+.cowart-image-actions button:focus-visible,.cowart-image-preview-close:focus-visible{outline:2px solid #9be4ad;outline-offset:2px}
+.cowart-image-preview{position:fixed;inset:0;z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#06110eef;padding:48px 24px 28px;box-sizing:border-box;color:#bedbc9;pointer-events:auto}
+.cowart-image-preview-image{display:block;max-width:100%;max-height:calc(100dvh - 120px);object-fit:contain;box-shadow:0 8px 48px #0008;user-select:none}
+.cowart-image-preview p{margin:0;font:12px/1.5 system-ui,sans-serif;text-align:center}
+.cowart-image-preview-close{position:absolute;right:18px;top:14px;width:36px;height:36px;border:1px solid #4b7660;border-radius:8px;background:#19372b;color:#e1f6e9;font:24px/1 system-ui,sans-serif;cursor:pointer}

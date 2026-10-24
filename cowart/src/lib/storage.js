@@ -1,5 +1,7 @@
+import { normalizeAssetSources } from './assetCapture.js'
 import { getStudioSnapshot, putStudioSnapshot, getStudioContext } from './studioBridge.js'
 import { acknowledgeSavedResult } from './jobRecovery.js'
+import { uploadCanvasAssets } from './canvasAssets.js'
 // IndexedDB-backed canvas persistence.
 //
 // Replaces the Vite dev-server middleware that previously stored the tldraw
@@ -11,10 +13,10 @@ import { acknowledgeSavedResult } from './jobRecovery.js'
 //  - A single merged canvas snapshot is stored under the "canvas" key. The old
 //    per-page file split existed to give the Codex MCP server file-level
 //    access; a browser-only, single-user app does not need it.
-//  - Image assets are stored inline as data URLs inside the snapshot so the
-//    JSON is fully self-contained (no separate blob store, no object-URL
-//    lifecycle to manage). blob: URLs from drag-and-drop are captured into
-//    data URLs on save.
+//  - Studio saves local blob/data image bytes separately before the snapshot.
+//    The snapshot contains account-scoped media URLs; legacy inline assets are
+//    migrated during the next successful save without changing live records
+//    before persistence succeeds.
 
 import {
   isCanvasSnapshot,
@@ -79,39 +81,6 @@ async function kvSet(key, value) {
   })
 }
 
-function blobToDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result)
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(blob)
-  })
-}
-
-// Capture blob: asset sources (e.g. from drag-and-drop uploads) into stable
-// data URLs so the persisted snapshot is self-contained. Remote http(s) URLs
-// and existing data URLs are left untouched.
-async function normalizeAssetSources(snapshot) {
-  const store = snapshot.store
-  for (const id of Object.keys(store)) {
-    const record = store[id]
-    if (record?.typeName !== 'asset' || record.type !== 'image') continue
-    const src = record.props?.src
-    if (typeof src !== 'string' || !src.startsWith('blob:')) continue
-    try {
-      const response = await fetch(src)
-      const blob = await response.blob()
-      record.props.src = await blobToDataUrl(blob)
-    } catch (error) {
-      // A revoked blob URL cannot be recovered; warn but keep going so the
-      // rest of the snapshot still saves.
-      console.warn('Cowart could not capture asset blob, skipping:', src, error)
-    }
-  }
-  return snapshot
-}
-
-
 let serverRevision = 0
 let sessionSelection = { selectedShapes: [], updatedAt: null }
 let sessionViewState = { version: 1, currentPageId: null, camera: { x: 0, y: 0, z: 1 }, updatedAt: null }
@@ -127,14 +96,15 @@ export async function loadCanvasSnapshot() {
 
 export async function saveCanvasSnapshot(snapshot) {
   if (!isCanvasSnapshot(snapshot)) return { storage: 'invalid', skippedRecords: [] }
-  const normalized = await normalizeAssetSources(snapshot)
+  const uploaded = await uploadCanvasAssets(snapshot)
+  const normalized = await normalizeAssetSources(uploaded.snapshot)
   const sanitized = sanitizeCanvasSnapshotForTldraw(normalized)
   if (!sanitized.snapshot) return { storage: 'invalid', skippedRecords: sanitized.skippedRecords }
   const response = await putStudioSnapshot(sanitized.snapshot, serverRevision)
   serverRevision = response.revision
   const { projectId } = await getStudioContext()
   acknowledgeSavedResult(projectId, sanitized.snapshot)
-  return { storage: 'studio', skippedRecords: sanitized.skippedRecords }
+  return { storage: 'studio', skippedRecords: sanitized.skippedRecords, assetReplacements: uploaded.replacements }
 }
 
 export async function readSelection() {

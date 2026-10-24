@@ -46,3 +46,7 @@
 .hamoki-vision-switch input{margin:3px 0 0;accent-color:#88d8a1;flex-shrink:0}
 .hamoki-vision-settings .hamoki-studio-row{margin-top:12px}
 .hamoki-vision-settings .hamoki-studio-field{margin-bottom:0}
+.hamoki-canvas-inputs{margin:10px 0 14px;padding:10px 12px;border:1px solid #355445;border-radius:10px;min-width:0}
+.hamoki-canvas-inputs summary{color:#b5d3c3;font-size:12px;cursor:pointer}
+.hamoki-canvas-inputs[open] summary{margin-bottom:12px}
+.hamoki-canvas-inputs small{display:block;color:#a2bdb0;font-size:11px;line-height:1.5}
