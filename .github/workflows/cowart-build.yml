@@ -37,9 +37,6 @@ jobs:
       - name: Install Cowart dependencies
         run: npm ci --no-audit --no-fund
         working-directory: cowart
-      - name: Install pinned local tldraw assets package
-        run: npm install --no-save @tldraw/assets@5.1.1 --no-audit --no-fund
-        working-directory: cowart
       - name: Build Cowart preview
         run: npm run build
         working-directory: cowart
@@ -53,6 +50,9 @@ jobs:
         run: |
           npm install --no-save --package-lock=false playwright
           npx playwright install --with-deps chromium
+        working-directory: cowart
+      - name: Test independent Hamoki canvas interactions and legacy documents
+        run: node tests/native-canvas-smoke.mjs
         working-directory: cowart
       - name: Test large canvas asset upload in real Chromium
         run: node tests/asset-upload-smoke.mjs

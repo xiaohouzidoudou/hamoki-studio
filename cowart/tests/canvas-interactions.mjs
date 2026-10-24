@@ -81,7 +81,7 @@ export async function verifyCanvasInteractions({page,context,base,projectId,scre
     const s=window.__cowartEditor.getShape('shape:interaction-one');return {x:s.x,y:s.y}
   }),{x:70,y:80},'Panning cannot move the original')
   await page.evaluate(()=>{const e=window.__cowartEditor;e.setCamera({x:0,y:0,z:1});e.selectNone()})
-  await page.mouse.move(40,60)
+  await page.mouse.move(40,110)
   await page.mouse.down()
   await page.mouse.move(280,230,{steps:10})
   await page.mouse.up()

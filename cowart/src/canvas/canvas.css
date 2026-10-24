@@ -1,0 +1,412 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  color: #dbeae1;
+  background: #0c1411;
+  color-scheme: dark;
+}
+body {
+  margin: 0;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
+.cowart-canvas {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+.hamoki-canvas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #0f1914;
+  touch-action: none;
+}
+.hamoki-board {
+  width: 100%;
+  height: 100%;
+  display: block;
+  outline: none;
+  user-select: none;
+  touch-action: none;
+}
+.hamoki-canvas-header {
+  position: absolute;
+  left: 18px;
+  top: 15px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  pointer-events: none;
+  font-size: 13px;
+  letter-spacing: 0.2px;
+}
+.hamoki-canvas-header img {
+  width: 27px;
+  height: 27px;
+  border-radius: 9px;
+}
+.hamoki-sync {
+  font-size: 11px;
+  font-weight: 400;
+  color: #83aa92;
+  margin-left: 8px;
+}
+.hamoki-sync.is-error {
+  color: #f49e94;
+}
+.hamoki-tools {
+  position: absolute;
+  left: 16px;
+  top: 54px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 5px;
+  background: #19271fee;
+  border: 1px solid #354c3c;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px #0004;
+}
+.hamoki-tools button,
+.hamoki-view-controls button,
+.hamoki-selection-properties > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  color: #b9d1c1;
+  background: transparent;
+  border-radius: 8px;
+  min-width: 34px;
+  height: 34px;
+  padding: 7px;
+}
+.hamoki-tools button:hover,
+.hamoki-view-controls button:hover,
+.hamoki-selection-properties > button:hover {
+  background: #2d4937;
+  color: #e3ffec;
+}
+.hamoki-tools button[aria-pressed='true'] {
+  background: #3e7050;
+  color: #e7ffed;
+  box-shadow: inset 0 0 0 1px #6d9f79;
+}
+.hamoki-tools button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.hamoki-tool-divider {
+  height: 22px;
+  width: 1px;
+  background: #3d5444;
+  margin: 0 4px;
+}
+.hamoki-view-controls {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  border: 1px solid #354c3c;
+  border-radius: 12px;
+  background: #19271fee;
+  padding: 5px;
+}
+.hamoki-view-controls select {
+  border: 0;
+  border-left: 1px solid #354c3c;
+  background: transparent;
+  color: #c5d9cc;
+  width: 110px;
+  margin-left: 5px;
+  padding-left: 9px;
+  outline: none;
+}
+.hamoki-empty-hint {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 12px;
+  color: #789480;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.hamoki-empty-hint strong {
+  color: #b9d6c0;
+  font-weight: 500;
+  font-size: 24px;
+  letter-spacing: 1px;
+}
+.hamoki-empty-hint span {
+  font-size: 14px;
+}
+.hamoki-empty-hint small {
+  font-size: 11px;
+  margin-top: 8px;
+  color: #66826f;
+}
+.hamoki-context-menu {
+  position: absolute;
+  z-index: 28;
+  width: 190px;
+  padding: 6px;
+  background: #1d2c23;
+  border: 1px solid #526c59;
+  border-radius: 12px;
+  box-shadow: 0 15px 40px #0007;
+}
+.hamoki-context-menu button {
+  width: 100%;
+  text-align: left;
+  display: block;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 7px;
+  color: #d6e8dc;
+  background: transparent;
+  font-size: 13px;
+}
+.hamoki-context-menu button:hover {
+  background: #35503e;
+}
+.hamoki-selection-properties {
+  position: absolute;
+  bottom: 72px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #19271ff2;
+  border: 1px solid #3a5543;
+  border-radius: 12px;
+  padding: 8px 10px;
+  max-width: calc(100% - 32px);
+  overflow: auto;
+}
+.hamoki-selection-properties strong {
+  font-size: 11px;
+  white-space: nowrap;
+  font-weight: 500;
+  color: #8dab98;
+}
+.hamoki-selection-properties label {
+  font-size: 11px;
+  color: #99b5a2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hamoki-selection-properties input {
+  width: 63px;
+  background: #101d16;
+  border: 1px solid #415e4b;
+  border-radius: 5px;
+  color: #e1f0e6;
+  padding: 5px;
+  font-size: 12px;
+}
+.hamoki-color-palette {
+  display: flex;
+  gap: 5px;
+}
+.hamoki-color-palette button {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #ffffff29;
+  background: #55b58a;
+}
+.hamoki-color-palette button[data-color='yellow'] {
+  background: #edcf76;
+}
+.hamoki-color-palette button[data-color='red'] {
+  background: #f28280;
+}
+.hamoki-color-palette button[data-color='blue'] {
+  background: #79aee8;
+}
+.hamoki-color-palette button[data-color='white'] {
+  background: #f3faf6;
+}
+.hamoki-color-palette button[data-color='grey'] {
+  background: #9aaea5;
+}
+.hamoki-text-editor {
+  position: absolute;
+  z-index: 22;
+  resize: both;
+  background: #16251ff5;
+  color: #e0f2e7;
+  border: 1px solid #9cdeb6;
+  border-radius: 6px;
+  padding: 8px;
+  outline: none;
+  box-shadow: 0 8px 30px #0006;
+  font:
+    20px/1.4 system-ui,
+    sans-serif;
+}
+.cowart-ai-launcher {
+  position: absolute;
+  display: flex;
+  gap: 8px;
+}
+.cowart-ai-launcher > button {
+  background: #234331;
+  border: 1px solid #4a7256;
+  border-radius: 9px;
+  padding: 9px 12px;
+  color: #d4f1de;
+  font-size: 12px;
+}
+.hamoki-back-link {
+  font-size: 12px;
+}
+.hamoki-toast {
+  position: absolute;
+  z-index: 30;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2d4938;
+  color: #d4f3dd;
+  border: 1px solid #6d967b;
+  border-radius: 10px;
+  padding: 11px 15px;
+  font-size: 13px;
+  box-shadow: 0 8px 28px #0006;
+  max-width: 75vw;
+}
+.hamoki-toast button {
+  border: 0;
+  color: inherit;
+  background: transparent;
+  margin-left: 18px;
+}
+.hamoki-legacy-warning {
+  position: absolute;
+  top: 103px;
+  left: 16px;
+  background: #3d3824;
+  color: #e1d29d;
+  border: 1px solid #7e7147;
+  border-radius: 9px;
+  padding: 10px;
+  font-size: 11px;
+  max-width: 480px;
+  z-index: 23;
+}
+.hamoki-legacy-warning button {
+  background: transparent;
+  color: inherit;
+  border: 1px solid #a49360;
+  border-radius: 6px;
+  padding: 5px;
+}
+.hamoki-load-error {
+  max-width: 650px;
+  margin: 15vh auto;
+  padding: 32px;
+  background: #223126;
+  border: 1px solid #53715b;
+  border-radius: 18px;
+}
+.hamoki-load-error h1 {
+  font-size: 22px;
+}
+.hamoki-load-error p {
+  color: #b1cab8;
+  line-height: 1.8;
+}
+.hamoki-load-error button {
+  background: #30553d;
+  color: #d9f1de;
+  border: 1px solid #6d9878;
+  border-radius: 8px;
+  padding: 10px;
+  margin-right: 9px;
+}
+.cowart-status {
+  display: grid;
+  place-items: center;
+  height: 100vh;
+  color: #9cbeaa;
+  background: #101a17;
+}
+.hamoki-save-error {
+  top: 106px;
+  max-width: min(590px, calc(100% - 32px));
+}
+.hamoki-canvas button:focus-visible {
+  outline: 2px solid #b6f0ca;
+  outline-offset: 3px;
+}
+@media (max-width: 840px) {
+  .hamoki-tools {
+    max-width: calc(100% - 32px);
+    overflow: auto;
+    top: 52px;
+  }
+  .hamoki-canvas-header {
+    font-size: 12px;
+  }
+  .hamoki-selection-properties {
+    bottom: 125px;
+    gap: 6px;
+  }
+  .hamoki-view-controls {
+    bottom: 65px;
+  }
+  .hamoki-empty-hint small {
+    white-space: normal;
+    text-align: center;
+    max-width: 230px;
+  }
+  .hamoki-canvas-header .hamoki-sync {
+    display: none;
+  }
+  .hamoki-load-error {
+    margin: 15vh 12px;
+  }
+  .hamoki-studio-panel {
+    box-shadow: -20px 0 80px #0009;
+  }
+  .hamoki-studio-panel:has(+ *) {
+    max-height: 90vh;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+body {
+  color: #dbeae1;
+  background: #0c1411;
+}
+.hamoki-canvas-header {
+  color: #dbeae1;
+}

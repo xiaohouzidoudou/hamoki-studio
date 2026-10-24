@@ -25,7 +25,7 @@
 5. After CI success, verify exact SHA and merge the reviewed PR. If CI fails, fix on task branch.
 6. Isolated QA staging may auto-deploy the integration branch **only after a successful matching push CI**. Check what SHA actually reached QA.
 7. After smoke testing, comment on the Issue and update the development snapshot as needed.
-8. Production promotion remains separate and manual, requiring user acceptance, tldraw licensing, backups, upstream E2E and rollback evidence.
+8. Production promotion remains separate and manual, requiring user acceptance, dependency license review, backups, upstream E2E and rollback evidence.
 
 ## Deployment distinction
 - "Committed" = GitHub repository contains code.

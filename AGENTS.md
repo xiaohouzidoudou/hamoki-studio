@@ -7,7 +7,7 @@ Scope: this **public product repository only**. Never copy personal/global Agent
 2. Fetch the latest remote refs. Confirm which branch you are on and whether the working tree is clean.
 3. Create or claim a focused Issue and work on an **agent-specific task branch**, for example `codex/issue-123-fix` or `chatgpt/issue-123-fix`. Base it on the current integration branch, not a stale local copy.
 4. Open a PR targeting `feature/cowart-web-canvas-20261016`. Do not edit the same file from two branches without checking the other agent's changes. The integration branch is for reviewed PR merges, not concurrent direct edits.
-5. Do not merge the Cowart integration branch into `main` before actual paid-model E2E verification and license review.
+5. Do not merge the Cowart integration branch into `main` before actual paid-model E2E verification and dependency license review.
 
 ## Work and verification
 - Reuse existing code and tests. Fix the specific issue before adding unrelated features.

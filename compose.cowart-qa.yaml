@@ -3,8 +3,6 @@ services:
   cowart-qa:
     build:
       context: .
-      args:
-        VITE_TLDRAW_LICENSE_KEY: ${QA_TLDRAW_LICENSE_KEY:-}
     image: hamoki-studio:cowart-qa
     restart: unless-stopped
     ports:

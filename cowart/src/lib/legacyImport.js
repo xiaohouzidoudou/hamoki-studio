@@ -1,6 +1,6 @@
 // Imports legacy Studio project nodes without deleting, moving, or altering their server records.
 // This is deliberately user-triggered and idempotent via studioNodeId metadata.
-import { createShapeId, toRichText } from 'tldraw'
+import { createShapeId, toRichText } from '../canvas/model.js'
 import { buildImageShapeRecords } from './placement.js'
 import { studioJSON } from './studioBridge.js'
 
