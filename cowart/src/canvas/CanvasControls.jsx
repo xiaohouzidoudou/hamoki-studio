@@ -19,6 +19,8 @@ function ToolGlyph({ type }) {
     laser:
       'M12 2V6M2 12H6M18 12H22M12 18V22M5 5L8 8M16 16L19 19M5 19L8 16M16 8L19 5',
     frame: 'M4 0V24M20 0V24M0 4H24M0 20H24',
+    'x-box': 'M0 0H24V24H0ZM0 0L24 24M24 0L0 24',
+    'check-box': 'M0 0H24V24H0ZM4 12L10 19L21 5',
   }
   return (
     <svg
@@ -33,6 +35,29 @@ function ToolGlyph({ type }) {
       aria-hidden="true"
     >
       <path d={paths[type] || geoPath(type, 24, 24)} />
+    </svg>
+  )
+}
+function PanelIcon({ name }) {
+  const paths = {
+    close: 'M5 5L19 19M19 5L5 19',
+    edit: 'M4 16L15 5L19 9L8 20H4ZM14 6L18 10',
+    up: 'M5 14L12 7L19 14',
+    media: 'M3 3H21V21H3ZM3 16L8 11L13 16L17 12L21 16M16 7h.01',
+  }
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d={paths[name]} />
     </svg>
   )
 }
@@ -178,13 +203,15 @@ export default function CanvasControls({
     },
     applicable = (key) => {
       if (!one) return true
-      if (one.type === 'image') return false
+      const types = new Set(editor.styleTargets().map((s) => s.type))
+      if (!types.size || [...types].every((type) => type === 'image'))
+        return false
       if (key === 'kind' || key.startsWith('arrowhead'))
-        return one.type === 'arrow'
-      if (key === 'spline') return one.type === 'line'
-      if (key === 'fill') return one.type === 'geo'
+        return types.has('arrow')
+      if (key === 'spline') return types.has('line')
+      if (key === 'fill') return types.has('geo')
       if (['font', 'textAlign', 'verticalAlign'].includes(key))
-        return ['text', 'note', 'geo', 'arrow'].includes(one.type)
+        return ['text', 'note', 'geo', 'arrow'].some((type) => types.has(type))
       return true
     }
   const action = (label, fn, disabled = false) => (
@@ -426,7 +453,7 @@ export default function CanvasControls({
           <header>
             <strong>{panel}</strong>
             <button aria-label="关闭画布面板" onClick={() => setPanel(null)}>
-              ×
+              <PanelIcon name="close" />
             </button>
           </header>
           {panel === '工具库' && (
@@ -452,7 +479,7 @@ export default function CanvasControls({
                   setPanel(null)
                 }}
               >
-                <ToolGlyph type="holder" />
+                <PanelIcon name="media" />
                 <span>导入媒体</span>
               </button>
             </div>
@@ -460,7 +487,10 @@ export default function CanvasControls({
           {panel === '样式' && (
             <fieldset
               className="hamoki-style-fields"
-              disabled={!!selected.length && selected.every((s) => s.isLocked)}
+              disabled={
+                !!selected.length &&
+                selected.every((s) => editor.isShapeLocked(s))
+              }
             >
               <p className="hamoki-panel-hint">
                 {selected.length
@@ -742,7 +772,7 @@ export default function CanvasControls({
                       if (name) editor.renamePage(p.id, name)
                     }}
                   >
-                    ✎
+                    <PanelIcon name="edit" />
                   </button>
                   <button
                     aria-label={'上移页面 ' + p.name}
@@ -751,7 +781,7 @@ export default function CanvasControls({
                       editor.reorderPage(p.id, -1)
                     }}
                   >
-                    ↑
+                    <PanelIcon name="up" />
                   </button>
                 </div>
               ))}

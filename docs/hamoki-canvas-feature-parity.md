@@ -26,3 +26,11 @@ The original app did not enable collaborative multiplayer or cursor chat. SDK de
 Status: full parity in development. No complete acceptance or deployment is claimed by this document.
 
 The expanded engine writes native schema version 2. Version 1 documents remain readable; a version 1 engine rejects version 2 snapshots rather than silently dropping new native transforms and types. Rolling back QA therefore requires the pre-upgrade data backup together with the previous image. Future native schema versions remain fail-closed.
+
+## Expanded tool milestone and remaining gaps
+
+The expanded milestone provides real implementations for all 30 toolbar entries (the media picker currently follows Studio's persistent PNG/JPEG/WebP formats), common styles, arrange/page/clipboard actions, crop/flip, rich text and SVG/PNG/JSON export. This is not yet a complete SDK-equivalence claim.
+
+Remaining full-parity work includes SVG/vector and video media import/persistence, provider-specific embed URL handling/previews, portable backups carrying the actual asset bytes, object snapping and remaining original menu/preferences details, and the full legacy-document fixture/hardware/cross-device matrix. Unknown legacy types remain explicitly marked and retained. Sandbox embeds may be blocked by a target site's own frame policy. These gaps must stay visible until implemented and verified; a passing toolbar smoke alone cannot close the overall task.
+
+The newer regression checks include real grouped style/opacity, clipboard and page operations, draggable crop/flip with sampled output pixels and unchanged source, connector bindings/edge positions/drag/undo, rich-text live saving and undo, plus SVG XML and PNG signatures. The existing Studio generation/edit/reference, recovery, upload/save-race and cancellation scripts remain required on the final exact SHA.

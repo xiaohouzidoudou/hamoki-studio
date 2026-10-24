@@ -163,11 +163,12 @@ export default function ShapeContent({ editor, shape }) {
     b = localBounds(shape),
     color = shapeColor(shape),
     sw = strokeWidth(p),
+    patternId = 'hamoki-fill-' + shape.id.replace(/[^a-zA-Z0-9]/g, ''),
     fill =
       p.fill === 'none' || !p.fill
         ? 'transparent'
         : p.fill === 'pattern'
-          ? 'url(#hamoki-hatch)'
+          ? `url(#${patternId})`
           : color,
     fillOpacity = p.fill === 'semi' ? 0.25 : 1,
     stroke = {
@@ -222,6 +223,22 @@ export default function ShapeContent({ editor, shape }) {
   if (shape.type === 'geo')
     return (
       <>
+        {p.fill === 'pattern' && (
+          <defs>
+            <pattern
+              id={patternId}
+              width="8"
+              height="8"
+              patternUnits="userSpaceOnUse"
+            >
+              <path
+                d="M-2 2L2 -2M0 8L8 0M6 10L10 6"
+                stroke={color}
+                strokeWidth="1"
+              />
+            </pattern>
+          </defs>
+        )}
         <path
           d={geoPath(p.geo, b.w, b.h)}
           fill={fill}

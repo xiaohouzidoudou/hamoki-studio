@@ -24,6 +24,79 @@ export function installCanvasActions(
       if (!outer) this.endGesture()
     }
   }
+  p.captureInsideFrame = function (id) {
+    const frame = this.getShape(id)
+    if (frame?.type !== 'frame') return
+    const im = inverse(shapeMatrix(this.records, frame)),
+      updates = []
+    for (const shape of this.getCurrentPageShapes()) {
+      if (shape.id === id || shape.parentId !== frame.parentId) continue
+      const b = this.getShapePageBounds(shape),
+        corners = [
+          [b.x, b.y],
+          [b.x + b.w, b.y],
+          [b.x, b.y + b.h],
+          [b.x + b.w, b.y + b.h],
+        ].map(([x, y]) => transform(im, { x, y }))
+      if (
+        corners.every(
+          (p) =>
+            p.x >= 0 &&
+            p.y >= 0 &&
+            p.x <= frame.props.w &&
+            p.y <= frame.props.h,
+        )
+      )
+        updates.push({
+          id: shape.id,
+          parentId: id,
+          ...decompose(multiply(im, shapeMatrix(this.records, shape))),
+        })
+    }
+    this.updateShapes(updates)
+  }
+  p.adoptMovedShapes = function (ids, point) {
+    const selected = new Set(ids),
+      frames = this.getCurrentPageShapes()
+        .filter((s) => s.type === 'frame' && !selected.has(s.id))
+        .reverse()
+    const target = frames.find((frame) => {
+      const seen = new Set()
+      let parent = frame
+      while (parent?.typeName === 'shape' && !seen.has(parent.id)) {
+        if (selected.has(parent.id)) return false
+        seen.add(parent.id)
+        parent = this.records[parent.parentId]
+      }
+      const p = transform(inverse(shapeMatrix(this.records, frame)), point)
+      return (
+        p.x >= 0 && p.y >= 0 && p.x <= frame.props.w && p.y <= frame.props.h
+      )
+    })
+    this.updateShapes(
+      ids
+        .map((id) => this.getShape(id))
+        .filter(Boolean)
+        .filter((s) => !s.isLocked && !selected.has(s.parentId))
+        .map((shape) => {
+          const parent = this.records[shape.parentId],
+            parentId =
+              target?.id || (parent?.type === 'group' ? parent.id : this.pageId)
+          if (shape.parentId === parentId) return null
+          const world = shapeMatrix(this.records, shape),
+            inverseParent = target
+              ? inverse(shapeMatrix(this.records, target))
+              : [1, 0, 0, 1, 0, 0]
+          return {
+            id: shape.id,
+            parentId,
+            ...decompose(multiply(inverseParent, world)),
+            index: this.nextIndex(parentId),
+          }
+        })
+        .filter(Boolean),
+    )
+  }
   p.frameSelection = function () {
     const roots = this.roots(),
       b = union(roots.map((s) => this.getShapePageBounds(s)))
@@ -110,7 +183,7 @@ export function installCanvasActions(
   p.selectionRoots = function (includeLocked = false) {
     const ids = new Set(this.selected)
     return this.getSelectedShapes().filter((s) => {
-      if (!includeLocked && s.isLocked) return false
+      if (!includeLocked && this.isShapeLocked(s)) return false
       const seen = new Set()
       let parent = this.records[s.parentId]
       while (parent?.typeName === 'shape' && !seen.has(parent.id)) {
@@ -314,7 +387,7 @@ export function installCanvasActions(
       seen = new Set()
     while (queue.length) {
       const shape = queue.shift()
-      if (seen.has(shape.id) || shape.isLocked) continue
+      if (seen.has(shape.id) || this.isShapeLocked(shape)) continue
       seen.add(shape.id)
       if (shape.type === 'group')
         queue.push(
@@ -396,7 +469,7 @@ export function installCanvasActions(
               x: Math.max(0, Math.min(1, local.x / (target.props.w || 180))),
               y: Math.max(0, Math.min(1, local.y / (target.props.h || 120))),
             },
-            isExact: true,
+            isExact: !!arrow.meta?.cowartAnnotationArrow,
             isPrecise: true,
           },
         },

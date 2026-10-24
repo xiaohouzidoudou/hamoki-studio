@@ -116,7 +116,7 @@ test('剪贴板：子树、资产、内部绑定重新编号；外部连线定�
     image = d.getSelectedShapes().find((s) => s.type === 'image')
   assert.notEqual(image.props.assetId, 'asset:original')
   assert.equal(d.getBindings(arrow.id)[0].toId, image.id)
-  near(arrow.props.end.x, 300)
+  near(arrow.props.end.x, 250)
   assert.ok(d.getShape('shape:b'))
   d.undo()
   assert.equal(d.getCurrentPageShapes().length, 0)
@@ -298,4 +298,100 @@ test('生成图定位尊重旋转和缩放后的锚点，不与原图重叠', as
   })
   near(placed.x, 240)
   near(placed.y, 100)
+})
+test('组合样式和透明度：样式更新子元素；解组保持视觉透明度', async () => {
+  const d = await setup()
+  d.createShapes([
+    { id: 'shape:a', type: 'geo', opacity: 0.5 },
+    { id: 'shape:b', type: 'geo', x: 300 },
+  ])
+  d.select('shape:a', 'shape:b')
+  d.groupSelected()
+  const group = d.getSelectedShapes()[0]
+  d.setStyle({ color: 'red', opacity: 0.5 })
+  assert.equal(d.getShape('shape:a').props.color, 'red')
+  assert.equal(d.getShape('shape:a').opacity, 0.5)
+  assert.equal(d.getShape(group.id).opacity, 0.5)
+  d.ungroupSelected()
+  assert.equal(d.getShape('shape:a').opacity, 0.25)
+  assert.equal(d.getShape('shape:b').opacity, 0.5)
+})
+test('占位框：框住既有标注后必须非空；移动进出框架保留世界位置和任务身份', async () => {
+  const d = await setup(),
+    { isEmptyImageHolder } = await import('../cowart/src/lib/canvasInputs.js')
+  d.createShape({
+    id: 'shape:a',
+    type: 'geo',
+    x: 100,
+    y: 120,
+    props: { w: 40, h: 40 },
+    meta: { requestId: 'unchanged' },
+  })
+  d.transaction(() => {
+    d.createShape({
+      id: 'shape:f',
+      type: 'frame',
+      x: 80,
+      y: 90,
+      props: { w: 200, h: 200 },
+      meta: { cowartAiImageHolder: true },
+    })
+    d.captureInsideFrame('shape:f')
+  })
+  assert.equal(d.getShape('shape:a').parentId, 'shape:f')
+  assert.equal(isEmptyImageHolder(d.records, d.getShape('shape:f')), false)
+  near(d.getShapePageBounds('shape:a').x, 100)
+  d.adoptMovedShapes(['shape:a'], { x: 500, y: 500 })
+  assert.equal(d.getShape('shape:a').parentId, d.pageId)
+  near(d.getShape('shape:a').x, 100)
+  assert.equal(d.getShape('shape:a').meta.requestId, 'unchanged')
+  d.adoptMovedShapes(['shape:a'], { x: 150, y: 150 })
+  assert.equal(d.getShape('shape:a').parentId, 'shape:f')
+  near(d.getShapePageBounds('shape:a').x, 100)
+})
+test('普通连线落在目标边界，标注保留精确落点；旧非精确绑定也正确解析', async () => {
+  const d = await setup()
+  d.createShapes([
+    { id: 'shape:left', type: 'geo', x: 0, y: 0, props: { w: 100, h: 100 } },
+    { id: 'shape:right', type: 'geo', x: 300, y: 0, props: { w: 100, h: 100 } },
+    {
+      id: 'shape:arrow',
+      type: 'arrow',
+      props: { start: { x: 50, y: 50 }, end: { x: 350, y: 50 } },
+    },
+  ])
+  d.bindArrow('shape:arrow', 'start', 'shape:left', { x: 50, y: 50 })
+  d.bindArrow('shape:arrow', 'end', 'shape:right', { x: 350, y: 50 })
+  const e = d.getArrowEndpoints(d.getShape('shape:arrow'))
+  near(e.start.x, 100)
+  near(e.end.x, 300)
+  d.updateShape({ id: 'shape:arrow', meta: { cowartAnnotationArrow: true } })
+  d.bindArrow('shape:arrow', 'end', 'shape:right', { x: 350, y: 50 })
+  near(d.getArrowEndpoints(d.getShape('shape:arrow')).end.x, 350)
+})
+test('保存URL异步提交：撤销/重做只还原用户编辑，不把资产退回旧blob；已捕获快照保持原值', async () => {
+  const d = await setup()
+  d.createAssets([
+    { id: 'asset:a', type: 'image', props: { src: 'blob:before-save' } },
+  ])
+  d.createShape({
+    id: 'shape:a',
+    type: 'image',
+    x: 20,
+    props: { assetId: 'asset:a' },
+  })
+  const captured = d.store.getStoreSnapshot()
+  d.beginGesture()
+  d.updateShape({ id: 'shape:a', x: 100 })
+  d.store.mergeRemoteChanges(() =>
+    d.updateAssets([{ id: 'asset:a', props: { src: '/api/media/saved.png' } }]),
+  )
+  d.endGesture()
+  d.undo()
+  assert.equal(d.getShape('shape:a').x, 20)
+  assert.equal(d.getAsset('asset:a').props.src, '/api/media/saved.png')
+  assert.equal(captured.store['asset:a'].props.src, 'blob:before-save')
+  d.redo()
+  assert.equal(d.getShape('shape:a').x, 100)
+  assert.equal(d.getAsset('asset:a').props.src, '/api/media/saved.png')
 })

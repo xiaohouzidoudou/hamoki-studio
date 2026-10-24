@@ -458,7 +458,7 @@ export default function StudioPanel({ open, onClose, getEditor, canvasEditor }) 
 
   if (!open) return null
   return <section className="hamoki-studio-panel" role="dialog" aria-label="Hamoki Studio AI 生图">
-    <header><strong>🐵 Hamoki Studio</strong><button type="button" onClick={onClose} aria-label="关闭">×</button></header>
+    <header><strong><img className="hamoki-studio-avatar" src="/assets/hamoki-avatar-32.png" alt=""/>Hamoki Studio</strong><button type="button" onClick={onClose} aria-label="关闭">×</button></header>
     {context && <label className="hamoki-studio-field">当前项目
       <select value={context.projectId} disabled={!!jobId && !['done','failed','uncertain'].includes(phase)} onChange={event => {
         const url = new URL(window.location.href)
@@ -488,13 +488,13 @@ export default function StudioPanel({ open, onClose, getEditor, canvasEditor }) 
     <div className="hamoki-conversation" aria-label="当前项目 AI 对话记录">
       {!turns.length && <div className="hamoki-conversation-empty">在画布选一张图片，写下你的要求。我会分析标注和已确认的项目美术规范。</div>}
       {turns.map((turn,index)=><div key={turn.id||index} className={'hamoki-bubble '+(turn.role==='user'?'is-user':'is-assistant')}>
-        <small>{turn.role==='user'?'你':'🐵 AI 助手'}{turn.action==='edit'?' · 编辑计划':turn.action==='generate'?' · 生图计划':''}</small>
+        <small>{turn.role==='user'?'你':'AI 助手'}{turn.action==='edit'?' · 编辑计划':turn.action==='generate'?' · 生图计划':''}</small>
         <span>{turn.content}</span>
       </div>)}
     </div>
     {context && <div className="hamoki-legacy-tools">
       <button type="button" disabled={importing} onClick={importOldCanvas}>
-        {importing ? '正在导入旧素材…' : '↳ 导入旧 Studio 画布素材'}
+        {importing ? '正在导入旧素材…' : '导入旧 Studio 画布素材'}
       </button>
       {importNotice && <small aria-live="polite">{importNotice}</small>}
     </div>}

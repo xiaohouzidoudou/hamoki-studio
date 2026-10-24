@@ -237,9 +237,9 @@ try{
   await page.route('**/api/projects/'+projectId,route=>route.fulfill({json:{project:{id:projectId,nodes:[
     {id:'legacy-reference',kind:'reference',url:legacyUrl,x:40,y:900,w:128,h:128}
   ]}}}))
-  await page.getByRole('button',{name:'↳ 导入旧 Studio 画布素材',exact:true}).click()
+  await page.getByRole('button',{name:'导入旧 Studio 画布素材',exact:true}).click()
   await page.waitForFunction(()=>window.__cowartEditor.getCurrentPageShapes().some(s=>s.meta?.studioNodeId==='legacy-reference'))
-  await page.getByRole('button',{name:'↳ 导入旧 Studio 画布素材',exact:true}).click()
+  await page.getByRole('button',{name:'导入旧 Studio 画布素材',exact:true}).click()
   await page.waitForFunction(()=>!document.querySelector('.hamoki-legacy-tools button').disabled)
   assert.equal(await page.evaluate(()=>window.__cowartEditor.getCurrentPageShapes()
     .filter(s=>s.meta?.studioNodeId==='legacy-reference').length),1,'Legacy remote image imports without invalid fileSize or duplication')
@@ -247,7 +247,7 @@ try{
   assert.equal(errors.length,0,'Image workflow must not cause browser page errors')
   await page.screenshot({path:path.join(root,'cowart','test-results','browser-smoke.png'),fullPage:true})
   console.log('PASS: mock generation + two edits, lost POST response recovery, tab-close recovery, offline query safety; exactly three image submissions')
-  console.log('PASS: authenticated Cowart renders, Studio panel responds, tldraw shape persists and survives reload')
+  console.log('PASS: authenticated Cowart renders, Studio panel responds, independent canvas shape persists and survives reload')
   await verifyCanvasInputs({page,projectId,submissions,imageRows,png,screenshotPath:path.join(root,'cowart','test-results','canvas-inputs.png')})
   assert.equal(errors.length,0,'Holder and reference workflow must not cause browser errors')
 }catch(error){

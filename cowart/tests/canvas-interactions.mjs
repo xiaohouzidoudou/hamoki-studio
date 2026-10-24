@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 
-// No image model calls: a local fixture exercises actual tldraw input handling.
+// No image model calls: a local fixture exercises actual canvas input handling.
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAUAAAAC0CAIAAABqhmJGAAADaElEQVR4nO3avU0jURSAUYM2pQFCGiGjALLpwykRqfsgowAyOtsAiQ34WYlg7vvMOSGJZyR/3DtvfHF1c30Ami6nLwD4OQFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAEPbnsKqn18fpS4B/ttuHw3ourm6uDyvRLYvbVip5oYClS8i2RsZLBCxdorbpjOcPsdRL19P0Sc3wBP7+/o/PLzteC3zpdH+35hyeDPirenVLruRtqOGxgD+tV7p0M94mGp55BlYvacfPHu5GnocHJvDH+zR4OZtRvO07h+dPoYFMwMYv5+T4YZfeeZEensCWZ+qOoy87L3/VW284s+/55AQ2fjkPx7kh7BALwvYL2P7M7/G01xY9NoHtz5yT49AWbYWGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhYwGf7u+mPhrO5vu8X8Db7cNunwWzdvu2W6EhbDJgWzTn4TT3PLhrwLZofoNtx6fF4RXaEKbuNHocezn+z0nDdJ0+1LvzmukQC8Iurm6u9//Up9fHj388Pr/sfyXwM59ujvuf8sxM4E/v0y5NxWmNescm8Ddz2ChmZacvjqym3rBMBvxNw28s1Szi9O1R8+D70eGA/9swLG4b/Y3w/Cm0X3fQtU3/wn9+Ar8zignZptNdLuA3MmZx2xrpLhrwOyWzlG2lbgMBA4FDLODHBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGQ9dfbauD6wphGLUAAAAASUVORK5CYII=','base64')
 
 export async function verifyCanvasInteractions({page,context,base,projectId,screenshotPath}) {
@@ -81,9 +81,10 @@ export async function verifyCanvasInteractions({page,context,base,projectId,scre
     const s=window.__cowartEditor.getShape('shape:interaction-one');return {x:s.x,y:s.y}
   }),{x:70,y:80},'Panning cannot move the original')
   await page.evaluate(()=>{const e=window.__cowartEditor;e.setCamera({x:0,y:0,z:1});e.selectNone()})
-  await page.mouse.move(40,110)
+  // Start on visible blank canvas below the floating controls, then enclose the image.
+  await page.mouse.move(40,260)
   await page.mouse.down()
-  await page.mouse.move(280,230,{steps:10})
+  await page.mouse.move(280,70,{steps:10})
   await page.mouse.up()
   assert.deepEqual(await page.evaluate(()=>window.__cowartEditor.getSelectedShapeIds()),['shape:interaction-one'],'Left drag on blank canvas selects a marquee')
   second=await center('shape:interaction-two')

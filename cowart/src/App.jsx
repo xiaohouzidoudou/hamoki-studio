@@ -378,7 +378,7 @@ export default function App() {
   const selected = editor?.getSelectedShapes() || [],
     one = selected.length === 1 ? selected[0] : null
   function setDimension(key, value) {
-    if (!one || one.isLocked) return
+    if (!one || editor.isShapeLocked(one)) return
     const size = Number(value)
     if (!Number.isFinite(size) || size < 16 || size > 8192) return
     const props = { [key]: size }
@@ -598,7 +598,9 @@ export default function App() {
                   aria-label="删除所选内容"
                   onClick={() =>
                     editor.deleteShapes(
-                      selected.filter((s) => !s.isLocked).map((s) => s.id),
+                      selected
+                        .filter((s) => !editor.isShapeLocked(s))
+                        .map((s) => s.id),
                     )
                   }
                 >
@@ -617,6 +619,19 @@ export default function App() {
           aria-label="选择导入图片"
           onChange={(e) => importFiles([...e.target.files])}
         />
+        {warnings.length > 0 && (
+          <details className="hamoki-legacy-warning">
+            <summary>
+              {warnings.length} 条旧画布兼容提示（原始记录保留）
+            </summary>
+            {warnings.slice(0, 12).map((r, i) => (
+              <p key={i}>
+                {r.id}：{r.reason}
+              </p>
+            ))}
+            <button onClick={exportDocument}>导出完整备份</button>
+          </details>
+        )}
       </div>
       <div className="cowart-ai-launcher">
         <button onClick={() => setOpen((v) => !v)}>
@@ -640,17 +655,6 @@ export default function App() {
           <button onClick={() => retrySave.current?.()}>重试保存</button>
           <button onClick={exportDocument}>导出当前画布备份</button>
         </aside>
-      )}
-      {warnings.length > 0 && (
-        <details className="hamoki-legacy-warning">
-          <summary>{warnings.length} 条旧画布兼容提示（原始记录保留）</summary>
-          {warnings.slice(0, 12).map((r, i) => (
-            <p key={i}>
-              {r.id}：{r.reason}
-            </p>
-          ))}
-          <button onClick={exportDocument}>导出完整备份</button>
-        </details>
       )}
       {notice && (
         <div className="hamoki-toast" role="status">

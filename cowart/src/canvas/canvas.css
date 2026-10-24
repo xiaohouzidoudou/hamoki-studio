@@ -849,3 +849,15 @@ body {
   border-radius: 5px;
   font-size: 12px;
 }
+.hamoki-studio-panel header strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.hamoki-studio-avatar {
+  width: 21px;
+  height: 21px;
+  border-radius: 7px;
+  display: block;
+  flex: none;
+}

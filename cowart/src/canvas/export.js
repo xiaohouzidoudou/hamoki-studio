@@ -15,7 +15,10 @@ export async function exportSvg(editor, ids, options = {}) {
   const selected = all.filter((s) => include.has(s.id)),
     boxes = selected.map((s) => editor.getShapePageBounds(s)).filter(Boolean)
   if (!boxes.length) throw Error('没有可导出的元素')
-  const padding = options.padding ?? 16,
+  const padding =
+      typeof options.padding === 'number' && Number.isFinite(options.padding)
+        ? Math.max(0, options.padding)
+        : 16,
     x = Math.min(...boxes.map((b) => b.x)) - padding,
     y = Math.min(...boxes.map((b) => b.y)) - padding,
     w = Math.max(...boxes.map((b) => b.x + b.w)) - x + padding,
@@ -124,6 +127,7 @@ export function originalSourceMatches(shape, editor) {
   while (current && !seen.has(current.id)) {
     seen.add(current.id)
     if (
+      (current.opacity ?? 1) !== 1 ||
       current.rotation ||
       current.skewX ||
       (current.scaleX ?? 1) !== 1 ||

@@ -26,6 +26,7 @@ export function plainText(value, depth = 0) {
   if (depth > 16) return ''
   if (typeof value === 'string') return value
   if (!value || typeof value !== 'object') return ''
+  if (value.type === 'hardBreak') return '\n'
   if (value.type === 'text') return String(value.text || '')
   return (Array.isArray(value.content) ? value.content : [])
     .map((item) => plainText(item, depth + 1))
@@ -193,7 +194,9 @@ export function arrowEndpoints(store, shape) {
       start: shape.props?.start || { x: 0, y: 0 },
       end: shape.props?.end || { x: 160, y: 80 },
     },
-    im = inverse(shapeMatrix(store, shape))
+    m = shapeMatrix(store, shape),
+    im = inverse(m),
+    bindings = []
   for (const r of Object.values(store))
     if (
       r.typeName === 'binding' &&
@@ -203,18 +206,53 @@ export function arrowEndpoints(store, shape) {
       const target = store[r.toId],
         a = r.props?.normalizedAnchor || { x: 0.5, y: 0.5 },
         terminal = r.props?.terminal
-      if (
-        target?.typeName === 'shape' &&
-        (terminal === 'start' || terminal === 'end')
-      )
-        result[terminal] = transform(
-          im,
-          transform(shapeMatrix(store, target), {
-            x: a.x * (target.props?.w || 180),
-            y: a.y * (target.props?.h || 120),
-          }),
-        )
+      if (target?.typeName !== 'shape' || !['start', 'end'].includes(terminal))
+        continue
+      const tm = shapeMatrix(store, target),
+        w = target.props?.w || 180,
+        h = target.props?.h || 120,
+        anchor = { x: a.x * w, y: a.y * h }
+      result[terminal] = transform(im, transform(tm, anchor))
+      bindings.push({ r, target, tm, w, h, anchor, terminal })
     }
+  const anchors = { ...result }
+  for (const { r, target, tm, w, h, anchor, terminal } of bindings) {
+    if (
+      r.props.isExact ||
+      anchor.x <= 0.001 ||
+      anchor.y <= 0.001 ||
+      anchor.x >= w - 0.001 ||
+      anchor.y >= h - 0.001
+    )
+      continue
+    const other = transform(
+        inverse(tm),
+        transform(m, anchors[terminal === 'start' ? 'end' : 'start']),
+      ),
+      dx = other.x - anchor.x,
+      dy = other.y - anchor.y
+    if (Math.hypot(dx, dy) < 0.001) continue
+    let t = Math.min(
+      dx > 0 ? (w - anchor.x) / dx : dx < 0 ? -anchor.x / dx : Infinity,
+      dy > 0 ? (h - anchor.y) / dy : dy < 0 ? -anchor.y / dy : Infinity,
+    )
+    if (target.type === 'geo' && target.props.geo === 'ellipse') {
+      const ax = (anchor.x - w / 2) / (w / 2),
+        ay = (anchor.y - h / 2) / (h / 2),
+        vx = dx / (w / 2),
+        vy = dy / (h / 2),
+        a = vx * vx + vy * vy,
+        b = 2 * (ax * vx + ay * vy),
+        c = ax * ax + ay * ay - 1,
+        discriminant = b * b - 4 * a * c
+      if (discriminant >= 0) t = (-b + Math.sqrt(discriminant)) / (2 * a)
+    }
+    if (Number.isFinite(t) && t >= 0)
+      result[terminal] = transform(
+        im,
+        transform(tm, { x: anchor.x + dx * t, y: anchor.y + dy * t }),
+      )
+  }
   return result
 }
 export function shapeBounds(store, shape) {
@@ -437,7 +475,17 @@ export class CanvasDocument {
       return clone(r)
     })
     this.checkpoint()
-    for (const r of copied) this.records[r.id] = r
+    for (const r of copied) {
+      const old = this.records[r.id]
+      if (this.remote && old)
+        for (const snapshot of [
+          ...this.history,
+          ...this.future,
+          ...(this.gesture ? [this.gesture] : []),
+        ])
+          if (snapshot[r.id] === old) snapshot[r.id] = r
+      this.records[r.id] = r
+    }
     this.notify()
   }
   getContainer() {
@@ -852,8 +900,18 @@ export class CanvasDocument {
   isIn(tool) {
     return this.tool === tool.split('.')[0] && !tool.includes('crop')
   }
+  isShapeLocked(shape) {
+    let current = this.getShape(shape)
+    const seen = new Set()
+    while (current?.typeName === 'shape' && !seen.has(current.id)) {
+      if (current.isLocked) return true
+      seen.add(current.id)
+      current = this.records[current.parentId]
+    }
+    return false
+  }
   canEditShape(shape) {
-    return !shape.isLocked
+    return !this.isShapeLocked(shape)
   }
   duplicateSelected() {
     const originals = this.getSelectedShapes(),
@@ -936,6 +994,7 @@ export class CanvasDocument {
           x: t[4],
           y: t[5],
           ...decompose(t),
+          opacity: finite(s.opacity, 1) * finite(group.opacity, 1),
         })
         ids.push(s.id)
       }

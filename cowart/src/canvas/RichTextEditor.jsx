@@ -4,6 +4,7 @@ export default function RichTextEditor({
   shape,
   style,
   onCommit,
+  onChange,
   onCancel,
   ref,
 }) {
@@ -36,11 +37,28 @@ export default function RichTextEditor({
     committed.current = true
     onCommit(dirty.current ? domToRich(root.current) : shape.props.richText)
   }
+  function publish() {
+    dirty.current = true
+    onChange?.(domToRich(root.current))
+  }
   function format(tag, attrs = {}) {
     const selection = getSelection()
     if (!selection?.rangeCount) return
     const range = selection.getRangeAt(0)
     if (!root.current.contains(range.commonAncestorContainer)) return
+    const command = {
+      strong: 'bold',
+      em: 'italic',
+      u: 'underline',
+      s: 'strikeThrough',
+      a: 'createLink',
+    }[tag]
+    if (command) {
+      document.execCommand(command, false, attrs.href || null)
+      publish()
+      root.current.focus()
+      return
+    }
     if (range.collapsed) return
     const el = document.createElement(tag)
     for (const [key, value] of Object.entries(attrs))
@@ -51,7 +69,7 @@ export default function RichTextEditor({
     const selected = document.createRange()
     selected.selectNodeContents(el)
     selection.addRange(selected)
-    dirty.current = true
+    publish()
     root.current.focus()
   }
   return (
@@ -90,22 +108,23 @@ export default function RichTextEditor({
         >
           链接
         </button>
-        <button
-          onClick={() => {
-            const selection = getSelection()
-            if (!selection?.rangeCount) return
-            const range = selection.getRangeAt(0)
-            if (!root.current.contains(range.commonAncestorContainer)) return
-            const ul = document.createElement('ul'),
-              li = document.createElement('li')
-            li.append(range.extractContents())
-            ul.append(li)
-            range.insertNode(ul)
-            dirty.current = true
-          }}
-        >
-          列表
-        </button>
+        {[
+          [false, '无序列表'],
+          [true, '有序列表'],
+        ].map(([ordered, label]) => (
+          <button
+            key={label}
+            onClick={() => {
+              root.current.focus()
+              document.execCommand(
+                ordered ? 'insertOrderedList' : 'insertUnorderedList',
+              )
+              publish()
+            }}
+          >
+            {label}
+          </button>
+        ))}
         <button onClick={commit}>完成</button>
       </div>
       <div
@@ -117,7 +136,7 @@ export default function RichTextEditor({
         suppressContentEditableWarning
         className="hamoki-text-editor"
         onInput={() => {
-          dirty.current = true
+          publish()
         }}
         onPaste={(e) => {
           e.preventDefault()
@@ -132,7 +151,7 @@ export default function RichTextEditor({
             range.collapse(true)
             selection.removeAllRanges()
             selection.addRange(range)
-            dirty.current = true
+            publish()
           }
         }}
         onBlur={(e) => {

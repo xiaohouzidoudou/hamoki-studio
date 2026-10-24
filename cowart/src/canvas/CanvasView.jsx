@@ -34,11 +34,13 @@ function Shape({ editor, shape }) {
     color = shapeColor(shape),
     selected = editor.selected.includes(shape.id)
   let content = <ShapeContent editor={editor} shape={shape} />
+  let opacity = shape.opacity ?? 1
   const clips = [],
     seen = new Set()
   let parent = editor.getShape(shape.parentId)
   while (parent?.typeName === 'shape' && !seen.has(parent.id)) {
     seen.add(parent.id)
+    opacity *= parent.opacity ?? 1
     if (parent.type === 'frame') {
       const pm = shapeMatrix(editor.records, parent),
         im = inverse(m),
@@ -72,12 +74,12 @@ function Shape({ editor, shape }) {
       data-shape-id={shape.id}
       data-shape-type={shape.type}
       transform={`matrix(${m.join(' ')})`}
-      opacity={shape.opacity ?? 1}
+      opacity={opacity}
       style={{
         cursor:
           editor.tool !== 'select'
             ? 'inherit'
-            : shape.isLocked
+            : editor.isShapeLocked(shape)
               ? 'not-allowed'
               : 'move',
       }}
@@ -114,6 +116,7 @@ export default function CanvasView({
   const svg = useRef(null),
     gesture = useRef(null),
     richEditor = useRef(null),
+    editingInitial = useRef(null),
     lastPointer = useRef(null),
     space = useRef(false),
     touches = useRef(new Map()),
@@ -134,7 +137,10 @@ export default function CanvasView({
       onNotice(e.message)
     }
   }
-  const editShape = (shape) => {
+  const editShape = (shape, created = false) => {
+    editor.beginGesture()
+    editor.editingShape = shape.id
+    editingInitial.current = { shape, created }
     setEditing(shape.id)
     setMenu(null)
   }
@@ -152,12 +158,23 @@ export default function CanvasView({
       seen.add(shape.id)
       shape = editor.getShape(shape.parentId)
     }
+    let parent = shape && editor.getShape(shape.parentId),
+      seenParents = new Set()
+    while (parent?.typeName === 'shape' && !seenParents.has(parent.id)) {
+      seenParents.add(parent.id)
+      if (parent.isLocked) shape = parent
+      parent = editor.getShape(parent.parentId)
+    }
     return shape
   }
   useEffect(() => {
     const crop = () => {
       const one = editor.getSelectedShapes()
-      if (one.length === 1 && one[0].type === 'image' && !one[0].isLocked)
+      if (
+        one.length === 1 &&
+        one[0].type === 'image' &&
+        !editor.isShapeLocked(one[0])
+      )
         setCropId(one[0].id)
     }
     editor.container.addEventListener('cowart:crop-selection', crop)
@@ -259,7 +276,7 @@ export default function CanvasView({
         editor.deleteShapes(
           editor
             .getSelectedShapes()
-            .filter((s) => !s.isLocked)
+            .filter((s) => !editor.isShapeLocked(s))
             .map((s) => s.id),
         )
       } else if (e.key.startsWith('Arrow')) {
@@ -268,7 +285,7 @@ export default function CanvasView({
         editor.updateShapes(
           editor
             .getSelectedShapes()
-            .filter((s) => !s.isLocked)
+            .filter((s) => !editor.isShapeLocked(s))
             .map((s) => ({
               id: s.id,
               x:
@@ -441,7 +458,7 @@ export default function CanvasView({
         bounds,
         records: editor
           .getSelectedShapes()
-          .filter((s) => !s.isLocked)
+          .filter((s) => !editor.isShapeLocked(s))
           .map((s) => structuredClone(s)),
       }
       return
@@ -469,10 +486,11 @@ export default function CanvasView({
         editor.beginGesture()
         gesture.current = { kind: 'erase', point }
         const hit = editor.hitTest(point)
-        if (hit && !hit.isLocked) editor.deleteShapes([hit.id])
+        if (hit && !editor.isShapeLocked(hit)) editor.deleteShapes([hit.id])
         return
       }
       if (kind === 'text') {
+        editor.beginGesture()
         const id = createShapeId()
         editor.createShape({
           id,
@@ -483,7 +501,7 @@ export default function CanvasView({
           props: { ...editor.style, w: 260, h: 70, richText: toRichText('') },
         })
         editor.select(id)
-        editShape(editor.getShape(id))
+        editShape(editor.getShape(id), true)
         if (!editor.preferences.toolLock) editor.setCurrentTool('select')
         return
       }
@@ -511,13 +529,16 @@ export default function CanvasView({
       }
       if (!editor.selected.includes(shape.id)) editor.select(shape.id)
       editor.beginGesture()
-      if (e.altKey && !shape.isLocked) editor.duplicateSelected()
+      if (e.altKey && !editor.isShapeLocked(shape)) editor.duplicateSelected()
       gesture.current = {
         kind: 'move',
         point,
         records: editor
           .getSelectedShapes()
-          .filter((s) => !s.isLocked && !editor.selected.includes(s.parentId))
+          .filter(
+            (s) =>
+              !editor.isShapeLocked(s) && !editor.selected.includes(s.parentId),
+          )
           .map((s) => structuredClone(s)),
       }
     } else {
@@ -609,12 +630,38 @@ export default function CanvasView({
           x: g.point.x + ((p.x - g.point.x) * i) / steps,
           y: g.point.y + ((p.y - g.point.y) * i) / steps,
         })
-        if (hit && !hit.isLocked) editor.deleteShapes([hit.id])
+        if (hit && !editor.isShapeLocked(hit)) editor.deleteShapes([hit.id])
       }
       g.point = p
       return
     }
     if (g.kind === 'move') {
+      if (Math.hypot(dx, dy) > 3 / zoom) g.moved = true
+      if (g.moved && !g.detached) {
+        g.detached = true
+        const selected = new Set(editor.selected)
+        for (const s of g.records.filter((s) => s.type === 'arrow')) {
+          const bindings = editor.getBindings(s.id).filter((binding) => {
+            let target = editor.getShape(binding.toId)
+            const seen = new Set()
+            while (target?.typeName === 'shape' && !seen.has(target.id)) {
+              if (selected.has(target.id)) return false
+              seen.add(target.id)
+              target = editor.getShape(target.parentId)
+            }
+            return true
+          })
+          if (bindings.length) {
+            editor.updateShape({
+              id: s.id,
+              props: editor.getArrowEndpoints(editor.getShape(s.id)),
+            })
+            for (const binding of bindings)
+              editor.unbindArrow(s.id, binding.props.terminal)
+          }
+        }
+      }
+
       editor.updateShapes(
         g.records.map((s) => {
           const parent = editor.getShape(s.parentId),
@@ -767,6 +814,11 @@ export default function CanvasView({
     }
     const g = gesture.current
     gesture.current = null
+    if (g?.kind === 'move' && g.moved)
+      editor.adoptMovedShapes(
+        g.records.map((s) => s.id),
+        editor.screenToPage({ x: e.clientX, y: e.clientY }),
+      )
     if (
       g?.kind === 'vertex' &&
       editor.getShape(g.id)?.type === 'arrow' &&
@@ -872,16 +924,18 @@ export default function CanvasView({
             : {}),
         },
       })
+      if (g.type === 'frame' || g.type === 'holder')
+        editor.captureInsideFrame(id)
       if (isArrow && !e.altKey) {
         if (g.startTarget) editor.bindArrow(id, 'start', g.startTarget, g.point)
         if (target) editor.bindArrow(id, 'end', target.id, p)
       }
       editor.select(id)
       if (g.type === 'annotation' || g.type === 'note')
-        editShape(editor.getShape(id))
+        editShape(editor.getShape(id), true)
       if (!editor.preferences.toolLock) editor.setCurrentTool('select')
     }
-    editor.endGesture()
+    if (!editor.editingShape) editor.endGesture()
     setMarquee(null)
     setDraft(null)
   }
@@ -934,7 +988,7 @@ export default function CanvasView({
       editor.notify('session')
       return
     }
-    if (shape.isLocked) return
+    if (editor.isShapeLocked(shape)) return
     if (shape.type === 'image')
       editor
         .getContainer()
@@ -1110,7 +1164,7 @@ export default function CanvasView({
               (s) =>
                 editor.tool === 'select' &&
                 ['arrow', 'line'].includes(s.type) &&
-                !s.isLocked,
+                !editor.isShapeLocked(s),
             )
             .flatMap((s) => {
               const m = shapeMatrix(editor.records, s),
@@ -1170,7 +1224,9 @@ export default function CanvasView({
               .getSelectedShapes()
               .every((s) => ['arrow', 'line'].includes(s.type)) &&
             !editing &&
-            editor.getSelectedShapes().some((s) => !s.isLocked) && (
+            editor
+              .getSelectedShapes()
+              .some((s) => !editor.isShapeLocked(s)) && (
               <g className="hamoki-handles">
                 <rect
                   x={bounds.x}
@@ -1226,6 +1282,9 @@ export default function CanvasView({
           ref={richEditor}
           key={editing}
           shape={shapeBeingEdited}
+          onChange={(richText) =>
+            editor.updateShape({ id: editing, props: { richText } })
+          }
           onCommit={(richText) => {
             if (richText)
               editor.updateShape({
@@ -1242,9 +1301,41 @@ export default function CanvasView({
                     : {}),
                 },
               })
+            editor.editingShape = null
+            editor.endGesture()
+            editingInitial.current = null
             setEditing(null)
           }}
-          onCancel={() => setEditing(null)}
+          onCancel={() => {
+            const initial = editingInitial.current
+            if (initial?.created) editor.deleteShapes([initial.shape.id])
+            else if (initial) {
+              const current = editor.getShape(initial.shape.id),
+                restored = {
+                  ...current,
+                  props: {
+                    ...current.props,
+                    richText: initial.shape.props.richText,
+                    h: initial.shape.props.h,
+                  },
+                }
+              if (JSON.stringify(restored) === JSON.stringify(initial.shape)) {
+                editor.records[initial.shape.id] = initial.shape
+                editor.notify()
+              } else
+                editor.updateShape({
+                  id: initial.shape.id,
+                  props: {
+                    richText: initial.shape.props.richText,
+                    h: initial.shape.props.h,
+                  },
+                })
+            }
+            editor.editingShape = null
+            editor.endGesture()
+            editingInitial.current = null
+            setEditing(null)
+          }}
           style={{
             left: (editBounds.x + camera.x) * zoom,
             top: (editBounds.y + camera.y) * zoom,
@@ -1305,9 +1396,10 @@ export default function CanvasView({
               '锁定 / 解锁',
               () =>
                 editor.updateShapes(
-                  editor
-                    .getSelectedShapes()
-                    .map((s) => ({ id: s.id, isLocked: !s.isLocked })),
+                  editor.getSelectedShapes().map((s) => ({
+                    id: s.id,
+                    isLocked: !editor.isShapeLocked(s),
+                  })),
                 ),
             ],
             [
@@ -1316,7 +1408,7 @@ export default function CanvasView({
                 editor.deleteShapes(
                   editor
                     .getSelectedShapes()
-                    .filter((s) => !s.isLocked)
+                    .filter((s) => !editor.isShapeLocked(s))
                     .map((s) => s.id),
                 ),
             ],

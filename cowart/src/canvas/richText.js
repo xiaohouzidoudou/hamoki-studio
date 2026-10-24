@@ -49,12 +49,11 @@ export function richBlocks(doc) {
   return blocks.length ? blocks : [[]]
 }
 export function richToDOM(doc, root) {
-  root.replaceChildren()
-  for (const runs of richBlocks(doc)) {
-    const p = document.createElement('div')
-    for (const run of runs) {
-      let el = document.createTextNode(run.text)
-      for (const mark of run.marks) {
+  const build = (node, depth = 0) => {
+    if (!node || depth > 24) return document.createTextNode('')
+    if (node.type === 'text') {
+      let el = document.createTextNode(String(node.text || ''))
+      for (const mark of node.marks || []) {
         const tag =
           {
             bold: 'strong',
@@ -65,78 +64,114 @@ export function richToDOM(doc, root) {
           }[mark.type] ||
           (mark.type === 'link' && safeLink(mark.attrs?.href) ? 'a' : null)
         if (!tag) continue
-        const span = document.createElement(tag)
-        if (tag === 'a') span.href = safeLink(mark.attrs.href)
-        span.append(el)
-        el = span
+        const wrapper = document.createElement(tag)
+        if (tag === 'a') wrapper.href = safeLink(mark.attrs.href)
+        wrapper.append(el)
+        el = wrapper
       }
-      p.append(el)
+      return el
     }
-    if (!runs.length) p.append(document.createElement('br'))
-    root.append(p)
+    if (node.type === 'hardBreak') return document.createElement('br')
+    const tag =
+        {
+          bulletList: 'ul',
+          orderedList: 'ol',
+          listItem: 'li',
+          paragraph: 'div',
+          heading: 'div',
+        }[node.type] || 'div',
+      el = document.createElement(tag)
+    if (node.type === 'orderedList' && Number.isInteger(node.attrs?.start))
+      el.start = node.attrs.start
+    for (const child of node.content || []) el.append(build(child, depth + 1))
+    if (!el.childNodes.length) el.append(document.createElement('br'))
+    return el
   }
+  root.replaceChildren(...(doc?.content || []).map((node) => build(node)))
+  if (!root.childNodes.length) root.append(document.createElement('br'))
 }
 export function domToRich(root) {
-  const content = []
-  function read(node, marks = [], depth = 0) {
+  const read = (node, marks = [], depth = 0) => {
     if (depth > 24) return []
-    if (node.nodeType === 3)
-      return node.textContent
-        ? [
-            {
-              type: 'text',
-              text: node.textContent,
-              ...(marks.length ? { marks } : {}),
-            },
-          ]
+    if (node.nodeType === 3) {
+      const text = node.textContent.replace(/\u200b/g, '')
+      return text
+        ? [{ type: 'text', text, ...(marks.length ? { marks } : {}) }]
         : []
+    }
     if (node.nodeType !== 1) return []
     const mark = {
-      B: 'bold',
-      STRONG: 'bold',
-      I: 'italic',
-      EM: 'italic',
-      U: 'underline',
-      S: 'strike',
-      STRIKE: 'strike',
-      CODE: 'code',
-    }[node.tagName]
-    let next = mark ? [...marks, { type: mark }] : marks
+        B: 'bold',
+        STRONG: 'bold',
+        I: 'italic',
+        EM: 'italic',
+        U: 'underline',
+        S: 'strike',
+        STRIKE: 'strike',
+        CODE: 'code',
+      }[node.tagName],
+      next = [...marks]
+    if (mark) next.push({ type: mark })
+    if (
+      node.style?.fontWeight === 'bold' ||
+      Number(node.style?.fontWeight) >= 600
+    )
+      next.push({ type: 'bold' })
+    if (node.style?.fontStyle === 'italic') next.push({ type: 'italic' })
+    if (node.style?.textDecoration?.includes('underline'))
+      next.push({ type: 'underline' })
+    if (node.style?.textDecoration?.includes('line-through'))
+      next.push({ type: 'strike' })
     if (node.tagName === 'A' && safeLink(node.getAttribute('href')))
-      next = [
-        ...next,
-        { type: 'link', attrs: { href: safeLink(node.getAttribute('href')) } },
-      ]
+      next.push({
+        type: 'link',
+        attrs: { href: safeLink(node.getAttribute('href')) },
+      })
     if (node.tagName === 'BR') return [{ type: 'hardBreak' }]
     return [...node.childNodes].flatMap((child) => read(child, next, depth + 1))
   }
-  let inline = []
-  const flush = () => {
-    if (inline.length) {
-      content.push({ type: 'paragraph', content: inline })
-      inline = []
+  const blocks = (container, depth = 0) => {
+    if (depth > 24) return []
+    const content = []
+    let inline = []
+    const flush = () => {
+      if (inline.length) {
+        content.push({ type: 'paragraph', content: inline })
+        inline = []
+      }
     }
+    for (const child of container.childNodes) {
+      if (child.tagName === 'UL' || child.tagName === 'OL') {
+        flush()
+        content.push({
+          type: child.tagName === 'UL' ? 'bulletList' : 'orderedList',
+          ...(child.tagName === 'OL'
+            ? { attrs: { start: Number(child.getAttribute('start')) || 1 } }
+            : {}),
+          content: [...child.children]
+            .filter((el) => el.tagName === 'LI')
+            .map((li) => ({
+              type: 'listItem',
+              content: blocks(li, depth + 1),
+            })),
+        })
+      } else if (
+        ['DIV', 'P', 'H1', 'H2', 'H3', 'H4', 'LI'].includes(child.tagName)
+      ) {
+        flush()
+        if (
+          [...child.children].some((el) =>
+            ['DIV', 'P', 'UL', 'OL'].includes(el.tagName),
+          )
+        )
+          content.push(...blocks(child, depth + 1))
+        else content.push({ type: 'paragraph', content: read(child) })
+      } else inline.push(...read(child))
+    }
+    flush()
+    return content.length ? content : [{ type: 'paragraph', content: [] }]
   }
-  for (const child of root.childNodes) {
-    if (['DIV', 'P', 'H1', 'H2', 'H3', 'LI'].includes(child.tagName)) {
-      flush()
-      content.push({ type: 'paragraph', content: read(child) })
-    } else if (child.tagName === 'UL' || child.tagName === 'OL') {
-      flush()
-      content.push({
-        type: child.tagName === 'UL' ? 'bulletList' : 'orderedList',
-        content: [...child.children].map((li) => ({
-          type: 'listItem',
-          content: [{ type: 'paragraph', content: read(li) }],
-        })),
-      })
-    } else inline.push(...read(child))
-  }
-  flush()
-  return {
-    type: 'doc',
-    content: content.length ? content : [{ type: 'paragraph', content: [] }],
-  }
+  return { type: 'doc', content: blocks(root) }
 }
 let measureContext
 export function layoutRich(doc, width, font, wrap = true) {
