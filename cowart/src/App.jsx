@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { CanvasDocument, createShapeId } from './canvas/model.js'
 import CanvasControls from './canvas/CanvasControls.jsx'
 import CanvasView from './canvas/CanvasView.jsx'
+import { openArchive, restoreArchive } from './canvas/archive.js'
+import { chooseArchiveDestination, downloadArchive } from './canvas/archiveTransfer.js'
+import { getStudioContext, studioJSON } from './lib/studioBridge.js'
 import { originalImagesZip } from './canvas/download.js'
 import { sanitizeCanvasSnapshot } from './canvasSnapshot.js'
 import {
@@ -74,6 +77,8 @@ export default function App() {
   const container = useRef(null),
     editorRef = useRef(null),
     retrySave = useRef(null),
+    flushForArchive = useRef(null),
+    archiveController = useRef(null),
     raw = useRef(null),
     fileInput = useRef(null)
   const [loaded, setLoaded] = useState(null),
@@ -84,6 +89,7 @@ export default function App() {
     [warnings, setWarnings] = useState([]),
     [open, setOpen] = useState(true),
     [notice, setNotice] = useState(''),
+    [archiveProgress, setArchiveProgress] = useState(''),
     [revision, setRevision] = useState(0)
   const getEditor = useCallback(() => editorRef.current, [])
   useEffect(() => {
@@ -153,7 +159,8 @@ export default function App() {
       viewTimer,
       saving = false,
       pending = false,
-      disposed = false
+      disposed = false,
+      lastSaveError = null
     const schedule = () => {
       state.changed()
       setStatus('待保存')
@@ -175,11 +182,13 @@ export default function App() {
           throw Error('画布未保存，请保留备份并重试')
         applySavedAssetSources(doc, result.assetReplacements)
         state.acknowledge(captured)
+        lastSaveError = null
         if (!disposed) {
           setSaveError('')
           setStatus(state.dirty ? '待保存' : '已同步')
         }
       } catch (e) {
+        lastSaveError = e
         if (!disposed) {
           setSaveError(e.message)
           setStatus('未同步')
@@ -194,6 +203,19 @@ export default function App() {
       }
     }
     retrySave.current = save
+    flushForArchive.current = async (signal) => {
+      const target = state.capture(), deadline = Date.now() + 60000
+      clearTimeout(timer)
+      while (state.savedVersion < target) {
+        if (signal.aborted || disposed) throw new DOMException('操作已取消', 'AbortError')
+        if (Date.now() > deadline) throw Error('保存仍未完成，请稍后再导出完整备份')
+        if (saving) await new Promise(resolve => setTimeout(resolve, 50))
+        else {
+          await save()
+          if (lastSaveError) throw lastSaveError
+        }
+      }
+    }
     const off = doc.store.listen(schedule, {
       source: 'user',
       scope: 'document',
@@ -234,6 +256,8 @@ export default function App() {
     window.addEventListener('beforeunload', beforeUnload)
     return () => {
       disposed = true
+      archiveController.current?.abort()
+      flushForArchive.current = null
       clearTimeout(timer)
       clearTimeout(viewTimer)
       off()
@@ -341,6 +365,56 @@ export default function App() {
       setNotice(e.message)
     }
   }, [])
+  const portableBackup = async () => {
+    if (!editorRef.current || archiveController.current) return
+    const controller = new AbortController()
+    archiveController.current = controller
+    setArchiveProgress('准备完整备份…')
+    try {
+      // Open the picker during the user gesture, before waiting for autosave.
+      const destination = await chooseArchiveDestination()
+      setArchiveProgress('正在保存最新画布…')
+      await flushForArchive.current(controller.signal)
+      const { projectId } = await getStudioContext()
+      await downloadArchive(projectId, destination, {
+        signal: controller.signal, onProgress: setArchiveProgress,
+      })
+      setNotice('完整备份已下载，包含画布和原始图片')
+    } catch (error) {
+      setNotice(error.name === 'AbortError' ? '备份已取消' : error.message)
+    } finally {
+      if (archiveController.current === controller) archiveController.current = null
+      setArchiveProgress('')
+    }
+  }
+  const importArchive = async (file) => {
+    const doc = editorRef.current
+    if (!doc || archiveController.current || !file) return
+    const controller = new AbortController()
+    archiveController.current = controller
+    setArchiveProgress('正在检查完整备份…')
+    try {
+      const options = { signal: controller.signal, onProgress: setArchiveProgress }
+      const archive = await openArchive(file, options)
+      const { projectId } = await getStudioContext()
+      const snapshot = await restoreArchive(archive, async (blob) => {
+        const result = await studioJSON('/api/cowart/assets?projectId=' + encodeURIComponent(projectId), {
+          method: 'POST', headers: { 'Content-Type': blob.type }, body: blob,
+          signal: controller.signal,
+        })
+        return result.url
+      }, options)
+      if (controller.signal.aborted || editorRef.current !== doc)
+        throw new DOMException('导入已取消', 'AbortError')
+      doc.importSnapshot(snapshot)
+      setNotice('完整备份已导入为新页面，正在保存；可撤销本次导入')
+    } catch (error) {
+      setNotice(error.name === 'AbortError' ? '导入已取消，原画布未改动' : error.message)
+    } finally {
+      if (archiveController.current === controller) archiveController.current = null
+      setArchiveProgress('')
+    }
+  }
   const exportDocument = () =>
     downloadBlob(
       new Blob(
@@ -421,6 +495,9 @@ export default function App() {
               onNotice={setNotice}
               onImport={() => fileInput.current?.click()}
               onBackup={exportDocument}
+              onPortableBackup={portableBackup}
+              onArchiveImport={importArchive}
+              archiveBusy={!!archiveProgress}
               onDownload={download}
             />
             <div className="hamoki-tools" role="toolbar" aria-label="画布工具">
@@ -656,7 +733,13 @@ export default function App() {
           <button onClick={exportDocument}>导出当前画布备份</button>
         </aside>
       )}
-      {notice && (
+      {archiveProgress && (
+        <div className="hamoki-toast" role="status" aria-label="完整备份进度">
+          {archiveProgress}
+          <button onClick={() => archiveController.current?.abort()}>取消</button>
+        </div>
+      )}
+      {!archiveProgress && notice && (
         <div className="hamoki-toast" role="status">
           {notice}
           <button aria-label="关闭提示" onClick={() => setNotice('')}>

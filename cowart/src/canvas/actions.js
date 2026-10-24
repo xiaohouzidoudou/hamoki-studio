@@ -551,6 +551,8 @@ export function installCanvasActions(
         if (s.props.assetId)
           s.props.assetId = map.get(s.props.assetId) || s.props.assetId
       }
+      if (s.meta?.cowartAnnotationSourceShapeId && map.has(s.meta.cowartAnnotationSourceShapeId))
+        s.meta.cowartAnnotationSourceShapeId = map.get(s.meta.cowartAnnotationSourceShapeId)
       if (s.typeName === 'binding') {
         s.fromId = map.get(s.fromId)
         s.toId = map.get(s.toId)
@@ -647,6 +649,8 @@ export function installCanvasActions(
       if (next.parentId) next.parentId = map.get(next.parentId) || next.parentId
       if (next.props?.assetId)
         next.props.assetId = map.get(next.props.assetId) || next.props.assetId
+      if (next.meta?.cowartAnnotationSourceShapeId && map.has(next.meta.cowartAnnotationSourceShapeId))
+        next.meta.cowartAnnotationSourceShapeId = map.get(next.meta.cowartAnnotationSourceShapeId)
       if (next.typeName === 'binding') {
         next.fromId = map.get(next.fromId)
         next.toId = map.get(next.toId)

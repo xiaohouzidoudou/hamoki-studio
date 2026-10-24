@@ -158,12 +158,16 @@ export default function CanvasControls({
   onNotice,
   onImport,
   onBackup,
+  onPortableBackup,
+  onArchiveImport,
+  archiveBusy,
   onDownload,
 }) {
   const [panel, setPanel] = useState(null),
     [transparent, setTransparent] = useState(false),
     [help, setHelp] = useState(false),
-    importInput = useRef(null)
+    importInput = useRef(null),
+    archiveInput = useRef(null)
   useEffect(() => {
     const down = (e) => {
       if (e.key === 'Escape') {
@@ -855,7 +859,7 @@ export default function CanvasControls({
           {panel === '文件' && (
             <>
               <p className="hamoki-panel-hint">
-                有选区时导出选区，否则导出当前页面。
+                有选区时导出选区，否则导出当前页面。完整备份包含原图；JSON 保留结构和素材引用。
               </p>
               <label>
                 透明背景
@@ -868,7 +872,9 @@ export default function CanvasControls({
               <div className="hamoki-action-grid">
                 {action('导出 PNG', () => exportImage('png'))}
                 {action('导出 SVG', () => exportImage('svg'))}
-                {action('完整画布备份', onBackup)}
+                {action('完整画布备份 ZIP', onPortableBackup, archiveBusy)}
+                {action('导入完整备份 ZIP', () => archiveInput.current.click(), archiveBusy)}
+                {action('导出画布结构 JSON', onBackup)}
                 {action('插入链接卡片', () => insertLink('bookmark'))}
                 {action('插入嵌入内容', () => insertLink('embed'))}
                 {action('所选原图 ZIP', onDownload)}
@@ -889,6 +895,18 @@ export default function CanvasControls({
           )}
         </section>
       )}
+      <input
+        ref={archiveInput}
+        type="file"
+        accept="application/zip,.zip"
+        aria-label="导入完整备份文件"
+        hidden
+        onChange={(event) => {
+          const file = event.target.files[0]
+          event.target.value = ''
+          if (file) run(() => onArchiveImport(file))
+        }}
+      />
       <input
         ref={importInput}
         type="file"

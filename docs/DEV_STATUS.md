@@ -114,3 +114,12 @@ See `docs/AI_COLLABORATION.md` for conflict-free working rules. Production remai
 - Initial PR35 head 9d23275 CI run 40100426107 failed because the old marquee fixture began on the added menu. It is changed to start on actual blank canvas and still enclose the same image. The subsequent combined browser run additionally exposed `padding: "auto"` compatibility in reference export; the exporter now handles it while retaining the exact submission-count checks.
 - Rich text now saves while editing and groups its creation/typing into one undo. Successful remote asset URL commits are carried through matching undo/redo snapshots while previously captured save snapshots stay immutable. Frame creation adopts contained annotations so a populated AI holder cannot be misclassified as empty.
 - This remains an expanded milestone, with full-parity gaps documented explicitly in the matrix (media formats, portable asset backups, embed adapters, object snap and remaining legacy/device acceptance). No new QA promotion or overall completion is claimed by this entry.
+
+
+### Portable archive increment (2026-10-24)
+
+- Expanded tool PR #35 is merged at integration `983c54287da22da04e73d71bdb5b470424d88207`. Exact push CI 40104063507 succeeded (201 tests and four browser scripts); isolated QA was verified at the same source/deployed SHA with healthy image and matching frontend/backend hashes. Actual HTTPS tools and original save/upload/recovery/cancel combinations passed, with no paid provider attempts. Issue #23 has the evidence and limitations.
+- Owner ChatGPT; next branch `chatgpt/23-canvas-portable-backup` adds actual image bytes to complete ZIP export and restores into additional pages. Existing emergency structure JSON is retained. Asset format/size and account quota limits continue to apply; no jobs are enqueued by archive operations.
+- New code validates archive paths, checksums, hierarchy and schema before upload, preserves original media, remaps all imported IDs/known annotation references, and separates old history provenance from active source IDs. Streaming saves avoid unbounded archive buffers; cancellation and download failure are explicit.
+- Dedicated Node/API/browser regressions are added; exact final CI, integration SHA and deployed QA status must be recorded in #23 before claiming this increment accepted. The source document contains specific limits and remaining full-parity gaps: `docs/hamoki-canvas-feature-parity.md`.
+- #22 stays Draft. No main merge, production changes, existing user data migration, or paid-model calls.
