@@ -67,3 +67,7 @@ in the isolated development copy. Exact PR/integration CI and actual isolated
 QA deployment/browser evidence must be read from Issue #23; source tests alone
 do not constitute deployment. Production/main remain untouched. Real paid-model
 E2E and production promotion still require their separate authorization/gates.
+
+## Scope expanded after the core milestone
+
+The user subsequently requested full original canvas behavior. This document records the #34 core milestone only. Follow `hamoki-canvas-feature-parity.md` and Issue #23 for the expanded implementation and acceptance; the earlier core test result does not establish full parity. The expanded engine uses native schema 2 so a schema-1 deployment cannot silently edit the new feature set.

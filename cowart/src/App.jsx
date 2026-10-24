@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CanvasDocument, createShapeId } from './canvas/model.js'
+import CanvasControls from './canvas/CanvasControls.jsx'
 import CanvasView from './canvas/CanvasView.jsx'
 import { originalImagesZip } from './canvas/download.js'
 import { sanitizeCanvasSnapshot } from './canvasSnapshot.js'
@@ -111,6 +112,38 @@ export default function App() {
     const doc = new CanvasDocument(loaded.snapshot, container.current)
     editorRef.current = doc
     window.__cowartEditor = doc
+    try {
+      const style = JSON.parse(localStorage.getItem('hamoki-canvas-style'))
+      if (style && typeof style === 'object')
+        for (const key of [
+          'color',
+          'fill',
+          'dash',
+          'size',
+          'font',
+          'textAlign',
+          'verticalAlign',
+          'kind',
+          'spline',
+          'arrowheadStart',
+          'arrowheadEnd',
+          'bold',
+          'italic',
+          'underline',
+          'strike',
+          'opacity',
+        ])
+          if (['string', 'boolean', 'number'].includes(typeof style[key]))
+            doc.style[key] = style[key]
+    } catch {}
+    try {
+      const prefs = JSON.parse(
+        localStorage.getItem('hamoki-canvas-preferences'),
+      )
+      if (prefs && typeof prefs === 'object')
+        for (const key of Object.keys(doc.preferences))
+          if (typeof prefs[key] === 'boolean') doc.preferences[key] = prefs[key]
+    } catch {}
     if (loaded.view?.currentPageId)
       doc.setCurrentPage(loaded.view.currentPageId)
     if (loaded.view?.camera) doc.setCamera(loaded.view.camera)
@@ -345,7 +378,7 @@ export default function App() {
   const selected = editor?.getSelectedShapes() || [],
     one = selected.length === 1 ? selected[0] : null
   function setDimension(key, value) {
-    if (!one) return
+    if (!one || one.isLocked) return
     const size = Number(value)
     if (!Number.isFinite(size) || size < 16 || size > 8192) return
     const props = { [key]: size }
@@ -357,7 +390,11 @@ export default function App() {
   }
   return (
     <main
-      className={'cowart-canvas' + (open ? ' with-studio-panel' : '')}
+      className={
+        'cowart-canvas' +
+        (open ? ' with-studio-panel' : '') +
+        (editor?.preferences.focus ? ' hamoki-focus' : '')
+      }
       data-canvas-engine="hamoki-native-v1"
     >
       <div ref={container} className="hamoki-canvas tl-container">
@@ -365,6 +402,7 @@ export default function App() {
           <CanvasView
             editor={editor}
             onImport={importFiles}
+            onImportRequest={() => fileInput.current?.click()}
             onDownload={download}
             onNotice={setNotice}
           />
@@ -378,6 +416,13 @@ export default function App() {
         </div>
         {editor && (
           <>
+            <CanvasControls
+              editor={editor}
+              onNotice={setNotice}
+              onImport={() => fileInput.current?.click()}
+              onBackup={exportDocument}
+              onDownload={download}
+            />
             <div className="hamoki-tools" role="toolbar" aria-label="画布工具">
               {[
                 ['select', '选择 · V'],
@@ -541,13 +586,7 @@ export default function App() {
                         key={color}
                         aria-label={'颜色 ' + color}
                         data-color={color}
-                        onClick={() =>
-                          editor.updateShapes(
-                            selected
-                              .filter((s) => s.type !== 'image' && !s.isLocked)
-                              .map((s) => ({ id: s.id, props: { color } })),
-                          )
-                        }
+                        onClick={() => editor.setStyle({ color })}
                       />
                     ),
                   )}

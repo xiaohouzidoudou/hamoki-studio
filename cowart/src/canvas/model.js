@@ -1,6 +1,17 @@
 // Hamoki's independent canvas document engine. No third-party editor code.
 // The record envelope is retained solely to read existing Studio documents.
 import { generateKeyBetween } from 'fractional-indexing'
+import { layoutRich, richWidth } from './richText.js'
+import { rasterSvg } from './export.js'
+import { installCanvasActions } from './actions.js'
+import {
+  linePoints,
+  strokePoints,
+  pointDistance,
+  arrowGeometry,
+  fontSize,
+  fontFamilies,
+} from './features.js'
 export const createShapeId = () => 'shape:' + crypto.randomUUID()
 export const toRichText = (text) => ({
   type: 'doc',
@@ -51,6 +62,23 @@ export function inverse(m) {
     (m[1] * m[4] - m[0] * m[5]) / d,
   ]
 }
+export function decompose(m) {
+  const scaleX = Math.hypot(m[0], m[1]),
+    det = m[0] * m[3] - m[1] * m[2],
+    scaleY = det / Math.max(0.000001, scaleX)
+  return {
+    x: m[4],
+    y: m[5],
+    rotation: Math.atan2(m[1], m[0]),
+    scaleX,
+    scaleY,
+    skewX: Math.atan(
+      ((m[0] * m[2] + m[1] * m[3]) /
+        Math.max(0.000001, Math.abs(scaleX * scaleY))) *
+        (scaleY < 0 ? -1 : 1),
+    ),
+  }
+}
 export function shapeMatrix(store, shape, seen = new Set()) {
   if (!shape || seen.has(shape.id)) return identity
   seen.add(shape.id)
@@ -59,11 +87,12 @@ export function shapeMatrix(store, shape, seen = new Set()) {
     s = Math.sin(r)
   const sx = finite(shape.scaleX, 1),
     sy = finite(shape.scaleY, 1)
+  const k = Math.tan(finite(shape.skewX))
   const local = [
     c * sx,
     s * sx,
-    -s * sy,
-    c * sy,
+    (c * k - s) * sy,
+    (s * k + c) * sy,
     finite(shape.x),
     finite(shape.y),
   ]
@@ -74,16 +103,73 @@ export function shapeMatrix(store, shape, seen = new Set()) {
 }
 export function localBounds(shape) {
   const p = shape.props || {}
-  if (shape.type === 'arrow') {
-    const a = p.start || { x: 0, y: 0 },
-      b = p.end || { x: 160, y: 0 }
+  if (shape.type === 'text') {
+    const doc = p.richText || toRichText(p.text || ''),
+      size = fontSize(p),
+      font = `${size}px ${fontFamilies[p.font] || fontFamilies.sans}`,
+      w = p.autoSize
+        ? Math.max(16, richWidth(doc, font) + 4)
+        : Math.max(16, finite(p.w, 240)),
+      lines = layoutRich(doc, w, font, !p.autoSize)
     return {
-      x: Math.min(a.x, b.x),
-      y: Math.min(a.y, b.y),
-      w: Math.max(1, Math.abs(a.x - b.x)),
-      h: Math.max(1, Math.abs(a.y - b.y)),
+      x: 0,
+      y: 0,
+      w,
+      h: Math.max(finite(p.h, 0), lines.length * size * 1.35),
     }
   }
+  if (['draw', 'highlight', 'line'].includes(shape.type)) {
+    const points = shape.type === 'line' ? linePoints(p) : strokePoints(p)
+    if (points.length) {
+      const x = Math.min(...points.map((p) => p.x)),
+        y = Math.min(...points.map((p) => p.y))
+      return {
+        x,
+        y,
+        w: Math.max(1, ...points.map((p) => p.x - x)),
+        h: Math.max(1, ...points.map((p) => p.y - y)),
+      }
+    }
+  }
+  if (shape.type === 'arrow') {
+    const g = arrowGeometry(p),
+      a = g.start,
+      e = g.end,
+      dx = e.x - a.x,
+      dy = e.y - a.y,
+      len = Math.hypot(dx, dy) || 1,
+      bend = p.kind === 'straight' ? 0 : p.bend || 0,
+      c = {
+        x: (a.x + e.x) / 2 - (dy / len) * bend * 2,
+        y: (a.y + e.y) / 2 + (dx / len) * bend * 2,
+      },
+      points = Array.from({ length: 25 }, (_, i) => {
+        const t = i / 24
+        return {
+          x: (1 - t) ** 2 * a.x + 2 * (1 - t) * t * c.x + t * t * e.x,
+          y: (1 - t) ** 2 * a.y + 2 * (1 - t) * t * c.y + t * t * e.y,
+        }
+      }),
+      text = plainText(p.richText || p.text)
+    if (text) {
+      const label = p.labelPosition === 0 ? a : g.label,
+        size = fontSize(p),
+        w = Math.min(6000, text.length * size * 0.7)
+      points.push(
+        { x: label.x - w / 2, y: label.y - size - 10 },
+        { x: label.x + w / 2, y: label.y },
+      )
+    }
+    const x = Math.min(...points.map((p) => p.x)),
+      y = Math.min(...points.map((p) => p.y))
+    return {
+      x,
+      y,
+      w: Math.max(1, ...points.map((p) => p.x - x)),
+      h: Math.max(1, ...points.map((p) => p.y - y)),
+    }
+  }
+
   return {
     x: 0,
     y: 0,
@@ -102,6 +188,35 @@ export function localBounds(shape) {
     ),
   }
 }
+export function arrowEndpoints(store, shape) {
+  const result = {
+      start: shape.props?.start || { x: 0, y: 0 },
+      end: shape.props?.end || { x: 160, y: 80 },
+    },
+    im = inverse(shapeMatrix(store, shape))
+  for (const r of Object.values(store))
+    if (
+      r.typeName === 'binding' &&
+      r.type === 'arrow' &&
+      r.fromId === shape.id
+    ) {
+      const target = store[r.toId],
+        a = r.props?.normalizedAnchor || { x: 0.5, y: 0.5 },
+        terminal = r.props?.terminal
+      if (
+        target?.typeName === 'shape' &&
+        (terminal === 'start' || terminal === 'end')
+      )
+        result[terminal] = transform(
+          im,
+          transform(shapeMatrix(store, target), {
+            x: a.x * (target.props?.w || 180),
+            y: a.y * (target.props?.h || 120),
+          }),
+        )
+    }
+  return result
+}
 export function shapeBounds(store, shape) {
   if (!shape) return null
   if (shape.type === 'group') {
@@ -111,7 +226,14 @@ export function shapeBounds(store, shape) {
     if (children.length)
       return union(children.map((s) => shapeBounds(store, s)).filter(Boolean))
   }
-  const b = localBounds(shape),
+  const b = localBounds(
+      shape.type === 'arrow'
+        ? {
+            ...shape,
+            props: { ...shape.props, ...arrowEndpoints(store, shape) },
+          }
+        : shape,
+    ),
     m = shapeMatrix(store, shape),
     points = [
       [b.x, b.y],
@@ -164,6 +286,10 @@ export const colors = {
   yellow: '#edcf76',
   blue: '#79aee8',
   violet: '#b8a3dd',
+  'light-violet': '#dcccf3',
+  'light-blue': '#b4d6f7',
+  'light-green': '#b1dfb1',
+  'light-red': '#ffc2bb',
   white: '#f3faf6',
   orange: '#e9a16a',
 }
@@ -177,13 +303,30 @@ export function shapeColor(shape) {
 }
 export class CanvasDocument {
   constructor(snapshot, container) {
-    this.schema = { ...(snapshot?.schema || {}), hamokiCanvas: 1 }
+    this.schema = { ...(snapshot?.schema || {}), hamokiCanvas: 2 }
     this.records = { ...(snapshot?.store || {}) }
     this.container = container
     this.listeners = new Set()
     this.selected = []
     this.camera = { x: 0, y: 0, z: 1 }
     this.tool = 'select'
+    this.style = {
+      color: 'green',
+      fill: 'none',
+      dash: 'solid',
+      size: 'm',
+      font: 'sans',
+      textAlign: 'start',
+      opacity: 1,
+    }
+    this.preferences = {
+      grid: true,
+      snap: false,
+      toolLock: false,
+      focus: false,
+      edgeScroll: true,
+      wrap: true,
+    }
     this.pageId =
       Object.values(this.records).find((r) => r.typeName === 'page')?.id ||
       'page:main'
@@ -275,6 +418,7 @@ export class CanvasDocument {
     if (!this.history.length) return
     this.future.push({ ...this.records })
     this.records = this.history.pop()
+    if (!this.records[this.pageId]) this.pageId = this.getPages()[0]?.id
     this.selected = this.selected.filter((id) => this.records[id])
     this.notify()
   }
@@ -282,16 +426,18 @@ export class CanvasDocument {
     if (!this.future.length) return
     this.history.push({ ...this.records })
     this.records = this.future.pop()
+    if (!this.records[this.pageId]) this.pageId = this.getPages()[0]?.id
     this.selected = this.selected.filter((id) => this.records[id])
     this.notify()
   }
   put(records) {
     if (!records.length) return
-    this.checkpoint()
-    for (const r of records) {
+    const copied = records.map((r) => {
       if (!r || typeof r.id !== 'string') throw Error('无效的画布记录')
-      this.records[r.id] = clone(r)
-    }
+      return clone(r)
+    })
+    this.checkpoint()
+    for (const r of copied) this.records[r.id] = r
     this.notify()
   }
   getContainer() {
@@ -301,13 +447,34 @@ export class CanvasDocument {
     return this.pageId
   }
   getPages() {
-    return Object.values(this.records).filter((r) => r.typeName === 'page')
+    return Object.values(this.records)
+      .filter((r) => r.typeName === 'page')
+      .sort((a, b) =>
+        String(a.index) < String(b.index)
+          ? -1
+          : String(a.index) > String(b.index)
+            ? 1
+            : 0,
+      )
   }
   createPage(page = {}) {
     const p = {
       id: page.id || 'page:' + crypto.randomUUID(),
       typeName: 'page',
-      index: 'a1',
+      index: (() => {
+        const keys = this.getPages()
+          .map((p) => p.index)
+          .filter((k) => {
+            try {
+              generateKeyBetween(k, null)
+              return true
+            } catch {
+              return false
+            }
+          })
+          .sort()
+        return generateKeyBetween(keys.at(-1) || null, null)
+      })(),
       name: '新画布',
       meta: {},
       ...page,
@@ -323,27 +490,31 @@ export class CanvasDocument {
     return this
   }
   getCurrentPageShapes() {
-    const list = Object.values(this.records)
-      .filter((s) => {
-        if (s.typeName !== 'shape') return false
-        const visited = new Set()
-        let p = s
-        while (p && !visited.has(p.id)) {
-          if (p.parentId === this.pageId) return true
-          visited.add(p.id)
-          p = this.records[p.parentId]
-        }
-        return false
-      })
-      .sort((a, b) => String(a.index).localeCompare(String(b.index)))
-    const ordered = []
-    const visit = (parent) => {
-      for (const s of list.filter((s) => s.parentId === parent)) {
-        ordered.push(s)
-        visit(s.id)
+    const byParent = new Map()
+    for (const s of Object.values(this.records))
+      if (s.typeName === 'shape') {
+        const list = byParent.get(s.parentId) || []
+        list.push(s)
+        byParent.set(s.parentId, list)
       }
+    for (const list of byParent.values())
+      list.sort((a, b) =>
+        String(a.index) < String(b.index)
+          ? -1
+          : String(a.index) > String(b.index)
+            ? 1
+            : 0,
+      )
+    const ordered = [],
+      stack = [...(byParent.get(this.pageId) || [])].reverse(),
+      seen = new Set()
+    while (stack.length) {
+      const s = stack.pop()
+      if (seen.has(s.id)) continue
+      seen.add(s.id)
+      ordered.push(s)
+      stack.push(...[...(byParent.get(s.id) || [])].reverse())
     }
-    visit(this.pageId)
     return ordered
   }
   getCurrentPageShapeIds() {
@@ -411,16 +582,11 @@ export class CanvasDocument {
     return this.createShapes([input])
   }
   createShapes(inputs) {
+    const pending = new Map()
     const records = inputs.map((input) => {
-      const siblings = Object.values(this.records)
-        .filter(
-          (s) =>
-            s.typeName === 'shape' &&
-            s.parentId === (input.parentId || this.pageId),
-        )
-        .map((s) => s.index)
-        .filter(Boolean)
-        .sort()
+      const parentId = input.parentId || this.pageId,
+        index = this.nextIndex(parentId, pending.get(parentId) || null)
+      pending.set(parentId, index)
       return {
         id: createShapeId(),
         typeName: 'shape',
@@ -430,7 +596,7 @@ export class CanvasDocument {
         isLocked: false,
         opacity: 1,
         parentId: this.pageId,
-        index: this.nextIndex(input.parentId || this.pageId),
+        index,
         meta: {},
         ...input,
         props: {
@@ -480,6 +646,19 @@ export class CanvasDocument {
     }
     if (!remove.size) return
     this.checkpoint()
+    for (const binding of Object.values(this.records).filter(
+      (r) =>
+        r.typeName === 'binding' &&
+        (remove.has(r.fromId) || remove.has(r.toId)),
+    )) {
+      const arrow = this.records[binding.fromId]
+      if (arrow && !remove.has(arrow.id))
+        this.records[arrow.id] = {
+          ...arrow,
+          props: { ...arrow.props, ...this.getArrowEndpoints(arrow) },
+        }
+      delete this.records[binding.id]
+    }
     for (const id of remove) delete this.records[id]
     this.selected = this.selected.filter((id) => !remove.has(id))
     this.notify()
@@ -495,11 +674,87 @@ export class CanvasDocument {
   getShapePageBounds(shape) {
     return shapeBounds(this.records, this.getShape(shape))
   }
-  hitTest(point) {
+  hitTest(point, options = {}) {
     for (const shape of this.getCurrentPageShapes().slice().reverse()) {
-      if (shape.type === 'group') continue
+      if (
+        shape.type === 'group' ||
+        options.exclude?.includes(shape.id) ||
+        (options.bindable &&
+          ['arrow', 'line', 'draw', 'highlight'].includes(shape.type))
+      )
+        continue
+      let parent = this.records[shape.parentId],
+        visible = true
+      const ancestors = new Set()
+      while (parent?.typeName === 'shape' && !ancestors.has(parent.id)) {
+        ancestors.add(parent.id)
+        if (parent.type === 'frame') {
+          const pointInFrame = transform(
+            inverse(shapeMatrix(this.records, parent)),
+            point,
+          )
+          if (
+            pointInFrame.x < 0 ||
+            pointInFrame.y < 0 ||
+            pointInFrame.x > parent.props.w ||
+            pointInFrame.y > parent.props.h
+          ) {
+            visible = false
+            break
+          }
+        }
+        parent = this.records[parent.parentId]
+      }
+      if (!visible) continue
       const local = transform(inverse(shapeMatrix(this.records, shape)), point),
         b = localBounds(shape)
+      if (['draw', 'highlight', 'line', 'arrow'].includes(shape.type)) {
+        let points =
+          shape.type === 'line'
+            ? linePoints(shape.props)
+            : shape.type === 'arrow'
+              ? null
+              : strokePoints(shape.props)
+        if (shape.type === 'arrow') {
+          const endpoints = arrowEndpoints(this.records, shape),
+            g = arrowGeometry(shape.props, endpoints),
+            a = endpoints.start,
+            e = endpoints.end
+          if (shape.props.kind === 'elbow') {
+            const mid = (a.x + e.x) / 2
+            points = [a, { x: mid, y: a.y }, { x: mid, y: e.y }, e]
+          } else {
+            const dx = e.x - a.x,
+              dy = e.y - a.y,
+              len = Math.hypot(dx, dy) || 1,
+              bend = shape.props.bend || 0,
+              c = {
+                x: (a.x + e.x) / 2 - (dy / len) * bend * 2,
+                y: (a.y + e.y) / 2 + (dx / len) * bend * 2,
+              }
+            points = Array.from({ length: 25 }, (_, i) => {
+              const t = i / 24
+              return {
+                x: (1 - t) ** 2 * a.x + 2 * (1 - t) * t * c.x + t * t * e.x,
+                y: (1 - t) ** 2 * a.y + 2 * (1 - t) * t * c.y + t * t * e.y,
+              }
+            })
+          }
+        }
+        const tolerance = (shape.type === 'highlight' ? 20 : 8) / this.camera.z
+        if (
+          points?.length === 1 &&
+          Math.hypot(local.x - points[0].x, local.y - points[0].y) <= tolerance
+        )
+          return shape
+        if (
+          points?.some(
+            (p, i) => i && pointDistance(local, points[i - 1], p) <= tolerance,
+          )
+        )
+          return shape
+        continue
+      }
       if (
         local.x >= b.x &&
         local.x <= b.x + b.w &&
@@ -628,9 +883,7 @@ export class CanvasDocument {
     this.select(...originals.map((s) => map.get(s.id)))
   }
   groupSelected() {
-    const roots = this.getSelectedShapes().filter(
-      (s) => !this.selected.includes(s.parentId),
-    )
+    const roots = this.roots()
     if (roots.length < 2 || new Set(roots.map((s) => s.parentId)).size !== 1)
       throw Error('请选择同一层级的至少两个元素')
     const parentId = roots[0].parentId,
@@ -676,25 +929,13 @@ export class CanvasDocument {
       for (const s of Object.values(this.records).filter(
         (s) => s.parentId === group.id && s.typeName === 'shape',
       )) {
-        const t = multiply(
-          pm,
-          multiply(m, [
-            Math.cos(s.rotation || 0),
-            Math.sin(s.rotation || 0),
-            -Math.sin(s.rotation || 0),
-            Math.cos(s.rotation || 0),
-            s.x,
-            s.y,
-          ]),
-        )
+        const t = multiply(pm, shapeMatrix(this.records, s))
         this.updateShape({
           id: s.id,
           parentId: group.parentId,
           x: t[4],
           y: t[5],
-          rotation: Math.atan2(t[1], t[0]),
-          scaleX: Math.hypot(t[0], t[1]),
-          scaleY: Math.hypot(t[2], t[3]),
+          ...decompose(t),
         })
         ids.push(s.id)
       }
@@ -704,6 +945,8 @@ export class CanvasDocument {
     this.select(...ids)
   }
   async toImageDataUrl(ids, options = {}) {
+    if (this.container?.querySelector?.('.hamoki-board'))
+      return rasterSvg(this, ids, options)
     const selected = ids.map((id) => this.getShape(id)).filter(Boolean),
       all = new Set(ids)
     let changed = true
@@ -817,3 +1060,14 @@ export class CanvasDocument {
     }
   }
 }
+
+installCanvasActions(CanvasDocument, {
+  shapeMatrix,
+  inverse,
+  transform,
+  union,
+  createShapeId,
+  arrowEndpoints,
+  multiply,
+  decompose,
+})

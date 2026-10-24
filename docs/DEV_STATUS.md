@@ -99,3 +99,11 @@ See `docs/AI_COLLABORATION.md` for conflict-free working rules. Production remai
 - Full local 186/186 tests, build and isolated system-Chromium all four scripts passed. Actual new tool UI, mouse operations, file import and ZIP are covered, alongside existing result/save/asset/cancel regressions.
 - See `docs/hamoki-native-canvas-acceptance.md` for supported behavior and explicit legacy visual limitations. Exact CI and actually deployed QA SHA/browser status remain in Issue #23. This entry does not claim a deployment.
 - No paid model calls, no main/production update or existing user data migration. Native snapshots preserve the old envelope so a previous renderer still has the original raw records; retain pre-deploy backup and old image before QA promotion.
+
+## Independent canvas full feature parity — in development (2026-10-24)
+
+- User clarified that the original Cowart's complete visible canvas behavior is required. #34 and its deployed integration `394bf04` are a core milestone only. #22 remains Draft; main/production are unchanged.
+- Owner ChatGPT; branch `chatgpt/23-canvas-feature-parity`, based on `394bf0450e0613bead23f874f33d8f622aa0a7c3`. Inventory and acceptance requirements: `docs/hamoki-canvas-feature-parity.md`.
+- Expanded implementation includes sixteen geometry variants, draw/highlight/eraser/laser, independent legacy point decoding, arrows with live bindings, rich text, crop/flip, affine group transformations, arrange/styles, clipboard/pages, SVG/PNG/JSON, and view/input controls. Implementation and verification are ongoing; this is not a full parity or QA promotion claim.
+- Earlier checkpoint: full local 197 tests and build passed. Expanded real-Chromium regression exposed menu overlap, stale resize handles intercepting new tools, and an undefined property differing after JSON round-trip; fixes are being reverified with the complete suite. Exact final CI/SHA/QA evidence must be recorded in #23 before merge/deploy.
+- Expanded native schema is version 2: old native/legacy documents can be read; old version 1 rejects version 2 documents. QA rollback must pair the old image with the pre-upgrade backup. No paid provider calls or production data migration.

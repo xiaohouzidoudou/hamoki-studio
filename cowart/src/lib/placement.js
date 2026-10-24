@@ -5,6 +5,7 @@
 // on plain tldraw store records, so they are reused by the AI agent tools
 // (insert_image / edit_image) without any Node-specific or MCP-specific code.
 
+import { shapeBounds } from '../canvas/model.js'
 import { generateKeyBetween } from 'fractional-indexing'
 
 export function finiteNumber(value, fallback) {
@@ -68,7 +69,12 @@ function localBoundsForShape(shape) {
     const minY = Math.min(start.y ?? 0, end.y ?? 0)
     const maxX = Math.max(start.x ?? 0, end.x ?? 0)
     const maxY = Math.max(start.y ?? 0, end.y ?? 0)
-    return { x: minX, y: minY, w: Math.max(1, maxX - minX), h: Math.max(1, maxY - minY) }
+    return {
+      x: minX,
+      y: minY,
+      w: Math.max(1, maxX - minX),
+      h: Math.max(1, maxY - minY),
+    }
   }
   const w = finiteNumber(shape.props?.w, shape.type === 'text' ? 160 : 1)
   const h = finiteNumber(shape.props?.h, shape.type === 'text' ? 40 : 1)
@@ -76,32 +82,43 @@ function localBoundsForShape(shape) {
 }
 
 export function pageBoundsForShape(store, shape) {
-  const local = localBoundsForShape(shape)
-  if (!local) return null
-  let x = finiteNumber(shape.x, 0) + local.x
-  let y = finiteNumber(shape.y, 0) + local.y
-  let parent = store[shape.parentId]
-  const visited = new Set([shape.id])
-  while (parent?.typeName === 'shape' && !visited.has(parent.id)) {
-    visited.add(parent.id)
-    x += finiteNumber(parent.x, 0)
-    y += finiteNumber(parent.y, 0)
-    parent = store[parent.parentId]
-  }
-  return { x, y, w: local.w, h: local.h }
+  return shape?.typeName === 'shape' ? shapeBounds(store, shape) : null
 }
 
 function chooseIndex(store, parentId) {
   const siblingIndexes = Object.values(store)
-    .filter((record) => record?.typeName === 'shape' && record.parentId === parentId && typeof record.index === 'string')
+    .filter(
+      (record) =>
+        record?.typeName === 'shape' &&
+        record.parentId === parentId &&
+        typeof record.index === 'string',
+    )
     .map((record) => record.index)
-    .filter(key => { try { generateKeyBetween(key, null); return true } catch { return false } })
+    .filter((key) => {
+      try {
+        generateKeyBetween(key, null)
+        return true
+      } catch {
+        return false
+      }
+    })
     .sort()
   return generateKeyBetween(siblingIndexes.at(-1) ?? null, null)
 }
 
-export function choosePlacement({ store, pageId, parentId, anchorShape, width, height, margin, placement }) {
-  const anchorBounds = anchorShape ? pageBoundsForShape(store, anchorShape) : null
+export function choosePlacement({
+  store,
+  pageId,
+  parentId,
+  anchorShape,
+  width,
+  height,
+  margin,
+  placement,
+}) {
+  const anchorBounds = anchorShape
+    ? pageBoundsForShape(store, anchorShape)
+    : null
   let x = anchorBounds ? anchorBounds.x + anchorBounds.w + margin : 0
   let y = anchorBounds ? anchorBounds.y : 0
 
@@ -113,7 +130,9 @@ export function choosePlacement({ store, pageId, parentId, anchorShape, width, h
 
   const pageShapes = getPageShapes(store, pageId)
   const obstacles = pageShapes
-    .filter((shape) => shape.parentId === parentId && shape.id !== anchorShape?.id)
+    .filter(
+      (shape) => shape.parentId === parentId && shape.id !== anchorShape?.id,
+    )
     .map((shape) => pageBoundsForShape(store, shape))
     .filter(Boolean)
 
@@ -121,7 +140,10 @@ export function choosePlacement({ store, pageId, parentId, anchorShape, width, h
   const stepY = Math.max(height + margin, 1)
   for (let attempt = 0; attempt < 60; attempt += 1) {
     const candidate = { x, y, w: width, h: height }
-    if (!obstacles.some((bounds) => rectsOverlap(candidate, bounds, margin / 2))) return candidate
+    if (
+      !obstacles.some((bounds) => rectsOverlap(candidate, bounds, margin / 2))
+    )
+      return candidate
     if (placement === 'below') y += stepY
     else if (placement === 'left') x -= stepX
     else x += stepX
@@ -131,7 +153,9 @@ export function choosePlacement({ store, pageId, parentId, anchorShape, width, h
 }
 
 export function firstSelectedShapeId(selection) {
-  return selection?.selectedShapes?.length === 1 ? selection.selectedShapes[0]?.id : null
+  return selection?.selectedShapes?.length === 1
+    ? selection.selectedShapes[0]?.id
+    : null
 }
 
 // Build the tldraw asset + image-shape records for a generated bitmap. This is
@@ -155,16 +179,32 @@ export function buildImageShapeRecords({
   dataUrl,
   mimeType,
   altText = 'Cowart inserted image',
-  shapeMeta = {}
+  shapeMeta = {},
 }) {
-  const anchorBounds = anchorShape ? pageBoundsForShape(store, anchorShape) : null
+  const anchorBounds = anchorShape
+    ? pageBoundsForShape(store, anchorShape)
+    : null
   const useAnchorSize = matchAnchor && anchorBounds
-  const width = finiteNumber(displayWidth, useAnchorSize ? anchorBounds.w : Math.min(imageSize.width, 512))
+  const width = finiteNumber(
+    displayWidth,
+    useAnchorSize ? anchorBounds.w : Math.min(imageSize.width, 512),
+  )
   const height = finiteNumber(
     displayHeight,
-    useAnchorSize ? anchorBounds.h : Math.round(width * (imageSize.height / imageSize.width))
+    useAnchorSize
+      ? anchorBounds.h
+      : Math.round(width * (imageSize.height / imageSize.width)),
   )
-  const bounds = choosePlacement({ store, pageId, parentId, anchorShape, width, height, margin, placement })
+  const bounds = choosePlacement({
+    store,
+    pageId,
+    parentId,
+    anchorShape,
+    width,
+    height,
+    margin,
+    placement,
+  })
 
   const assetId = `asset:${uniqueIdSeed()}`
   const shapeId = `shape:${uniqueIdSeed()}`
@@ -186,9 +226,9 @@ export function buildImageShapeRecords({
       h: imageSize.height,
       fileSize: Math.round((dataUrl.length - dataUrl.indexOf(',')) * 0.75),
       mimeType,
-      isAnimated: false
+      isAnimated: false,
     },
-    meta: {}
+    meta: {},
   }
 
   const shapeRecord = {
@@ -209,11 +249,11 @@ export function buildImageShapeRecords({
       crop: null,
       flipX: false,
       flipY: false,
-      altText
+      altText,
     },
     parentId,
     index,
-    typeName: 'shape'
+    typeName: 'shape',
   }
 
   return { assetRecord, shapeRecord, bounds, assetId, shapeId, index }

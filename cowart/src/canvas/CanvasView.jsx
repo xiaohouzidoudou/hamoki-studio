@@ -11,6 +11,17 @@ import {
   transform,
   safeImageSource,
 } from './model.js'
+import { safeLink } from './richText.js'
+import CropEditor from './CropEditor.jsx'
+import RichTextEditor from './RichTextEditor.jsx'
+import ShapeContent from './ShapeContent.jsx'
+import {
+  geometries,
+  tools,
+  pathThrough,
+  linePoints,
+  arrowGeometry,
+} from './features.js'
 import CanvasImageActions from '../ui/CanvasImageActions.jsx'
 const editable = (target) =>
   target?.closest?.(
@@ -22,165 +33,60 @@ function Shape({ editor, shape }) {
     m = shapeMatrix(editor.records, shape),
     color = shapeColor(shape),
     selected = editor.selected.includes(shape.id)
-  let content
-  if (shape.type === 'image') {
-    const src = safeImageSource(editor.getAsset(p.assetId)?.props?.src),
-      asset = editor.getAsset(p.assetId),
-      crop = p.crop
-    if (src) {
-      const tl = crop?.topLeft || { x: 0, y: 0 },
-        br = crop?.bottomRight || { x: 1, y: 1 },
-        w = asset?.props?.w || b.w,
-        h = asset?.props?.h || b.h
-      content = (
-        <svg
-          width={b.w}
-          height={b.h}
-          viewBox={`${tl.x * w} ${tl.y * h} ${Math.max(1, (br.x - tl.x) * w)} ${Math.max(1, (br.y - tl.y) * h)}`}
-          preserveAspectRatio="none"
-          overflow="hidden"
-        >
-          <image
-            href={src}
-            width={w}
-            height={h}
-            preserveAspectRatio="none"
-            transform={`${p.flipX || p.flipY ? `translate(${p.flipX ? w : 0} ${p.flipY ? h : 0}) scale(${p.flipX ? -1 : 1} ${p.flipY ? -1 : 1})` : ''}`}
-          />
-        </svg>
+  let content = <ShapeContent editor={editor} shape={shape} />
+  const clips = [],
+    seen = new Set()
+  let parent = editor.getShape(shape.parentId)
+  while (parent?.typeName === 'shape' && !seen.has(parent.id)) {
+    seen.add(parent.id)
+    if (parent.type === 'frame') {
+      const pm = shapeMatrix(editor.records, parent),
+        im = inverse(m),
+        corners = [
+          [0, 0],
+          [parent.props.w, 0],
+          [parent.props.w, parent.props.h],
+          [0, parent.props.h],
+        ].map(([x, y]) => transform(im, transform(pm, { x, y }))),
+        id =
+          'clip-' + shape.id.replace(/[^a-zA-Z0-9]/g, '') + '-' + clips.length
+      clips.push(
+        <clipPath key={id} id={id}>
+          <polygon points={corners.map((p) => `${p.x},${p.y}`).join(' ')} />
+        </clipPath>,
       )
-    } else
-      content = (
-        <>
-          <rect width={b.w} height={b.h} fill="#402b2c" />
-          <text x="12" y="28" fill="#ffb4ae">
-            原图暂不可读取
-          </text>
-        </>
-      )
-  } else if (shape.type === 'frame')
-    content = (
-      <>
-        <rect
-          width={b.w}
-          height={b.h}
-          rx="8"
-          fill="#284938"
-          fillOpacity=".18"
-          stroke={color}
-          strokeWidth="1.5"
-          strokeDasharray={shape.meta?.cowartAiImageHolder ? '8 5' : undefined}
-        />
-        <text x="10" y="-9" fill={color} fontSize="13">
-          {p.name || '占位框'}
-        </text>
-      </>
-    )
-  else if (shape.type === 'group') return null
-  else if (shape.type === 'arrow') {
-    const a = p.start || { x: 0, y: 0 },
-      e = p.end || { x: 160, y: 80 },
-      r = Math.atan2(e.y - a.y, e.x - a.x),
-      head = `${e.x},${e.y} ${e.x - 14 * Math.cos(r - 0.45)},${e.y - 14 * Math.sin(r - 0.45)} ${e.x - 14 * Math.cos(r + 0.45)},${e.y - 14 * Math.sin(r + 0.45)}`
-    content = (
-      <>
-        <path
-          d={`M ${a.x} ${a.y} L ${e.x} ${e.y}`}
-          stroke={color}
-          strokeWidth="2.5"
-          fill="none"
-        />
-        <polygon points={head} fill={color} />
-        <path
-          d={`M ${a.x} ${a.y} L ${e.x} ${e.y}`}
-          stroke="transparent"
-          strokeWidth="18"
-        />
-        <text
-          x={(a.x + e.x) / 2}
-          y={(a.y + e.y) / 2 - 12}
-          fill={color}
-          fontSize="18"
-        >
-          {plainText(p.richText || p.text)}
-        </text>
-      </>
-    )
-  } else if (shape.type === 'text' || shape.type === 'note') {
-    const size = p.fontSize || { s: 16, m: 22, l: 30, xl: 40 }[p.size] || 22
-    content = (
-      <>
-        {shape.type === 'note' && (
-          <rect width={b.w} height={b.h} rx="9" fill="#3b4831" />
-        )}
-        <rect width={b.w} height={b.h} fill="transparent" />
-        {plainText(p.richText || p.text)
-          .split('\n')
-          .map((line, i) => (
-            <text
-              key={i}
-              x={shape.type === 'note' ? 12 : 0}
-              y={size + i * (size * 1.35)}
-              fontSize={size}
-              fontFamily="system-ui,sans-serif"
-              fill={color}
-            >
-              {line || ' '}
-            </text>
-          ))}
-      </>
-    )
-  } else if (shape.type === 'geo')
-    content =
-      p.geo === 'ellipse' ? (
-        <ellipse
-          cx={b.w / 2}
-          cy={b.h / 2}
-          rx={b.w / 2}
-          ry={b.h / 2}
-          fill={p.fill === 'none' ? 'transparent' : color}
-          fillOpacity=".2"
-          stroke={color}
-          strokeWidth="2"
-        />
-      ) : (
-        <rect
-          width={b.w}
-          height={b.h}
-          rx="7"
-          fill={p.fill === 'none' ? 'transparent' : color}
-          fillOpacity=".2"
-          stroke={color}
-          strokeWidth="2"
-        />
-      )
-  else
-    content = (
-      <>
-        <rect
-          width={b.w}
-          height={b.h}
-          fill="#403a28"
-          fillOpacity=".4"
-          stroke="#cfbc79"
-          strokeDasharray="5 5"
-        />
-        <text x="10" y="25" fill="#e8d797" fontSize="13">
-          旧元素 · {String(shape.type)}（保留）
-        </text>
-      </>
-    )
+      content = <g clipPath={`url(#${id})`}>{content}</g>
+    }
+    parent = editor.getShape(parent.parentId)
+  }
   return (
     <g
+      id={'hamoki-shape-' + shape.id.replace(/[^a-zA-Z0-9]/g, '')}
+      role="graphics-symbol"
+      aria-label={(
+        shape.props?.altText ||
+        plainText(shape.props?.richText || shape.props?.text) ||
+        shape.props?.name ||
+        shape.type
+      ).slice(0, 150)}
       data-shape-id={shape.id}
       data-shape-type={shape.type}
       transform={`matrix(${m.join(' ')})`}
       opacity={shape.opacity ?? 1}
-      style={{ cursor: shape.isLocked ? 'not-allowed' : 'move' }}
+      style={{
+        cursor:
+          editor.tool !== 'select'
+            ? 'inherit'
+            : shape.isLocked
+              ? 'not-allowed'
+              : 'move',
+      }}
     >
+      {!!clips.length && <defs>{clips}</defs>}
       {content}
       {selected && (
         <rect
+          data-selection-decoration="true"
           x={b.x}
           y={b.y}
           width={b.w}
@@ -194,13 +100,21 @@ function Shape({ editor, shape }) {
     </g>
   )
 }
-export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
+export default function CanvasView({
+  editor,
+  onImport,
+  onImportRequest,
+  onDownload,
+  onNotice,
+}) {
   useSyncExternalStore(
     (fn) => editor.store.listen(fn, { source: 'all', scope: 'all' }),
     () => editor.revision,
   )
   const svg = useRef(null),
     gesture = useRef(null),
+    richEditor = useRef(null),
+    lastPointer = useRef(null),
     space = useRef(false),
     touches = useRef(new Map()),
     pinch = useRef(null)
@@ -208,7 +122,8 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
     [draft, setDraft] = useState(null),
     [menu, setMenu] = useState(null),
     [editing, setEditing] = useState(null),
-    [text, setText] = useState('')
+    [cropId, setCropId] = useState(null),
+    [laserTrail, setLaserTrail] = useState(null)
   const camera = editor.getCamera(),
     bounds = editor.getSelectionPageBounds(),
     zoom = camera.z
@@ -219,22 +134,8 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
       onNotice(e.message)
     }
   }
-  const finishText = () => {
-    if (editing) {
-      editor.updateShape({
-        id: editing,
-        type: editor.getShape(editing)?.type,
-        props: {
-          richText: toRichText(text),
-          h: Math.max(50, text.split('\n').length * 30),
-        },
-      })
-      setEditing(null)
-    }
-  }
   const editShape = (shape) => {
     setEditing(shape.id)
-    setText(plainText(shape.props?.richText || shape.props?.text))
     setMenu(null)
   }
   const hitShape = (target) => {
@@ -245,13 +146,24 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
     while (
       shape &&
       !seen.has(shape.id) &&
-      editor.getShape(shape.parentId)?.type === 'group'
+      editor.getShape(shape.parentId)?.type === 'group' &&
+      shape.parentId !== editor.focusedGroup
     ) {
       seen.add(shape.id)
       shape = editor.getShape(shape.parentId)
     }
     return shape
   }
+  useEffect(() => {
+    const crop = () => {
+      const one = editor.getSelectedShapes()
+      if (one.length === 1 && one[0].type === 'image' && !one[0].isLocked)
+        setCropId(one[0].id)
+    }
+    editor.container.addEventListener('cowart:crop-selection', crop)
+    return () =>
+      editor.container.removeEventListener('cowart:crop-selection', crop)
+  }, [editor])
   useEffect(() => {
     const wheel = (e) => {
       e.preventDefault()
@@ -266,6 +178,19 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
   useEffect(() => {
     const down = (e) => {
       if (editable(e.target)) return
+      if (e.key === 'Tab' && e.target === svg.current) {
+        e.preventDefault()
+        const shapes = editor
+            .getCurrentPageShapes()
+            .filter(
+              (s) => s.parentId === (editor.focusedGroup || editor.pageId),
+            ),
+          i = shapes.findIndex((s) => s.id === editor.selected.at(-1)),
+          next =
+            shapes[(i + (e.shiftKey ? -1 : 1) + shapes.length) % shapes.length]
+        if (next) editor.select(next.id)
+        return
+      }
       if (e.code === 'Space') {
         space.current = true
         e.preventDefault()
@@ -277,9 +202,41 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
         editor.endGesture()
         gesture.current = null
         editor.setCurrentTool('select')
+        editor.focusedGroup = null
         return
       }
       const command = e.ctrlKey || e.metaKey
+      if (command && e.key.toLowerCase() === 'u') {
+        e.preventDefault()
+        onImportRequest?.()
+        return
+      }
+      if (!command && !e.altKey) {
+        if (e.shiftKey && e.code === 'Digit1') {
+          e.preventDefault()
+          editor.zoomToFit()
+          return
+        }
+        if (e.shiftKey && e.code === 'Digit2') {
+          e.preventDefault()
+          editor.zoomToSelection()
+          return
+        }
+        if (e.shiftKey && e.code === 'Digit0') {
+          e.preventDefault()
+          editor.setCamera({ ...editor.camera, z: 1 })
+          return
+        }
+        if (e.key === '+' || e.key === '-' || e.key === '=') {
+          e.preventDefault()
+          const r = editor.container.getBoundingClientRect()
+          editor.zoomAt(
+            { x: r.left + r.width / 2, y: r.top + r.height / 2 },
+            e.key === '-' ? 0.8 : 1.25,
+          )
+          return
+        }
+      }
       if (command && e.key.toLowerCase() === 'z') {
         e.preventDefault()
         e.shiftKey ? editor.redo() : editor.undo()
@@ -324,8 +281,14 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
         )
       } else if (!command && e.key.toLowerCase() === 'v')
         editor.setCurrentTool('select')
-      else if (!command && e.key.toLowerCase() === 'h')
-        editor.setCurrentTool('hand')
+      else if (!command && e.key.length === 1 && !e.altKey) {
+        const shortcut = (e.shiftKey ? 'Shift+' : '') + e.key.toUpperCase(),
+          tool = tools.find(([, , key]) => key === shortcut)
+        if (tool) {
+          e.preventDefault()
+          editor.setCurrentTool(tool[0])
+        }
+      }
     }
     const up = (e) => {
       if (e.code === 'Space') space.current = false
@@ -343,6 +306,18 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
     }
     const paste = (e) => {
       if (editable(e.target)) return
+      const native = e.clipboardData?.getData('application/x-hamoki-canvas')
+      const plain = e.clipboardData?.getData('text/plain')
+      if (native || plain?.startsWith('{"format":"hamoki-clipboard"')) {
+        try {
+          e.preventDefault()
+          editor.pasteSelection(JSON.parse(native || plain))
+          return
+        } catch (error) {
+          onNotice(error.message)
+          return
+        }
+      }
       const files = [...(e.clipboardData?.files || [])].filter((f) =>
         f.type.startsWith('image/'),
       )
@@ -370,11 +345,23 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
         }
       }
     }
+    const copy = (e) => {
+      if (editable(e.target) || !editor.selected.length) return
+      e.preventDefault()
+      const value = JSON.stringify(editor.captureSelection())
+      e.clipboardData.setData('application/x-hamoki-canvas', value)
+      e.clipboardData.setData('text/plain', value)
+      if (e.type === 'cut') editor.deleteShapes(editor.roots().map((s) => s.id))
+    }
+    document.addEventListener('copy', copy)
+    document.addEventListener('cut', copy)
     document.addEventListener('keydown', down)
     document.addEventListener('keyup', up)
     window.addEventListener('blur', blur)
     document.addEventListener('paste', paste)
     return () => {
+      document.removeEventListener('copy', copy)
+      document.removeEventListener('cut', copy)
       document.removeEventListener('keydown', down)
       document.removeEventListener('keyup', up)
       window.removeEventListener('blur', blur)
@@ -382,8 +369,12 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
     }
   }, [editor, onImport])
   function start(e) {
-    if (e.button === 2) return
-    if (editing) finishText()
+    if (e.button === 2 || e.target.closest?.('[data-embed-interactive]')) return
+    if (editor.activeEmbed) {
+      editor.activeEmbed = null
+      editor.notify('session')
+    }
+    if (editing) richEditor.current?.commit()
     setMenu(null)
     e.preventDefault()
     svg.current.focus()
@@ -408,7 +399,39 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
       gesture.current = { kind: 'pan', screen, camera: editor.getCamera() }
       return
     }
-    const handle = e.target.dataset.handle
+    lastPointer.current = {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      shiftKey: e.shiftKey,
+      pointerType: e.pointerType,
+    }
+    const handle =
+      editor.tool === 'select' ? e.target.dataset.handle : undefined
+    if (editor.tool === 'select' && e.target.dataset.vertex !== undefined) {
+      const shape = editor.getShape(e.target.dataset.owner),
+        vertex = e.target.dataset.vertex
+      if (!shape || shape.isLocked) return
+      editor.beginGesture()
+      if (shape.type === 'arrow') {
+        editor.updateShape({
+          id: shape.id,
+          props: editor.getArrowEndpoints(shape),
+        })
+        editor.unbindArrow(shape.id, vertex)
+      }
+      let index = vertex
+      if (e.target.dataset.insert !== undefined) {
+        const points = linePoints(shape.props).map((p) => ({ ...p })),
+          i = Number(vertex),
+          a = points[i],
+          b = points[i + 1]
+        points.splice(i + 1, 0, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })
+        editor.updateShape({ id: shape.id, props: { points } })
+        index = String(i + 1)
+      }
+      gesture.current = { kind: 'vertex', id: shape.id, vertex: index, point }
+      return
+    }
     if (handle && bounds) {
       editor.beginGesture()
       gesture.current = {
@@ -425,21 +448,54 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
     }
     if (editor.tool !== 'select') {
       const kind = editor.tool
+      if (['draw', 'highlight', 'laser'].includes(kind)) {
+        editor.beginGesture()
+        gesture.current = {
+          kind: 'stroke',
+          type: kind,
+          isPen: e.pointerType === 'pen',
+          point,
+          points: [{ x: 0, y: 0, z: e.pressure || 0.5 }],
+        }
+        setDraft({
+          x: point.x,
+          y: point.y,
+          type: kind,
+          points: [{ x: 0, y: 0 }],
+        })
+        return
+      }
+      if (kind === 'eraser') {
+        editor.beginGesture()
+        gesture.current = { kind: 'erase', point }
+        const hit = editor.hitTest(point)
+        if (hit && !hit.isLocked) editor.deleteShapes([hit.id])
+        return
+      }
       if (kind === 'text') {
         const id = createShapeId()
         editor.createShape({
           id,
           type: 'text',
+          opacity: editor.style.opacity,
           x: point.x,
           y: point.y,
-          props: { w: 260, h: 70, richText: toRichText('') },
+          props: { ...editor.style, w: 260, h: 70, richText: toRichText('') },
         })
         editor.select(id)
         editShape(editor.getShape(id))
-        editor.setCurrentTool('select')
+        if (!editor.preferences.toolLock) editor.setCurrentTool('select')
         return
       }
-      gesture.current = { kind: 'create', type: kind, point }
+      gesture.current = {
+        kind: 'create',
+        type: kind,
+        point,
+        startTarget:
+          kind === 'arrow' || kind === 'annotation'
+            ? editor.hitTest(point, { bindable: true })?.id
+            : null,
+      }
       setDraft({ x: point.x, y: point.y, w: 1, h: 1, type: kind })
       return
     }
@@ -455,6 +511,7 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
       }
       if (!editor.selected.includes(shape.id)) editor.select(shape.id)
       editor.beginGesture()
+      if (e.altKey && !shape.isLocked) editor.duplicateSelected()
       gesture.current = {
         kind: 'move',
         point,
@@ -474,6 +531,12 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
     }
   }
   function move(e) {
+    lastPointer.current = {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      shiftKey: e.shiftKey,
+      pointerType: e.pointerType,
+    }
     if (e.pointerType === 'touch' && touches.current.has(e.pointerId)) {
       touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
       if (touches.current.size === 2 && pinch.current) {
@@ -508,6 +571,49 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
       })
       return
     }
+    if (g.kind === 'vertex') {
+      const shape = editor.getShape(g.id),
+        local = transform(inverse(shapeMatrix(editor.records, shape)), p)
+      if (shape.type === 'arrow')
+        editor.updateShape({ id: g.id, props: { [g.vertex]: local } })
+      else {
+        const points = linePoints(shape.props).map((p) => ({ ...p }))
+        points[Number(g.vertex)] = local
+        editor.updateShape({ id: g.id, props: { points } })
+      }
+      return
+    }
+    if (g.kind === 'stroke') {
+      const last = g.points.at(-1),
+        next = { x: p.x - g.point.x, y: p.y - g.point.y, z: e.pressure || 0.5 }
+      if (Math.hypot(next.x - last.x, next.y - last.y) > 0.6 / zoom)
+        g.points.push(next)
+      setDraft({
+        x: g.point.x,
+        y: g.point.y,
+        type: g.type,
+        points: [...g.points],
+      })
+      return
+    }
+    if (g.kind === 'erase') {
+      const steps = Math.max(
+        1,
+        Math.min(
+          200,
+          Math.ceil((Math.hypot(p.x - g.point.x, p.y - g.point.y) * zoom) / 4),
+        ),
+      )
+      for (let i = 1; i <= steps; i++) {
+        const hit = editor.hitTest({
+          x: g.point.x + ((p.x - g.point.x) * i) / steps,
+          y: g.point.y + ((p.y - g.point.y) * i) / steps,
+        })
+        if (hit && !hit.isLocked) editor.deleteShapes([hit.id])
+      }
+      g.point = p
+      return
+    }
     if (g.kind === 'move') {
       editor.updateShapes(
         g.records.map((s) => {
@@ -521,8 +627,16 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
               : { x: dx, y: dy }
           return {
             id: s.id,
-            x: s.x + (e.shiftKey ? Math.round(d.x / 10) * 10 : d.x),
-            y: s.y + (e.shiftKey ? Math.round(d.y / 10) * 10 : d.y),
+            x:
+              s.x +
+              (e.shiftKey || editor.preferences.snap
+                ? Math.round(d.x / 24) * 24
+                : d.x),
+            y:
+              s.y +
+              (e.shiftKey || editor.preferences.snap
+                ? Math.round(d.y / 24) * 24
+                : d.y),
           }
         }),
       )
@@ -564,7 +678,7 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
             id: s.id,
             x: local.x,
             y: local.y,
-            ...(s.type === 'group'
+            ...(['group', 'draw', 'highlight', 'line'].includes(s.type)
               ? { scaleX: (s.scaleX || 1) * sx, scaleY: (s.scaleY || 1) * sy }
               : {}),
             props:
@@ -637,7 +751,7 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
           .getCurrentPageShapes()
           .filter(
             (s) =>
-              s.parentId === editor.pageId &&
+              s.parentId === (editor.focusedGroup || editor.pageId) &&
               intersects(editor.getShapePageBounds(s), box),
           )
           .map((s) => s.id),
@@ -653,65 +767,182 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
     }
     const g = gesture.current
     gesture.current = null
+    if (
+      g?.kind === 'vertex' &&
+      editor.getShape(g.id)?.type === 'arrow' &&
+      !e.altKey
+    ) {
+      const p = editor.screenToPage({ x: e.clientX, y: e.clientY }),
+        target = editor.hitTest(p, { exclude: [g.id], bindable: true })
+      if (target && target.id !== g.id)
+        editor.bindArrow(g.id, g.vertex, target.id, p)
+    }
+    if (g?.kind === 'stroke' && g.type === 'laser')
+      setLaserTrail({ ...g, at: Date.now() })
+    if (g?.kind === 'stroke' && g.type !== 'laser') {
+      const id = createShapeId()
+      editor.createShape({
+        id,
+        type: g.type,
+        x: g.point.x,
+        y: g.point.y,
+        opacity: editor.style.opacity,
+        props: {
+          ...editor.style,
+          points: g.points,
+          isPen: g.isPen,
+          isComplete: true,
+        },
+      })
+      editor.select(id)
+    }
     if (g?.kind === 'create') {
       const p = editor.screenToPage({ x: e.clientX, y: e.clientY }),
+        isArrow = ['arrow', 'annotation'].includes(g.type),
+        isGeo = geometries.some(([id]) => id === g.type),
+        clicked = Math.hypot(p.x - g.point.x, p.y - g.point.y) < 4 / zoom,
         b = {
           x: Math.min(p.x, g.point.x),
           y: Math.min(p.y, g.point.y),
-          w: Math.max(30, Math.abs(p.x - g.point.x)),
-          h: Math.max(30, Math.abs(p.y - g.point.y)),
+          w: clicked
+            ? g.type === 'holder'
+              ? 512
+              : 180
+            : Math.max(16, Math.abs(p.x - g.point.x)),
+          h: clicked
+            ? g.type === 'holder'
+              ? 683
+              : 120
+            : Math.max(16, Math.abs(p.y - g.point.y)),
         },
-        id = createShapeId()
+        id = createShapeId(),
+        target =
+          isArrow && !e.altKey ? editor.hitTest(p, { bindable: true }) : null,
+        a = { x: g.point.x - b.x, y: g.point.y - b.y },
+        endPoint = clicked ? { x: 160, y: 80 } : { x: p.x - b.x, y: p.y - b.y }
+      editor.beginGesture()
       editor.createShape({
         id,
         type:
           g.type === 'holder'
             ? 'frame'
-            : g.type === 'rectangle' || g.type === 'ellipse'
+            : isGeo
               ? 'geo'
-              : g.type,
+              : isArrow
+                ? 'arrow'
+                : g.type,
         x: b.x,
         y: b.y,
+        opacity: editor.style.opacity,
         meta:
           g.type === 'holder'
             ? { cowartAiImageHolder: true, cowartAiAspectRatio: b.w / b.h }
-            : {},
+            : g.type === 'annotation'
+              ? { cowartAnnotationArrow: true }
+              : {},
         props: {
+          ...editor.style,
           w: b.w,
           h: b.h,
-          geo: g.type === 'ellipse' ? 'ellipse' : 'rectangle',
-          fill: 'none',
-          name: 'AI 图片',
-          color: g.type === 'arrow' ? 'red' : 'green',
-          ...(g.type === 'arrow'
+          ...(isGeo ? { geo: g.type } : {}),
+          name: g.type === 'holder' ? 'AI 图片' : '框架',
+          richText: toRichText(''),
+          ...(isArrow
             ? {
-                start: { x: g.point.x - b.x, y: g.point.y - b.y },
-                end: { x: p.x - b.x, y: p.y - b.y },
-                richText: toRichText(''),
+                start: a,
+                end: endPoint,
+                kind: 'arc',
+                arrowheadEnd: 'arrow',
+                ...(g.type === 'annotation'
+                  ? {
+                      bend: Math.min(
+                        48,
+                        Math.max(
+                          16,
+                          Math.hypot(endPoint.x - a.x, endPoint.y - a.y) * 0.12,
+                        ),
+                      ),
+                      labelPosition: 0,
+                    }
+                  : {}),
               }
+            : {}),
+          ...(g.type === 'line'
+            ? { points: [a, endPoint], spline: 'line' }
             : {}),
         },
       })
+      if (isArrow && !e.altKey) {
+        if (g.startTarget) editor.bindArrow(id, 'start', g.startTarget, g.point)
+        if (target) editor.bindArrow(id, 'end', target.id, p)
+      }
       editor.select(id)
-      editor.setCurrentTool('select')
+      if (g.type === 'annotation' || g.type === 'note')
+        editShape(editor.getShape(id))
+      if (!editor.preferences.toolLock) editor.setCurrentTool('select')
     }
     editor.endGesture()
     setMarquee(null)
     setDraft(null)
   }
+  useEffect(() => {
+    let frame
+    const tick = () => {
+      const g = gesture.current,
+        p = lastPointer.current
+      if (
+        editor.preferences.edgeScroll &&
+        g &&
+        p &&
+        ['move', 'create', 'stroke', 'marquee', 'vertex'].includes(g.kind)
+      ) {
+        const r = editor.container.getBoundingClientRect(),
+          dx = p.clientX < r.left + 24 ? -8 : p.clientX > r.right - 24 ? 8 : 0,
+          dy = p.clientY < r.top + 24 ? -8 : p.clientY > r.bottom - 24 ? 8 : 0
+        if (dx || dy) {
+          editor.setCamera({
+            ...editor.camera,
+            x: editor.camera.x - dx / editor.camera.z,
+            y: editor.camera.y - dy / editor.camera.z,
+          })
+          move(p)
+        }
+      }
+      frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [editor])
   const double = (e) => {
     const shape =
       hitShape(e.target) ||
       editor.hitTest(editor.screenToPage({ x: e.clientX, y: e.clientY }))
     if (!shape) return
+    if (shape.type === 'group') {
+      editor.focusedGroup = shape.id
+      editor.selectNone()
+      return
+    }
     editor.select(shape.id)
+    if (shape.type === 'bookmark') {
+      const url = safeLink(shape.props.url)
+      if (url) window.open(url, '_blank', 'noopener,noreferrer')
+      return
+    }
+    if (shape.type === 'embed') {
+      editor.activeEmbed = shape.id
+      editor.notify('session')
+      return
+    }
+    if (shape.isLocked) return
     if (shape.type === 'image')
       editor
         .getContainer()
         .dispatchEvent(
           new CustomEvent('cowart:preview-image', { detail: shape.id }),
         )
-    else if (['text', 'note', 'arrow'].includes(shape.type)) editShape(shape)
+    else if (['text', 'note', 'arrow', 'geo'].includes(shape.type))
+      editShape(shape)
   }
   const shapeBeingEdited = editing && editor.getShape(editing),
     editBounds = shapeBeingEdited && editor.getShapePageBounds(shapeBeingEdited)
@@ -720,7 +951,22 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
       <svg
         ref={svg}
         className="hamoki-board"
+        style={{
+          cursor:
+            editor.tool === 'hand'
+              ? 'grab'
+              : editor.tool === 'select'
+                ? 'default'
+                : 'crosshair',
+        }}
         aria-label="图片画布"
+        role="application"
+        aria-roledescription="无限画布"
+        aria-activedescendant={
+          editor.selected.length === 1
+            ? 'hamoki-shape-' + editor.selected[0].replace(/[^a-zA-Z0-9]/g, '')
+            : undefined
+        }
         tabIndex="0"
         onPointerDown={start}
         onPointerMove={move}
@@ -755,6 +1001,40 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
         }}
       >
         <defs>
+          <filter
+            id="hamoki-rough"
+            x="-10%"
+            y="-10%"
+            width="120%"
+            height="120%"
+          >
+            <feTurbulence
+              type="fractalNoise"
+              baseFrequency=".08"
+              numOctaves="2"
+              seed="17"
+              result="noise"
+            />
+            <feDisplacementMap
+              in="SourceGraphic"
+              in2="noise"
+              scale="2"
+              xChannelSelector="R"
+              yChannelSelector="G"
+            />
+          </filter>
+          <pattern
+            id="hamoki-hatch"
+            width="8"
+            height="8"
+            patternUnits="userSpaceOnUse"
+          >
+            <path
+              d="M-2 2L2 -2M0 8L8 0M6 10L10 6"
+              stroke="#83b39a"
+              strokeWidth="1"
+            />
+          </pattern>
           <pattern
             id="hamoki-grid"
             width={24 * zoom}
@@ -766,12 +1046,42 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
             <circle cx="1" cy="1" r="1" fill="#456151" opacity=".35" />
           </pattern>
         </defs>
-        <rect width="100%" height="100%" fill="url(#hamoki-grid)" />
+        <rect
+          width="100%"
+          height="100%"
+          fill={editor.preferences.grid ? 'url(#hamoki-grid)' : 'transparent'}
+        />
         <g transform={`scale(${zoom}) translate(${camera.x} ${camera.y})`}>
           {editor.getCurrentPageShapes().map((shape) => (
             <Shape key={shape.id} shape={shape} editor={editor} />
           ))}
-          {draft && (
+          {laserTrail && (
+            <path
+              key={laserTrail.at}
+              className="hamoki-laser-trail"
+              d={pathThrough(laserTrail.points, true)}
+              transform={`translate(${laserTrail.point.x} ${laserTrail.point.y})`}
+              fill="none"
+              stroke="#ff7979"
+              strokeWidth="3"
+              strokeLinecap="round"
+              pointerEvents="none"
+              onAnimationEnd={() => setLaserTrail(null)}
+            />
+          )}
+          {draft?.points && (
+            <path
+              d={pathThrough(draft.points, true)}
+              transform={`translate(${draft.x} ${draft.y})`}
+              fill="none"
+              stroke={draft.type === 'laser' ? '#fa7979' : '#9ae7b6'}
+              strokeWidth={draft.type === 'highlight' ? 20 : 3}
+              strokeLinecap="round"
+              opacity={draft.type === 'highlight' ? 0.4 : 1}
+              pointerEvents="none"
+            />
+          )}
+          {draft && !draft.points && (
             <rect
               x={draft.x}
               y={draft.y}
@@ -794,7 +1104,71 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
               pointerEvents="none"
             />
           )}
+          {editor
+            .getSelectedShapes()
+            .filter(
+              (s) =>
+                editor.tool === 'select' &&
+                ['arrow', 'line'].includes(s.type) &&
+                !s.isLocked,
+            )
+            .flatMap((s) => {
+              const m = shapeMatrix(editor.records, s),
+                points =
+                  s.type === 'arrow'
+                    ? Object.entries(editor.getArrowEndpoints(s))
+                    : linePoints(s.props).map((p, i) => [String(i), p])
+              const midpoints =
+                s.type === 'line'
+                  ? points.slice(0, -1).map(([vertex, p], i) => {
+                      const next = points[i + 1][1],
+                        world = transform(m, {
+                          x: (p.x + next.x) / 2,
+                          y: (p.y + next.y) / 2,
+                        })
+                      return (
+                        <circle
+                          key={s.id + 'mid' + vertex}
+                          data-owner={s.id}
+                          data-vertex={vertex}
+                          data-insert="true"
+                          cx={world.x}
+                          cy={world.y}
+                          r={4 / zoom}
+                          fill="#204b33"
+                          stroke="#90c8a3"
+                          strokeWidth={1 / zoom}
+                          style={{ cursor: 'copy' }}
+                        />
+                      )
+                    })
+                  : []
+              return [
+                ...midpoints,
+                ...points.map(([vertex, p]) => {
+                  const world = transform(m, p)
+                  return (
+                    <circle
+                      key={s.id + vertex}
+                      data-owner={s.id}
+                      data-vertex={vertex}
+                      cx={world.x}
+                      cy={world.y}
+                      r={6 / zoom}
+                      fill="#d0f7dd"
+                      stroke="#305d40"
+                      strokeWidth={1 / zoom}
+                      style={{ cursor: 'crosshair' }}
+                    />
+                  )
+                }),
+              ]
+            })}
           {bounds &&
+            editor.tool === 'select' &&
+            !editor
+              .getSelectedShapes()
+              .every((s) => ['arrow', 'line'].includes(s.type)) &&
             !editing &&
             editor.getSelectedShapes().some((s) => !s.isLocked) && (
               <g className="hamoki-handles">
@@ -848,28 +1222,42 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
         </g>
       </svg>
       {editBounds && (
-        <textarea
-          className="hamoki-text-editor"
-          aria-label="编辑标注文字"
-          autoFocus
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onBlur={finishText}
-          onKeyDown={(e) => {
-            e.stopPropagation()
-            if (e.key === 'Escape') {
-              setEditing(null)
-            } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-              e.preventDefault()
-              finishText()
-            }
+        <RichTextEditor
+          ref={richEditor}
+          key={editing}
+          shape={shapeBeingEdited}
+          onCommit={(richText) => {
+            if (richText)
+              editor.updateShape({
+                id: editing,
+                props: {
+                  richText,
+                  ...(shapeBeingEdited.type === 'text'
+                    ? {
+                        h: Math.max(
+                          50,
+                          plainText(richText).split('\n').length * 30,
+                        ),
+                      }
+                    : {}),
+                },
+              })
+            setEditing(null)
           }}
+          onCancel={() => setEditing(null)}
           style={{
             left: (editBounds.x + camera.x) * zoom,
             top: (editBounds.y + camera.y) * zoom,
-            width: Math.max(180, editBounds.w * zoom),
-            height: Math.max(90, editBounds.h * zoom),
+            width: Math.max(240, editBounds.w * zoom),
+            minHeight: Math.max(90, editBounds.h * zoom),
           }}
+        />
+      )}
+      {cropId && editor.getShape(cropId) && (
+        <CropEditor
+          editor={editor}
+          shape={editor.getShape(cropId)}
+          onClose={() => setCropId(null)}
         />
       )}
       <CanvasImageActions editor={editor} />
@@ -897,10 +1285,22 @@ export default function CanvasView({ editor, onImport, onDownload, onNotice }) {
                   .dispatchEvent(new CustomEvent('cowart:reference-selection')),
             ],
             ['下载所选原图', () => onDownload()],
+            [
+              '裁剪所选图片',
+              () =>
+                editor.container.dispatchEvent(
+                  new CustomEvent('cowart:crop-selection'),
+                ),
+            ],
             ['复制一份', () => editor.duplicateSelected()],
             ['组合', () => editor.groupSelected()],
             ['取消组合', () => editor.ungroupSelected()],
-            ['置于顶层', () => editor.bringToFront()],
+            ['置于顶层', () => editor.reorder('front')],
+            ['置于底层', () => editor.reorder('back')],
+            ['加入框架', () => editor.frameSelection()],
+            ['移除框架', () => editor.removeFrames()],
+            ['框架适应内容', () => editor.fitFrames()],
+            ['全选', () => editor.selectAll()],
             [
               '锁定 / 解锁',
               () =>

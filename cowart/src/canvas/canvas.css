@@ -416,3 +416,436 @@ body {
 .hamoki-canvas-header {
   color: #dbeae1;
 }
+.hamoki-menu-tabs {
+  position: absolute;
+  top: 108px;
+  left: 16px;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  background: #19271fee;
+  border: 1px solid #354c3c;
+  border-radius: 10px;
+  max-width: calc(100% - 32px);
+  overflow: auto;
+}
+.hamoki-menu-tabs button {
+  border: 0;
+  background: transparent;
+  color: #b9d1c1;
+  padding: 7px 10px;
+  white-space: nowrap;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.hamoki-menu-tabs button[aria-expanded='true'],
+.hamoki-control-panel button[aria-pressed='true'] {
+  background: #365e44;
+  color: #edfff2;
+}
+.hamoki-control-panel {
+  position: absolute;
+  left: 16px;
+  top: 152px;
+  width: 280px;
+  max-width: calc(100% - 32px);
+  max-height: calc(100% - 240px);
+  overflow: auto;
+  background: #19271ff7;
+  border: 1px solid #47624e;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 14px 40px #0006;
+  z-index: 24;
+  font-size: 12px;
+}
+.hamoki-control-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.hamoki-control-panel button,
+.hamoki-help button {
+  border: 1px solid #3f5c48;
+  border-radius: 6px;
+  background: #223d2c;
+  color: #c9e3d2;
+  padding: 7px;
+  cursor: pointer;
+}
+.hamoki-control-panel button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.hamoki-control-panel header button {
+  background: transparent;
+  font-size: 18px;
+  padding: 0 6px;
+  border: 0;
+}
+.hamoki-control-panel label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 9px 0;
+  color: #abc3b2;
+}
+.hamoki-control-panel select,
+.hamoki-control-panel input[type='number'] {
+  width: 125px;
+  max-width: 60%;
+  padding: 5px;
+  background: #101d16;
+  color: #d7eade;
+  border: 1px solid #405b49;
+  border-radius: 5px;
+  font-size: 12px;
+}
+.hamoki-tool-library {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+}
+.hamoki-tool-library button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 60px;
+  padding: 5px;
+  font-size: 10px;
+  background: transparent;
+}
+.hamoki-action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 10px 0;
+}
+.hamoki-full-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.hamoki-full-colors button {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  padding: 0;
+}
+.hamoki-full-colors button[aria-pressed='true'] {
+  outline: 2px solid #e5ffed;
+  outline-offset: 2px;
+}
+.hamoki-panel-hint {
+  font-size: 11px;
+  color: #7e9c88;
+  line-height: 1.6;
+}
+.hamoki-page-row {
+  display: flex;
+  gap: 3px;
+  margin: 6px 0;
+}
+.hamoki-page-row button:first-child {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hamoki-help {
+  position: absolute;
+  z-index: 60;
+  inset: 10% 15%;
+  overflow: auto;
+  background: #192b21;
+  border: 1px solid #6b967a;
+  border-radius: 16px;
+  padding: 24px;
+  font-size: 13px;
+  color: #d2e9da;
+  box-shadow: 0 20px 80px #000b;
+}
+.hamoki-help h2 {
+  font-size: 20px;
+}
+.hamoki-help > div {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+.hamoki-help kbd {
+  display: inline-block;
+  min-width: 24px;
+  border: 1px solid #627c69;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin-right: 6px;
+}
+.hamoki-focus .hamoki-tools,
+.hamoki-focus .hamoki-view-controls,
+.hamoki-focus .hamoki-selection-properties,
+.hamoki-focus .hamoki-canvas-header {
+  display: none;
+}
+.hamoki-context-menu {
+  max-height: 60vh;
+  overflow: auto;
+}
+@media (max-width: 840px) {
+  .hamoki-control-panel {
+    max-height: calc(100% - 300px);
+  }
+  .hamoki-help {
+    inset: 10% 4%;
+  }
+  .hamoki-help > div {
+    grid-template-columns: 1fr 1fr;
+  }
+  .hamoki-tools {
+    overflow: auto;
+  }
+  .hamoki-tools button {
+    flex-shrink: 0;
+  }
+}
+.hamoki-rich-editor {
+  position: absolute;
+  z-index: 25;
+  min-width: 240px;
+  max-width: calc(100% - 24px);
+  background: #16251f;
+  border: 1px solid #9cdeb6;
+  border-radius: 8px;
+  box-shadow: 0 8px 30px #0006;
+}
+.hamoki-rich-editor .hamoki-text-editor {
+  position: relative;
+  width: 100%;
+  min-height: 90px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  resize: none;
+  white-space: pre-wrap;
+  user-select: text;
+  overflow-wrap: anywhere;
+}
+.hamoki-rich-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 5px;
+  background: #243d2e;
+  border-radius: 8px 8px 0 0;
+}
+.hamoki-rich-toolbar button {
+  border: 0;
+  border-radius: 4px;
+  background: #31543e;
+  color: #d9f0e1;
+  padding: 5px;
+  font-size: 11px;
+}
+@keyframes hamoki-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.hamoki-control-panel,
+.hamoki-context-menu,
+.hamoki-rich-editor {
+  animation: hamoki-panel-in 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hamoki-menu-tabs button,
+.hamoki-tool-library button {
+  transition:
+    background-color 180ms,
+    color 180ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hamoki-control-panel,
+  .hamoki-context-menu,
+  .hamoki-rich-editor {
+    animation: none;
+  }
+  .hamoki-menu-tabs button,
+  .hamoki-tool-library button {
+    transition: none;
+  }
+}
+.hamoki-legacy-warning {
+  top: 160px;
+  left: auto;
+  right: 16px;
+  max-width: min(420px, calc(100% - 32px));
+  max-height: calc(100% - 240px);
+  overflow: auto;
+}
+.hamoki-save-error {
+  top: 160px;
+}
+.hamoki-crop-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: #040b08dc;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  touch-action: none;
+}
+.hamoki-crop-backdrop > section {
+  background: #192b21;
+  border: 1px solid #526e5b;
+  border-radius: 14px;
+  padding: 18px;
+  width: min(700px, 92vw);
+  max-height: 94vh;
+  overflow: auto;
+  box-shadow: 0 20px 80px #0009;
+}
+.hamoki-crop-backdrop header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+.hamoki-crop-backdrop header span {
+  font-size: 11px;
+  color: #91b19d;
+}
+.hamoki-crop-stage {
+  position: relative;
+  width: 100%;
+  max-height: 65vh;
+  overflow: hidden;
+  background: #090f0c;
+}
+.hamoki-crop-stage > img {
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  display: block;
+  pointer-events: none;
+}
+.hamoki-crop-area {
+  position: absolute;
+  border: 2px solid #a3efbe;
+  box-shadow: 0 0 0 1000px #0008;
+  cursor: move;
+  touch-action: none;
+  background: linear-gradient(
+    to right,
+    transparent 33%,
+    #a3efbe55 33%,
+    #a3efbe55 33.3%,
+    transparent 33.3%,
+    transparent 66%,
+    #a3efbe55 66%,
+    #a3efbe55 66.3%,
+    transparent 66.3%
+  );
+}
+.hamoki-crop-area button {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 2px solid #173c26;
+  border-radius: 4px;
+  background: #a3efbe;
+  touch-action: none;
+}
+.crop-nw {
+  left: -9px;
+  top: -9px;
+  cursor: nw-resize;
+}
+.crop-ne {
+  right: -9px;
+  top: -9px;
+  cursor: ne-resize;
+}
+.crop-sw {
+  left: -9px;
+  bottom: -9px;
+  cursor: sw-resize;
+}
+.crop-se {
+  right: -9px;
+  bottom: -9px;
+  cursor: se-resize;
+}
+.hamoki-crop-backdrop footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+.hamoki-crop-backdrop footer button {
+  border: 1px solid #4d6c57;
+  background: #233e2e;
+  color: #d0ead9;
+  border-radius: 7px;
+  padding: 9px 14px;
+  font-size: 12px;
+}
+.hamoki-crop-backdrop footer button.primary {
+  background: #497e59;
+  color: #fff;
+}
+.hamoki-focus .hamoki-studio-panel,
+.hamoki-focus .cowart-ai-launcher {
+  display: none;
+}
+.hamoki-focus.with-studio-panel .hamoki-canvas {
+  width: 100%;
+}
+@keyframes hamoki-laser-fade {
+  0% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.hamoki-laser-trail {
+  animation: hamoki-laser-fade 900ms ease-out forwards;
+  filter: drop-shadow(0 0 3px #ff5d5d);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hamoki-laser-trail {
+    animation-duration: 1ms;
+  }
+}
+.hamoki-style-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.hamoki-style-fields:disabled {
+  opacity: 0.55;
+}
+.hamoki-control-panel input[type='url'],
+.hamoki-control-panel input:not([type]) {
+  width: 125px;
+  max-width: 60%;
+  padding: 5px;
+  background: #101d16;
+  color: #d7eade;
+  border: 1px solid #405b49;
+  border-radius: 5px;
+  font-size: 12px;
+}

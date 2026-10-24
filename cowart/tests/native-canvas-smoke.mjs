@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
+import { verifyCanvasParity } from './canvas-parity.mjs'
 import { verifyNativeCanvas } from './native-canvas.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
@@ -82,6 +83,7 @@ try {
   )
   await page.waitForFunction(() => !!window.__cowartEditor)
   await verifyNativeCanvas({ page, context, base, projectId })
+  await verifyCanvasParity({ page, context, base, projectId })
   assert.deepEqual(errors, [])
   await page.evaluate(() => {
     window.__cowartEditor.zoomToFit({ animation: { duration: 0 } })

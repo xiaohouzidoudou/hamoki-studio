@@ -145,7 +145,7 @@ test('旧快照兼容：未知元素和元数据完整保留；坏格式/未来�
     snapshot.store['shape:unknown'],
   )
   assert.throws(
-    () => sanitizeCanvasSnapshot({ schema: { hamokiCanvas: 2 }, store: {} }),
+    () => sanitizeCanvasSnapshot({ schema: { hamokiCanvas: 3 }, store: {} }),
     /较新的版本/,
   )
   assert.throws(
