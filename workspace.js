@@ -20,13 +20,16 @@ const creativePages=require('./lib/creative-pages');
 const {referenceRatio}=require('./lib/creative-auto-ratio');
 const assistantMemory=require('./lib/assistant-memory');
 const cowartIntent=require('./lib/cowart-intent');
+const cowartJobState=require('./lib/cowart-job-state');
 const assistantReview=require('./lib/assistant-review');
 const {nextGeneratedPosition,intersects,TILE}=require('./lib/canvas-placement');
 const {retryPlan}=require('./lib/job-retry-policy');
 const generate=(...args)=>options.limiter.run(()=>upstreamGenerate(...args));
 const reverse=(...args)=>options.limiter.run(()=>upstreamReverse(...args));
 const listModels=(...args)=>options.limiter.run(()=>upstreamListModels(...args));
+const {protectedCanvasMedia}=require('./lib/cowart-media-protection');
 const {pack}=require('./lib/zip');
+const {requestOutcome,failedOutcome,resetQueuedRetryEvidence}=require('./lib/job-request-outcome');
 const ROOT=__dirname,PORT=Number(process.env.PORT||8028),HOST=process.env.HOST||'127.0.0.1';
 const PASSWORD=process.env.APP_PASSWORD||'';
 const BASE=(process.env.APP_BASE_PATH||'').replace(/\/$/,'');
@@ -608,7 +611,7 @@ function importProject(b){
 }
 
 
-function saveJobs(){atomic(jobsFile,JSON.stringify({jobs:jobs.slice(0,1000),paused}))}
+function saveJobs(){resetQueuedRetryEvidence(jobs);atomic(jobsFile,JSON.stringify({jobs:jobs.slice(0,1000),paused}))}
 function saveHistory(){atomic(historyFile,JSON.stringify(history.slice(0,2500)))}
 saveJobs();if(!paused&&jobs.some(j=>j.status==='queued'))schedule();
 const respond=(res,code,obj)=>{res.writeHead(code,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(obj))};
@@ -645,7 +648,7 @@ function removePreviewFiles(name){for(const ext of ['webp','jpg']){const file=pr
 function cleanupMessages(project,removedHistoryId=null,removedNodeIds=new Set()){project.messages=project.messages.filter(m=>m.imageId!==removedHistoryId&&m.sourceId!==removedHistoryId&&!(Array.isArray(m.referenceRoles)&&m.referenceRoles.some(r=>removedNodeIds.has(r.nodeId))))}
 function overSpace(incomingSize){return storageUsage(true).totalBytes+incomingSize>MEDIA_QUOTA_BYTES||(typeof options.globalBytesLeft==='function'&&options.globalBytesLeft()<incomingSize)}
 function releaseForQuota(incomingSize){
- const protectedFiles=new Set();
+ const protectedFiles=protectedCanvasMedia(DATA_DIR);
  // Keep document prototypes and approved style inputs available across sessions.
  for(const current of projects){
   const f=current.creativeWorkflow;
@@ -698,7 +701,7 @@ function storePreview(name,pic){mediaPath(name);if(!fs.existsSync(mediaPath(name
 function fetchMedia(name){const bytes=fs.readFileSync(mediaPath(name));return {mime:guessMime(bytes),bytes}}
 function sendMedia(req,res,filename,mime,cache='private, max-age=604800'){const stat=fs.statSync(filename);const tag='"'+stat.size.toString(16)+'-'+Math.round(stat.mtimeMs).toString(16)+'"';if(req.headers['if-none-match']===tag){res.writeHead(304,{'ETag':tag,'Cache-Control':cache});return res.end()}res.writeHead(200,{'Content-Type':mime,'Content-Length':stat.size,'Cache-Control':cache,'ETag':tag,'X-Content-Type-Options':'nosniff'});const stream=fs.createReadStream(filename);stream.on('error',e=>{console.error('[Hamoki media stream]',e.code||'stream');res.destroy(e)});return stream.pipe(res)}
 function publicHistory(h){return {...h,url:BASE+'/api/media/'+h.file,previewUrl:BASE+'/api/previews/'+h.file};}
-function publicJob(j){const {referenceMedia,maskMedia,maskSourceMedia,roleHints,review,submissionKey,submissionFingerprint,...exposed}=j;return {...exposed,referenceRoles:roleHints||[]};}
+function publicJob(j){const {referenceMedia,maskMedia,maskSourceMedia,roleHints,review,submissionKey,submissionFingerprint,...exposed}=j;return {...exposed,requestOutcome:requestOutcome(j),referenceRoles:roleHints||[]};}
 function pngDimensions(bytes){if(!bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))||bytes.length<24)throw Error('蒙版及蒙版原图必须为 PNG');return [bytes.readUInt32BE(16),bytes.readUInt32BE(20)]}
 function saveSourceFiles(refs,mask,maskSource){
  let size=0;const input=[];
@@ -812,7 +815,10 @@ async function execute(job){const abort=new AbortController();controllers.set(jo
   for(const f of job.referenceMedia||[])media.push(fetchMedia(f));
   const mask=job.maskMedia?fetchMedia(job.maskMedia):null;if(mask&&job.maskSourceMedia){const override=fetchMedia(job.maskSourceMedia);if(override.mime!=='image/png'||JSON.stringify(pngDimensions(override.bytes))!==JSON.stringify(pngDimensions(mask.bytes)))throw Error('局部重绘：PNG 源图与蒙版尺寸不一致');if(!media.length)throw Error('局部重绘缺少源图');media[0]=override}
   if(mask&&!(p.mode==='openai'&&(p.imageMode||'images')==='images'))throw Error('当前接口不支持蒙版局部重绘，请使用 OpenAI 图片接口');
+  if(!DEMO_MODE){job.upstreamAttemptedAt=time();job.requestOutcome='unknown';job.upstreamHttpStatus=null;saveJobs()}
   let output=DEMO_MODE ? {mime:'image/webp',bytes:fs.readFileSync(path.join(ROOT,'assets/hamoki-avatar-128.webp'))} : await generate(p,job,media,mask,abort.signal,progress=>{job.upstreamId=progress.id||job.upstreamId;job.progress=Math.max(0,Math.min(100,Number(progress.progress)||0));job.updatedAt=time();saveJobs()});
+  if(job.status==='cancelled')return;
+  job.requestOutcome='result_received';saveJobs();
   if(job.componentItemId){
    const result=require('node:child_process').spawnSync('python3',[path.join(ROOT,'lib/component-png.py')],{input:output.bytes,encoding:null,timeout:35000,maxBuffer:40*1024*1024});
    if(result.error||result.status!==0)throw Error('组件 PNG 标准化失败：'+String(result.stderr||result.error?.message||'转换异常').slice(0,220));
@@ -825,8 +831,9 @@ async function execute(job){const abort=new AbortController();controllers.set(jo
   history.unshift(entry);saveHistory();appendGeneratedNode(entry,job);job.resultId=id;jobStatusOk(job,'done');
   if(job.review&&!DEMO_MODE)setImmediate(()=>{void reviewGenerated(job,entry)});
 }catch(e){if(job.status==='cancelled')return;job.error=String(e?.message||'请求失败').slice(0,380);job.durationMs=Date.now()-t0;
+  job.requestOutcome=failedOutcome(job,e);job.upstreamHttpStatus=Number.isInteger(e.upstreamStatus)?e.upstreamStatus:null;
   diag({source:'queue',level:e.upstreamStatus===429?'warning':'error',action:'image_generation',path:'/api/jobs',method:'POST',model:job.model,status:e.upstreamStatus||undefined,message:job.error});
-  if(e.upstreamStatus===429&&job.attempts<3){
+  if(e.upstreamStatus===429&&job.attempts<3&&job.autoRetry!==false&&!job.cowart){
     const delay=Math.min(30000,e.retryAfterMs||Math.round(1600*2**(job.attempts-1)+Math.random()*600));
     job.status='queued';job.nextRunAt=Date.now()+delay;job.error+='（上游429限流，'+Math.ceil(delay/1000)+' 秒后重试，最多3次）';job.updatedAt=time();saveJobs();schedule();
   }else jobStatusOk(job,'failed');
@@ -838,9 +845,14 @@ function validateCreation(b){
  if(!instruction)throw Error('请输入创作描述');
  const targetProject=assertProject(b.projectId||defaultProject()?.id);
  const sourceNodeId=typeof b.sourceNodeId==='string'&&targetProject.nodes.some(x=>x.id===b.sourceNodeId)?b.sourceNodeId:null;
+ const uploadRoles=b.referenceRoles===undefined?refs.map(()=>'general'):b.referenceRoles;
+ if(!Array.isArray(uploadRoles)||uploadRoles.length!==refs.length||uploadRoles.some(role=>typeof role!=='string'||!Object.hasOwn(REFERENCE_ROLES,role)))throw Error('上传参考图用途需要与图片逐项对应');
+ const referenceHistory=b.referenceHistory===undefined?[]:b.referenceHistory;
+ if(!Array.isArray(referenceHistory)||referenceHistory.length>8)throw Error('历史参考图格式错误或超过 8 张');
+ const rawEdit=b.editMode==='edit'&&!b.sourceId&&refs.length>0;
  if(refs.length>8)throw Error('最多 8 张本地上传参考图');
  const referenceNodes=Array.isArray(b.referenceNodes)?b.referenceNodes:[];
- if(referenceNodes.length>8||refs.length+referenceNodes.length>8)throw Error('最多使用 8 张参考图');
+ if(referenceNodes.length>8||refs.length+referenceNodes.length+referenceHistory.length>8)throw Error('最多使用 8 张参考图');
  const images=referenceNodes.map(item=>{
    const node=targetProject.nodes.find(n=>n.id===item.nodeId&&n.kind!=='note');if(!node)throw Error('选中的参考图不在当前项目');
    const role=REFERENCE_ROLES[item.role]?item.role:'general';let file,historyId=null;
@@ -848,11 +860,32 @@ function validateCreation(b){
    else {const h=history.find(h=>h.id===node.historyId&&h.projectId===targetProject.id);if(!h)throw Error('画布图片没有对应的历史记录');file=h.file;historyId=h.id}
    return {file,role,nodeId:node.id,historyId};
  });
+ for(const item of referenceHistory){
+  if(!item||typeof item!=='object'||Array.isArray(item)||typeof item.sourceId!=='string')throw Error('历史参考图片编号无效');
+  const role=item.role===undefined?'general':item.role;
+  if(typeof role!=='string'||!Object.hasOwn(REFERENCE_ROLES,role))throw Error('参考图用途不支持');
+  const h=history.find(h=>h.id===item.sourceId&&h.projectId===targetProject.id);
+  if(!h)throw Error('找不到当前项目中的参考图片');
+  const node=targetProject.nodes.find(n=>n.kind==='generated'&&n.historyId===h.id);
+  images.push({file:h.file,role,nodeId:node?.id||null,historyId:h.id});
+ }
+ const referenceOrder=b.referenceOrder;
+ if(referenceOrder!==undefined){
+  const count=refs.length+referenceHistory.length;
+  if(referenceNodes.length||!Array.isArray(referenceOrder)||referenceOrder.length!==count)throw Error('逐图顺序必须覆盖当前全部参考图片');
+  const seen=new Set();
+  for(const item of referenceOrder){
+   if(!item||!['upload','history'].includes(item.kind)||!Number.isInteger(item.index)||item.index<0||item.index>=(item.kind==='upload'?refs.length:referenceHistory.length))throw Error('逐图参考顺序无效');
+   const key=item.kind+':'+item.index;if(seen.has(key))throw Error('逐图参考顺序不能重复');seen.add(key);
+  }
+  if(rawEdit&&(referenceOrder[0]?.kind!=='upload'||referenceOrder[0]?.index!==0))throw Error('导入的修改主图必须排第一');
+  if(b.sourceId&&referenceHistory.some(h=>h.sourceId===b.sourceId))throw Error('修改主图无需重复作为参考');
+ }
  // Reuse the STYLE references analyzed for this project when editing, even before
  // an explicit style lock. The lock remains an independent user approval flag.
  // This is the original creativeWorkflow source of truth, NOT a second style collection.
  const flow=targetProject.creativeWorkflow;
- if((b.sourceId||b.mask)&&b.useProjectStyle!==false&&flow?.styleDNA&&Array.isArray(flow.styleNodeIds)){
+ if((b.sourceId||b.mask||rawEdit)&&b.useProjectStyle!==false&&flow?.styleDNA&&Array.isArray(flow.styleNodeIds)){
   for(const id of flow.styleNodeIds.slice(0,2)){
    if(refs.length+images.length>=8)break;
    if(images.some(x=>x.nodeId===id))continue;
@@ -860,6 +893,7 @@ function validateCreation(b){
    if(node?.kind==='generated'&&node.historyId===b.sourceId)continue;
    if(!node)continue;
    const h=node.kind==='generated'?history.find(x=>x.id===node.historyId&&x.projectId===targetProject.id):null;
+   if(h&&images.some(x=>x.historyId===h.id))continue;
    const file=node.kind==='reference'?node.assetFile:h?.file;
    if(file)images.push({file,role:'style',nodeId:id,historyId:h?.id||null});
   }
@@ -870,7 +904,7 @@ function validateCreation(b){
   for(const a of approved){
    const node=targetProject.nodes.find(n=>n.id===a.nodeId&&n.kind==='generated'&&n.historyId===a.historyId);
    const h=node&&history.find(x=>x.id===a.historyId&&x.projectId===targetProject.id);
-   if(h&&a.historyId!==b.sourceId&&!images.some(x=>x.nodeId===node.id)){
+   if(h&&a.historyId!==b.sourceId&&!images.some(x=>x.nodeId===node.id||x.historyId===h.id)){
     images.push({file:h.file,role:'style',nodeId:node.id,historyId:h.id});
     break;
    }
@@ -878,7 +912,7 @@ function validateCreation(b){
  }
  const count=Number(b.count||1);
  if(!Number.isInteger(count)||count<1||count>8)throw Error('单次最多 8 张，建议先试 1 张');
- const capability=b.sourceId||b.mask?'edit':'image';
+ const capability=b.sourceId||b.mask||rawEdit?'edit':'image';
  const targets=Array.isArray(b.targets)&&b.targets.length?b.targets:[{providerId:b.providerId||state.activeId,model:b.model||''}];
  if(targets.length>2||targets.length*count>12)throw Error('每批最多 2 个模型、合计 12 个任务');
  if(jobs.filter(j=>['queued','running'].includes(j.status)).length+targets.length*count>MAX_QUEUED)throw Error('待处理任务最多 '+MAX_QUEUED+' 个，请稍后再提交');
@@ -886,7 +920,7 @@ function validateCreation(b){
  if(!['1:1','3:2','2:3','16:9','9:16','4:3','3:4'].includes(ratio))throw Error('比例不支持');
  if(!['1K','2K','4K'].includes(resolution))throw Error('分辨率不支持');
  if(!['auto','low','medium','high'].includes(quality))throw Error('画质参数不支持');
- const candidate=b.sourceId||images.find(n=>n.historyId&&n.role!=='style')?.historyId;
+ const candidate=b.sourceId||((rawEdit||(b.editMode==='new'&&b.referenceHistory!==undefined))?null:images.find(n=>n.historyId&&n.role!=='style')?.historyId);
  const source=candidate?history.find(h=>h.id===candidate&&h.projectId===targetProject.id):null;
  if(candidate&&!source)throw Error('找不到当前项目中的源图片');
  if(b.mask&&!source)throw Error('局部蒙版必须先选择一张已生成图片');
@@ -905,11 +939,11 @@ function validateCreation(b){
      rules:assistantMemory.guide(targetProject.assistantMemory,f.styleDNA||'',page?.requirements||'').slice(0,6500),
      requirements:String(page?.requirements||'').slice(0,2500)};
   })():null;
- const editMode=!!source&&b.editMode!=='new';
+ const editMode=(!!source||rawEdit)&&b.editMode!=='new';
  const styleGuide=editMode?creativeUpstream.styleFeedbackGuide(targetProject.creativeWorkflow?.styleDNA||'',b.editSpec):'';
- const draftPrompt=editMode?('根据第一张参考原图精确编辑。除本轮明确要求改变的内容外，保持原画构图、人物身份、页面文字、按钮位置与项目风格一致。\n历史创作描述：'+(source.editInstruction||source.prompt).slice(0,1450)+'\n本轮用户中文修改要求（原文，不得擅自翻译或反转）：'+instruction+'\n'+styleGuide):instruction;
+ const draftPrompt=editMode?('根据第一张参考原图精确编辑。除本轮明确要求改变的内容外，保持原画构图、人物身份、页面文字、按钮位置与项目风格一致。\n历史创作描述：'+(source?.editInstruction||source?.prompt||'用户选中的画布原图').slice(0,1450)+'\n本轮用户中文修改要求（原文，不得擅自翻译或反转）：'+instruction+'\n'+styleGuide):instruction;
  const prompt=assistantMemory.generationPrompt(draftPrompt,targetProject.assistantMemory,targetProject.creativeWorkflow?.styleDNA||'',(targetProject.creativeWorkflow?.pages||[]).find(x=>x.id===targetProject.creativeWorkflow?.activePageId)?.requirements||'');
- return {capability,prompt,editInstruction:instruction,refs,referenceNodes:images,count,targets,ratio,resolution,quality,review,transparentBg,sourceId:source?.id||null,sourceNodeId,projectId:targetProject.id,canvasX:num(b.canvasX,180),canvasY:num(b.canvasY,170),mask:b.mask||null,maskSourceImage:b.maskSourceImage||null};
+ return {capability,prompt,editInstruction:instruction,refs,uploadRoles,rawEdit,referenceOrder,historyReferenceCount:referenceHistory.length,referenceNodes:images,count,targets,ratio,resolution,quality,review,transparentBg,sourceId:source?.id||null,sourceNodeId,projectId:targetProject.id,canvasX:num(b.canvasX,180),canvasY:num(b.canvasY,170),mask:b.mask||null,maskSourceImage:b.maskSourceImage||null};
 }
 function submit(b){
  const key=b.idempotencyKey;
@@ -923,17 +957,38 @@ function submit(b){
    return {jobs:previous.map(publicJob),groupId:previous[0].groupId,idempotent:true};
   }
  }
+ const cowart=cowartJobState.normalizeCowartJob(b.cowart,key);
+ if(cowart){
+  if(process.env.COWART_PREVIEW!=='1')throw Error('Cowart 开发预览未开启');
+  assertProject(b.projectId);
+  if(cowartJobState.pendingCowartJobs(jobs,b.projectId).length)throw Object.assign(Error('当前项目有尚未处理的 Cowart 原任务，请先恢复或核对该任务，未新建生图'),{status:409});
+ }
  const valid=validateCreation(b);
+ if(cowart&&(valid.count!==1||valid.targets.length!==1))throw Error('Cowart 每次只能提交一个图片任务');
  for(const t of valid.targets){const p=effectiveProvider(provider(t.providerId),valid.capability);emptyProvider(p);t.model=assertModel(t.model||p.imageModel)}
  const store=saveSourceFiles(valid.refs,valid.mask,valid.maskSourceImage);
  const uploadMedia=store.input.splice(0);store.roleHints=[];
  const source=valid.sourceId?history.find(h=>h.id===valid.sourceId):null;
  const effectiveRefs=valid.referenceNodes.filter(item=>!source||item.historyId!==source.id);
- for(const r of effectiveRefs){store.input.push(r.file);store.roleHints.push(r.role)}
- store.input.push(...uploadMedia);store.roleHints.push(...valid.refs.map(()=> 'general'));
+ if(valid.referenceOrder){
+  for(const item of valid.referenceOrder){
+   const r=item.kind==='history'?valid.referenceNodes[item.index]:{file:uploadMedia[item.index],role:valid.uploadRoles[item.index]};
+   store.input.push(r.file);store.roleHints.push(r.role);
+  }
+  for(const r of valid.referenceNodes.slice(valid.historyReferenceCount)){if(!source||r.historyId!==source.id){store.input.push(r.file);store.roleHints.push(r.role)}}
+ }else{
+  if(valid.rawEdit){store.input.push(...uploadMedia);store.roleHints.push(...valid.uploadRoles)}
+  for(const r of effectiveRefs){store.input.push(r.file);store.roleHints.push(r.role)}
+  if(!valid.rawEdit){store.input.push(...uploadMedia);store.roleHints.push(...valid.uploadRoles)}
+ }
  const groupId=crypto.randomUUID(),created=[];
- for(const t of valid.targets)for(let i=0;i<valid.count;i++)created.push(makeJob({...valid,submissionKey,submissionFingerprint,batchIndex:created.length},store,t.providerId,t.model,groupId));
+ for(const t of valid.targets)for(let i=0;i<valid.count;i++){
+  const job=makeJob({...valid,submissionKey,submissionFingerprint,batchIndex:created.length},store,t.providerId,t.model,groupId);
+  if(cowart)job.cowart=cowart;
+  created.push(job);
+ }
  const proj=assertProject(valid.projectId);for(const job of created){const slot=nextGeneratedPosition(proj);job.canvasX=slot.x;job.canvasY=slot.y;job.reservedCanvasSlot=true}
+ for(const job of created)if(b.autoRetry===false)job.autoRetry=false;
  jobs.unshift(...created);saveJobs();
  proj.messages.push({id:crypto.randomUUID(),role:'user',content:valid.editInstruction,createdAt:time(),groupId,sourceId:valid.sourceId,referenceRoles:valid.referenceNodes.map(n=>({nodeId:n.nodeId,role:n.role})),providerIds:valid.targets.map(t=>t.providerId)});
  proj.messages=proj.messages.slice(-400);touchProject(proj);schedule();return {jobs:created.map(publicJob),groupId};
@@ -1771,11 +1826,31 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
     }
     if(req.method==='GET'&&route==='/api/models'){const cap=CAPABILITIES.includes(url.searchParams.get('capability'))?url.searchParams.get('capability'):'image';const p=effectiveProvider(provider(url.searchParams.get('providerId')||state.activeId),cap);emptyProvider(p);return respond(res,200,{models:await listModels(p)})}
     if(req.method==='POST'&&route==='/api/reverse'){const b=await readJSON(req),p=effectiveProvider(provider(b.providerId||state.activeId),'vision');emptyProvider(p);const pic=imageFromDataURL(b.image),model=assertModel(b.model||p.visionModel);const start=Date.now(),prompt=await reverse(p,pic,model,b.kind);recordCapability(p,'imageReverse',true,model,{durationMs:Date.now()-start});return respond(res,200,{prompt,providerName:p.name,model})}
+    if(route==='/api/cowart/jobs'&&req.method==='GET'){
+      if(process.env.COWART_PREVIEW!=='1')return fail(res,404,'Cowart 开发预览未开启');
+      const p=assertProject(url.searchParams.get('projectId'));
+      return respond(res,200,{jobs:cowartJobState.pendingCowartJobs(jobs,p.id).map(publicJob)});
+    }
+    const cowartAck=route.match(/^\/api\/cowart\/jobs\/([a-f0-9-]{36})\/ack$/);
+    if(cowartAck&&req.method==='POST'){
+      if(process.env.COWART_PREVIEW!=='1')return fail(res,404,'Cowart 开发预览未开启');
+      const b=await readJSON(req),p=assertProject(b.projectId),job=jobs.find(j=>j.id===cowartAck[1]&&j.projectId===p.id&&j.cowart);
+      if(!job)return fail(res,404,'当前项目中找不到该 Cowart 任务');
+      if(!job.cowart.acknowledgedAt){
+        if(!['failed','cancelled','interrupted'].includes(job.status))return fail(res,409,'任务尚未结束或结果尚未保存，不能丢弃恢复记录');
+        if(b.confirmed!==true)return fail(res,400,'请明确确认已核对原任务及可能产生的费用');
+        job.cowart.acknowledgedAt=time();saveJobs();
+      }
+      return respond(res,200,{ok:true});
+    }
     if(req.method==='POST'&&route==='/api/jobs'){const b=await readJSON(req);const result=submit(b);return respond(res,201,result)}
     if(req.method==='GET'&&route==='/api/jobs')return respond(res,200,{paused,running,concurrency:CONCURRENCY,jobs:jobs.filter(j=>!url.searchParams.get('projectId')||j.projectId===url.searchParams.get('projectId')).slice(0,300).map(publicJob)});
     if(req.method==='POST'&&route==='/api/queue'){const b=await readJSON(req);if(!['pause','resume'].includes(b.action))throw Error('无效队列操作');paused=b.action==='pause';saveJobs();if(!paused)schedule();return respond(res,200,{paused})}
     const jm=route.match(/^\/api\/jobs\/([a-f0-9-]{36})\/(cancel|retry)$/);
-    if(jm&&req.method==='POST'){const j=jobs.find(x=>x.id===jm[1]);if(!j)return fail(res,404,'任务不存在');if(jm[2]==='cancel'){if(!['queued','running','interrupted'].includes(j.status))throw Error('任务当前不可取消');j.status='cancelled';j.updatedAt=time();controllers.get(j.id)?.abort();saveJobs();return respond(res,200,{job:publicJob(j)})}
+    if(jm&&req.method==='POST'){const j=jobs.find(x=>x.id===jm[1]);if(!j)return fail(res,404,'任务不存在');if(jm[2]==='cancel'){
+      if(j.status==='cancelled')return respond(res,200,{job:publicJob(j)});
+      if(!['queued','running','interrupted'].includes(j.status))throw Object.assign(Error('任务当前不可取消，请重新查询原任务'),{status:409});
+      j.requestOutcome=requestOutcome(j);j.status='cancelled';j.updatedAt=time();controllers.get(j.id)?.abort();saveJobs();return respond(res,200,{job:publicJob(j)})}
       const request=await readJSON(req);
       const newProviderId=request.providerId||j.providerId,newModel=assertModel(request.model||j.model);
       const selected=effectiveProvider(provider(newProviderId),j.capability||'image');
@@ -1784,6 +1859,8 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
       if(j.maskMedia&&(selected.mode!=='openai'||(selected.imageMode||'images')!=='images'))throw Error('本次选中的模型接口不支持蒙版，已阻止任务提交');
       if(j.transparentBg&&(selected.mode!=='openai'||(selected.imageMode||'images')!=='images'))throw Error('本次选中的模型接口不支持透明背景，已阻止任务提交');
       const again={...j,upstreamId:policy.upstreamId,progress:0,providerId:newProviderId,providerName:selected.name,model:newModel,id:crypto.randomUUID(),createdAt:time(),updatedAt:time(),startedAt:null,resultId:null,error:'',status:'queued',attempts:0,retryOf:j.id,canvasX:j.canvasX,canvasY:j.canvasY,submissionKey:null,submissionFingerprint:null};
+      if(j.cowart&&cowartJobState.pendingCowartJobs(jobs,j.projectId).some(other=>other.id!==j.id))return fail(res,409,'当前项目已有另一个待处理 Cowart 任务，不能叠加重试');
+      if(j.cowart){again.cowart={...j.cowart,acknowledgedAt:null};j.cowart={...j.cowart,acknowledgedAt:time()}}
       jobs.unshift(again);saveJobs();schedule();return respond(res,201,{job:publicJob(again),resumeOriginal:policy.resumeOriginal});
     }
     if(req.method==='GET'&&route==='/api/history'){const q=trim(url.searchParams.get('q'),150).toLowerCase(),favorites=url.searchParams.get('favorite')==='1';let listed=history.filter(h=>(!favorites||h.favorite)&&(!url.searchParams.get('projectId')||h.projectId===url.searchParams.get('projectId')));if(q)listed=listed.filter(h=>[h.prompt,h.model,h.providerName].some(s=>(s||'').toLowerCase().includes(q)));return respond(res,200,{history:listed.slice(0,1500).map(publicHistory),total:listed.length})}
@@ -1800,10 +1877,12 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
     const msg=String(e?.message||'服务错误').slice(0,450);
     // Most 404s are normal navigation/missing thumbnails; record actionable failures only.
     if(!(e.status===404||route.startsWith('/api/previews/')))diag({source:e.upstreamStatus?'upstream':'backend',action:'api_request',method:req.method,path:route,status:e.upstreamStatus||e.status||400,message:msg});
-    if(!res.headersSent){const code=[400,401,403,404,409,413,415].includes(e.status)?e.status:400;return fail(res,code,msg)}console.error('[Hamoki]',route,msg);
+    if(!res.headersSent){const code=[400,401,403,404,409,413,415,503].includes(e.status)?e.status:400;return fail(res,code,msg)}console.error('[Hamoki]',route,msg);
   }
 }
 
-return {handler,storageUsage};
+return {handler,storageUsage,acknowledgeCowartSnapshot(projectId,snapshot){
+ if(cowartJobState.acknowledgeCowartSnapshot(jobs,projectId,snapshot,time()))saveJobs();
+}};
 };
 

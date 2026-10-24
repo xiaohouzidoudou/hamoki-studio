@@ -1,3 +1,4 @@
+import { createSaveState } from './lib/saveState.js'
 import {
   ArrowDownToolbarItem,
   ArrowLeftToolbarItem,
@@ -60,7 +61,9 @@ import {
   writeViewState,
   subscribeCanvasChanges
 } from './lib/storage.js'
+import { applySavedAssetSources } from './lib/canvasAssets.js'
 import StudioPanel from './ui/StudioPanel.jsx'
+import CanvasImageActions, { CowartImageShapeUtil } from './ui/CanvasImageActions.jsx'
 
 const TLDRAW_LICENSE_KEY = import.meta.env.VITE_TLDRAW_LICENSE_KEY
 // Bundle tldraw icons/fonts/translations locally: strict same-origin CSP, offline-friendly.
@@ -541,7 +544,7 @@ class CowartFrameShapeUtil extends FrameShapeUtil {
   }
 }
 
-const cowartShapeUtils = [CowartFrameShapeUtil]
+const cowartShapeUtils = [CowartFrameShapeUtil, CowartImageShapeUtil]
 
 const cowartUiOverrides = {
   translations: {
@@ -605,7 +608,8 @@ const cowartUiOverrides = {
 
 const cowartComponents = {
   Toolbar: CowartToolbar,
-  StylePanel: CowartStylePanel
+  StylePanel: CowartStylePanel,
+  InFrontOfTheCanvas: CanvasImageActions
 }
 
 function CowartStylePanel(props) {
@@ -1001,6 +1005,7 @@ export default function App() {
   const [skippedRecords, setSkippedRecords] = useState([])
   const [aiPanelOpen, setAiPanelOpen] = useState(true)
   const [saveError, setSaveError] = useState('')
+  const [canvasEditor, setCanvasEditor] = useState(null)
   const editorRef = useRef(null)
   const getEditor = useCallback(() => editorRef.current, [])
 
@@ -1031,8 +1036,15 @@ export default function App() {
   }, [])
 
   const handleMount = useCallback((editor) => {
+    const container = editor.getContainer()
+    const focusAssistant = () => {
+      setAiPanelOpen(true)
+      window.requestAnimationFrame(() => document.querySelector('.hamoki-studio-panel textarea')?.focus())
+    }
+    container.addEventListener('cowart:edit-selection', focusAssistant)
     editor.user.updateUserPreferences({ colorScheme: 'dark' })
     editorRef.current = editor
+    setCanvasEditor(editor)
     window.__cowartEditor = editor
     window.__cowartSelection = () => getCowartSelection(editor)
     window.__cowartViewState = () => getCowartViewState(editor)
@@ -1111,12 +1123,12 @@ export default function App() {
     let saveTimer = null
     let isSaving = false
     let hasPendingSave = false
-    let hasUnsavedChanges = false
+    const saveState = createSaveState()
     let isSyncingAnnotationShape = false
     let remoteLoadController = null
 
     async function saveCanvas() {
-      if (!hasUnsavedChanges) return
+      if (!saveState.dirty) return
 
       if (isSaving) {
         hasPendingSave = true
@@ -1124,12 +1136,15 @@ export default function App() {
       }
 
       isSaving = true
+      const capturedVersion = saveState.capture()
       try {
         const result = await saveCanvasSnapshot(editor.store.getStoreSnapshot())
+        if (result.storage === 'studio') applySavedAssetSources(editor, result.assetReplacements)
         if (result.storage === 'invalid') {
           setSkippedRecords(result.skippedRecords)
+          throw new Error('画布数据无效，当前修改尚未保存')
         }
-        hasUnsavedChanges = false
+        saveState.acknowledge(capturedVersion)
         setSaveError('')
       } catch (error) {
         setSaveError(error.message || '保存失败，当前修改尚未同步到服务器')
@@ -1144,7 +1159,7 @@ export default function App() {
     }
 
     function scheduleSave() {
-      hasUnsavedChanges = true
+      saveState.changed()
       window.clearTimeout(saveTimer)
       saveTimer = window.setTimeout(saveCanvas, 500)
     }
@@ -1158,7 +1173,7 @@ export default function App() {
       const controller = new AbortController()
       remoteLoadController = controller
 
-      const preserveLocalChanges = hasUnsavedChanges || isSaving
+      const preserveLocalChanges = saveState.dirty || isSaving
       const preFetchStore = preserveLocalChanges ? null : editor.store.getStoreSnapshot().store
 
       try {
@@ -1175,7 +1190,7 @@ export default function App() {
         setSkippedRecords(nextSkippedRecords)
 
         if (changedRecords > 0 && effectivePreserve) {
-          hasUnsavedChanges = true
+          saveState.changed()
           if (isSaving) {
             hasPendingSave = true
           } else {
@@ -1268,6 +1283,7 @@ export default function App() {
     )
 
     return () => {
+      container.removeEventListener('cowart:edit-selection', focusAssistant)
       window.clearTimeout(saveTimer)
       window.clearInterval(selectionStateTimer)
       window.clearInterval(viewStateTimer)
@@ -1340,7 +1356,7 @@ export default function App() {
         </button>
         <a className="hamoki-back-link" href="/" target="_blank" rel="noopener noreferrer">管理后台 ↗</a>
       </div>
-      <StudioPanel open={aiPanelOpen} onClose={() => setAiPanelOpen(false)} getEditor={getEditor} />
+      <StudioPanel open={aiPanelOpen} onClose={() => setAiPanelOpen(false)} getEditor={getEditor} canvasEditor={canvasEditor} />
     </main>
   )
 }

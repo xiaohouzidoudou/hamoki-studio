@@ -6,6 +6,7 @@ const path=require('node:path');
 const crypto=require('node:crypto');
 const createWorkspace=require('./workspace');
 const {openDiagnostics}=require('./lib/diagnostics');
+const cowartAssets=require('./lib/cowart-assets');
 
 const {randomBytes,createHmac,timingSafeEqual,scryptSync}=crypto;
 const ROOT=__dirname;
@@ -104,6 +105,7 @@ async function handleCowartData(req,res,url,account){
   const file=cowartProjectFile(account,id);
   if(req.method==='GET'){
     const record=readJSON(file,null);
+    if(record?.snapshot)handlerFor(account).acknowledgeCowartSnapshot(id,record.snapshot);
     return sendJSON(res,200,record?{snapshot:record.snapshot,revision:record.revision,updatedAt:record.updatedAt}:{snapshot:null,revision:0,updatedAt:null});
   }
   if(req.method!=='PUT')return fail(res,405,'不支持的操作');
@@ -120,7 +122,22 @@ async function handleCowartData(req,res,url,account){
   if(totalDirBytes(userDir(account.id))+incoming>limit || totalDirBytes(USERS_DIR)+incoming>TOTAL_QUOTA_BYTES)
     return fail(res,507,'账号图片空间不足，画布未保存，请先清理素材');
   atomic(file,payload);
+  handlerFor(account).acknowledgeCowartSnapshot(id,body.snapshot);
   return sendJSON(res,200,{revision:next.revision,updatedAt:next.updatedAt});
+}
+async function handleCowartAsset(req,res,url,account){
+  if(req.method!=='POST')return fail(res,405,'不支持的操作');
+  const id=url.searchParams.get('projectId')||'';
+  cowartProjectFile(account,id);
+  const image=await cowartAssets.readAsset(req);
+  cowartProjectFile(account,id); // Recheck after an async body / concurrent project deletion.
+  const dir=userDir(account.id);
+  const result=cowartAssets.storeAsset(dir,image,incoming=>{
+    if(totalDirBytes(dir)+incoming>Math.floor(USER_QUOTA_GB*1024**3)||totalDirBytes(USERS_DIR)+incoming>TOTAL_QUOTA_BYTES)
+      throw Object.assign(Error('图片存储空间不足，未删除已有作品，请整理素材后重试'),{status:413});
+  });
+  if(visitors.has(account.id))visitors.get(account.id).storageUsage(true);
+  return sendJSON(res,result.reused?200:201,result);
 }
 
 function readBody(req){return new Promise((resolve,reject)=>{const chunks=[];let total=0;req.on('data',chunk=>{total+=chunk.length;if(total>200*1024){reject(Object.assign(Error('请求体过大'),{status:413}));req.destroy();return}chunks.push(chunk)});req.on('end',()=>resolve(Buffer.concat(chunks).toString('utf8')));req.on('error',reject)})}
@@ -245,12 +262,13 @@ async function handler(req,res){
       res.setHeader('Set-Cookie',sessionCookie(session.token));
       return cowartCanvasResponse(req,res,url.pathname);
     }
-    if(url.pathname==='/api/cowart/snapshot'){
+    if(url.pathname==='/api/cowart/snapshot'||url.pathname==='/api/cowart/assets'){
       if(process.env.COWART_PREVIEW!=='1')return fail(res,404,'预览未启用');
       const session=getSession(req);
       if(!session)return fail(res,401,'请先登录');
       if(!sameOrigin(req))return fail(res,403,'禁止跨站写入画布');
       res.setHeader('Set-Cookie',sessionCookie(session.token));
+      if(url.pathname==='/api/cowart/assets')return await handleCowartAsset(req,res,url,session.account);
       return await handleCowartData(req,res,url,session.account);
     }
     if(!url.pathname.startsWith('/api/'))return serveStatic(req,res,url.pathname);

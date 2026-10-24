@@ -7,6 +7,7 @@ const os = require('node:os')
 const path = require('node:path')
 const http = require('node:http')
 const net = require('node:net')
+const crypto = require('node:crypto')
 
 const root = path.resolve(__dirname, '..')
 const freePort = () => new Promise(resolve => {
@@ -179,4 +180,98 @@ test('Cowart preview requires a session; server snapshots have account-scoped op
   child = await launch(port, dir)
   assert.equal((await a('/api/cowart/snapshot?projectId=' + pA)).data.revision, 1, 'saved canvas survives restart')
   assert.equal((await b('/api/cowart/snapshot?projectId=' + pB)).data.revision, 0)
+})
+
+test('Cowart job identity survives new sessions and restart, blocks duplicate billing and only acknowledges saved results', async t => {
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hamoki-cowart-durable-'))
+  const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLduAAAAABJRU5ErkJggg=='
+  let calls=0
+  const upstream=http.createServer(async(req,res)=>{
+    for await(const part of req){}
+    calls++
+    res.writeHead(200,{'Content-Type':'application/json'})
+    res.end(JSON.stringify({data:[{b64_json:png}]}))
+  })
+  await new Promise(r=>upstream.listen(0,'127.0.0.1',r))
+  const port=await freePort()
+  let child=await launch(port,dir)
+  t.after(async()=>{
+    await new Promise(r=>{child.once('exit',r);child.kill()})
+    await new Promise(r=>upstream.close(r))
+    fs.rmSync(dir,{recursive:true,force:true})
+  })
+  const a=client(port),b=client(port),outsider=client(port)
+  assert.equal((await a('/api/register','POST',{username:'durablea',password:'12345678',inviteCode:'local-test'})).status,201)
+  assert.equal((await b('/api/register','POST',{username:'durableb',password:'12345678',inviteCode:'local-test'})).status,201)
+  const projectId=(await a('/api/projects')).data.defaultId
+  const provider=await a('/api/providers','POST',{name:'Mock images',url:'http://127.0.0.1:'+upstream.address().port+'/v1',apiKey:'local-only',mode:'openai',imageMode:'images',imageModel:'gpt-image-2'})
+  assert.equal(provider.status,201)
+  assert.equal((await a('/api/queue','POST',{action:'pause'})).status,200)
+  const payload={projectId,providerId:provider.data.provider.id,model:'gpt-image-2',prompt:'游戏 UI 按钮',ratio:'1:1',resolution:'1K',quality:'auto',count:1,idempotencyKey:crypto.randomUUID(),cowart:{pageId:'page:durable',anchorId:'shape:original',privateExtra:'must-not-persist'}}
+  assert.equal((await a('/api/jobs','POST',{...payload,cowart:{pageId:'../escape'}})).status,400)
+  const first=await a('/api/jobs','POST',payload)
+  assert.equal(first.status,201,JSON.stringify(first.data))
+  const jobId=first.data.jobs[0].id
+  assert.equal(first.data.jobs[0].cowart.pageId,'page:durable')
+  assert.equal(first.data.jobs[0].cowart.privateExtra,undefined)
+  const repeated=await a('/api/jobs','POST',payload)
+  assert.equal(repeated.status,201)
+  assert.equal(repeated.data.jobs[0].id,jobId,'same idempotency key must retain the original task')
+  assert.equal((await a('/api/jobs','POST',{...payload,idempotencyKey:crypto.randomUUID()})).status,409)
+  assert.equal((await outsider('/api/cowart/jobs?projectId='+projectId)).status,401)
+  assert.equal((await b('/api/cowart/jobs?projectId='+projectId)).status,404)
+  assert.equal((await b('/api/cowart/jobs/'+jobId+'/ack','POST',{projectId,confirmed:true})).status,404)
+  assert.equal((await a('/api/cowart/jobs/'+jobId+'/ack','POST',{projectId,confirmed:true})).status,409,'running/queued task cannot be discarded')
+  assert.equal(calls,0)
+  await new Promise(r=>{child.once('exit',r);child.kill()})
+  child=await launch(port,dir)
+  const fresh=client(port)
+  assert.equal((await fresh('/api/login','POST',{username:'durablea',password:'12345678'})).status,200)
+  const restored=await fresh('/api/cowart/jobs?projectId='+projectId)
+  assert.equal(restored.data.jobs[0].id,jobId)
+  assert.equal(restored.data.jobs[0].cowart.requestId,payload.idempotencyKey)
+  assert.equal(restored.data.jobs[0].cowart.anchorId,'shape:original')
+  assert.equal(calls,0,'new login and restart do not generate images')
+  assert.equal((await fresh('/api/jobs/'+jobId+'/cancel','POST',{})).status,200)
+  assert.equal((await fresh('/api/cowart/jobs/'+jobId+'/ack','POST',{projectId})).status,400)
+  assert.equal((await fresh('/api/cowart/jobs/'+jobId+'/ack','POST',{projectId,confirmed:true})).status,200)
+  const next=await fresh('/api/jobs','POST',{...payload,idempotencyKey:crypto.randomUUID()})
+  assert.equal(next.status,201)
+  assert.equal((await fresh('/api/queue','POST',{action:'resume'})).status,200)
+  let done
+  for(let i=0;i<100;i++){
+    done=(await fresh('/api/jobs?projectId='+projectId)).data.jobs.find(j=>j.id===next.data.jobs[0].id)
+    if(done.status==='done'||done.status==='failed')break
+    await delay(50)
+  }
+  assert.equal(done.status,'done',done.error)
+  assert.equal(calls,1)
+  assert.equal((await fresh('/api/cowart/jobs/'+done.id+'/ack','POST',{projectId,confirmed:true})).status,409,'completed image must be saved before acknowledgement')
+  const snapshot={schema:{schemaVersion:2,sequences:{}},store:{'page:durable':{id:'page:durable',typeName:'page'}}}
+  assert.equal((await fresh('/api/cowart/snapshot?projectId='+projectId,'PUT',{snapshot,revision:0})).status,200)
+  assert.equal((await fresh('/api/cowart/jobs?projectId='+projectId)).data.jobs.length,1,'unrelated snapshot must not discard a generated result')
+  snapshot.store['shape:result']={id:'shape:result',typeName:'shape',meta:{studioHistoryId:done.resultId,studioProjectId:projectId}}
+  assert.equal((await fresh('/api/cowart/snapshot?projectId='+projectId,'PUT',{snapshot,revision:0})).status,409)
+  assert.equal((await fresh('/api/cowart/jobs?projectId='+projectId)).data.jobs.length,1,'rejected stale snapshot must not acknowledge anything')
+  assert.equal((await fresh('/api/cowart/snapshot?projectId='+projectId,'PUT',{snapshot,revision:1})).status,200)
+  assert.deepEqual((await fresh('/api/cowart/jobs?projectId='+projectId)).data.jobs,[])
+  await new Promise(r=>{child.once('exit',r);child.kill()})
+  child=await launch(port,dir)
+  assert.deepEqual((await fresh('/api/cowart/jobs?projectId='+projectId)).data.jobs,[],'acknowledged image must not resurrect after restart or intentional deletion')
+  assert.equal(calls,1,'recovery and saved-result acknowledgement never call the image upstream')
+  assert.equal((await fresh('/api/queue','POST',{action:'pause'})).status,200)
+  const concurrent=await Promise.all([fresh('/api/jobs','POST',{...payload,idempotencyKey:crypto.randomUUID()}),a('/api/jobs','POST',{...payload,idempotencyKey:crypto.randomUUID()})])
+  assert.deepEqual(concurrent.map(r=>r.status).sort(),[201,409],'two clients racing can only create one pending Cowart job')
+  assert.equal((await fresh('/api/cowart/jobs?projectId='+projectId)).data.jobs.length,1)
+  const blockedRetry=await fresh('/api/jobs/'+jobId+'/retry','POST',{acknowledgePotentialCharge:true})
+  assert.equal(blockedRetry.status,409,'retry cannot bypass the per-project Cowart recovery slot')
+  assert.match(blockedRetry.data.error,/另一个待处理/)
+  const last=concurrent.find(r=>r.status===201).data.jobs[0]
+  assert.equal((await fresh('/api/jobs/'+last.id+'/cancel','POST',{})).status,200)
+  assert.equal((await fresh('/api/cowart/jobs/'+last.id+'/ack','POST',{projectId,confirmed:true})).status,200)
+  const retry=await fresh('/api/jobs/'+jobId+'/retry','POST',{acknowledgePotentialCharge:true})
+  assert.equal(retry.status,201)
+  const transferred=(await fresh('/api/cowart/jobs?projectId='+projectId)).data.jobs
+  assert.deepEqual(transferred.map(j=>j.id),[retry.data.job.id],'explicit retry transfers recovery ownership to the new task')
+  assert.equal(calls,1)
 })
