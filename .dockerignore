@@ -12,3 +12,6 @@ tests
 README.md
 CHANGELOG.md
 *.zip
+
+cowart/node_modules
+cowart/dist

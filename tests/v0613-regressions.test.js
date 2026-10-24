@@ -26,7 +26,7 @@ test('generation quantity options agree with server',()=>{
 test('reference cap checks uploads plus canvas references',()=>{
  a.ok(front.includes('else if(referenceInputs.length+referenceNodeRoles.length>=8)'));
  a.ok(front.includes('if(referenceInputs.length+referenceNodeRoles.length>=8)'));
- a.ok(back.includes('refs.length+referenceNodes.length>8'));
+ a.ok(back.includes('refs.length+referenceNodes.length+referenceHistory.length>8'));
 });
 test('editing requests use dedicated provider on validation and execution',()=>{
  a.ok(front.includes("checkProvider(sourceId||maskData?'edit':'image')"));

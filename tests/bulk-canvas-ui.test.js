@@ -9,6 +9,7 @@ test('Left mouse on blank canvas draws marquee; shift adds; touch/hand/space can
  assert.match(js,/if\(!g\.additive\)multiNodeIds\.clear\(\)/);
  assert.match(js,/n\.kind!=='note'&&n\.x<hiX/);
  assert.match(js,/if\(spaceDown\|\|tool==='hand'\)/);
+ assert.match(js,/if\(spaceDown\|\|tool==='hand'\)\{startPan\(e\);return\}const pos=worldXY\(e\)/);
  assert.match(js,/selectNode\(n\.id,true\);return/);
 });
 test('Bulk actions are displayed together and reference role defaults general',()=>{
