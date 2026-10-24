@@ -7,6 +7,7 @@ const crypto=require('node:crypto');
 const createWorkspace=require('./workspace');
 const {openDiagnostics}=require('./lib/diagnostics');
 const cowartAssets=require('./lib/cowart-assets');
+const cowartArchive=require('./lib/cowart-archive');
 
 const {randomBytes,createHmac,timingSafeEqual,scryptSync}=crypto;
 const ROOT=__dirname;
@@ -262,12 +263,16 @@ async function handler(req,res){
       res.setHeader('Set-Cookie',sessionCookie(session.token));
       return cowartCanvasResponse(req,res,url.pathname);
     }
-    if(url.pathname==='/api/cowart/snapshot'||url.pathname==='/api/cowart/assets'){
+    if(url.pathname==='/api/cowart/snapshot'||url.pathname==='/api/cowart/assets'||url.pathname==='/api/cowart/archive'){
       if(process.env.COWART_PREVIEW!=='1')return fail(res,404,'预览未启用');
       const session=getSession(req);
       if(!session)return fail(res,401,'请先登录');
       if(!sameOrigin(req))return fail(res,403,'禁止跨站写入画布');
       res.setHeader('Set-Cookie',sessionCookie(session.token));
+      if(url.pathname==='/api/cowart/archive'){
+        const projectId=url.searchParams.get('projectId')||'',file=cowartProjectFile(session.account,projectId),record=await cowartArchive.readRecord(file);
+        return await cowartArchive.serve(req,res,{accountId:session.account.id,projectId,revision:record?.revision||0,snapshot:record?.snapshot,mediaDirectory:path.join(userDir(session.account.id),'media')});
+      }
       if(url.pathname==='/api/cowart/assets')return await handleCowartAsset(req,res,url,session.account);
       return await handleCowartData(req,res,url,session.account);
     }

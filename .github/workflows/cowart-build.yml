@@ -51,6 +51,9 @@ jobs:
           npm install --no-save --package-lock=false playwright
           npx playwright install --with-deps chromium
         working-directory: cowart
+      - name: Test portable archive bytes and additive restore in Chromium
+        run: node tests/archive-smoke.mjs
+        working-directory: cowart
       - name: Test independent Hamoki canvas interactions and legacy documents
         run: node tests/native-canvas-smoke.mjs
         working-directory: cowart
