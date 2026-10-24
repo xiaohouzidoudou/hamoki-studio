@@ -25,9 +25,34 @@ export async function verifyCanvasAssets({page,context,base,projectId}) {
   await page.locator('.hamoki-save-error').filter({hasText:'模拟图片存储不可用'}).waitFor()
   assert.equal(puts,0,'Failed upload must not save a partial snapshot')
   assert.equal(await page.evaluate(()=>window.__cowartEditor.getAsset('asset:large-1').props.src.startsWith('data:')),true)
+  // Joint #29/#31 regression: the first successful asset save captures x=650.
+  // Editing while its response is held must remain dirty after URLs are applied.
+  let releaseSave, signalCaptured
+  const captured = new Promise(resolve => { signalCaptured = resolve })
+  const held = new Promise(resolve => { releaseSave = resolve })
+  let holdNext = true
+  await page.route('**/api/cowart/snapshot?*', async route => {
+    if (route.request().method() === 'PUT' && holdNext) {
+      holdNext = false
+      const response = await route.fetch()
+      signalCaptured()
+      await held
+      return route.fulfill({ response })
+    }
+    return route.continue()
+  })
   denyUpload=false
   await page.evaluate(()=>{window.__cowartEditor.updateShape({id:'shape:large-1',type:'image',x:650})})
+  await captured
+  await page.evaluate(()=>{window.__cowartEditor.updateShape({id:'shape:large-1',type:'image',x:680})})
+  releaseSave()
   await page.waitForFunction(()=>[1,2].every(n=>window.__cowartEditor?.getAsset('asset:large-'+n)?.props.src.startsWith('/api/media/')))
+  await page.waitForFunction(async projectId => {
+    const response = await fetch('/api/cowart/snapshot?projectId=' + projectId)
+    const saved = await response.json()
+    return saved.snapshot?.store?.['shape:large-1']?.x === 680
+  }, projectId)
+  await page.unroute('**/api/cowart/snapshot?*')
   assert.equal(uploads,3,'One failed upload then exactly two successful uploads')
   assert.ok(maxSnapshotBytes<100*1024,'Snapshot must contain small URLs, not inline media')
   const saved=await (await context.request.get(base+'/api/cowart/snapshot?projectId='+projectId)).json()
@@ -50,5 +75,5 @@ export async function verifyCanvasAssets({page,context,base,projectId}) {
   assert.equal(await page.evaluate(()=>window.__cowartEditor.getAsset('asset:large-2').props.src.startsWith('/api/media/')),true)
   page.off('request',listener)
   await page.unroute('**/api/cowart/assets?*')
-  console.log('PASS: >12MB inline canvas migrated to URLs, failed upload preserves originals, move/reload needs no reupload')
+  console.log('PASS: >12MB inline canvas migrated to URLs, failed upload preserves originals, concurrent edit survives held save response, move/reload needs no reupload')
 }
