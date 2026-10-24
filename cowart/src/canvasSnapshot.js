@@ -28,7 +28,7 @@ export function sanitizeCanvasSnapshot(snapshot) {
   if (snapshot == null) return { snapshot: null, skippedRecords: [] }
   if (!isCanvasSnapshot(snapshot))
     throw Error('旧画布格式无法安全读取，已停止保存；请先导出原始备份')
-  if (snapshot.schema.hamokiCanvas > 1)
+  if (snapshot.schema.hamokiCanvas > 2)
     throw Error('此画布来自较新的版本，已停止保存，避免覆盖')
   const warnings = []
   for (const [id, r] of Object.entries(snapshot.store)) {
@@ -36,9 +36,20 @@ export function sanitizeCanvasSnapshot(snapshot) {
       throw Error('画布记录不完整，已停止保存，避免丢失内容')
     if (r.typeName === 'shape') {
       if (
-        !['image', 'frame', 'group', 'geo', 'text', 'note', 'arrow'].includes(
-          r.type,
-        )
+        ![
+          'image',
+          'frame',
+          'group',
+          'geo',
+          'text',
+          'note',
+          'arrow',
+          'draw',
+          'highlight',
+          'line',
+          'bookmark',
+          'embed',
+        ].includes(r.type)
       )
         warnings.push(
           describeSkippedRecord(r, '旧元素暂不支持编辑，原始记录将保留'),
@@ -51,7 +62,7 @@ export function sanitizeCanvasSnapshot(snapshot) {
   }
   return {
     snapshot: {
-      schema: { ...snapshot.schema, hamokiCanvas: 1 },
+      schema: { ...snapshot.schema, hamokiCanvas: 2 },
       store: { ...snapshot.store },
     },
     skippedRecords: warnings,

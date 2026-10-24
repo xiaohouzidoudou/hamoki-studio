@@ -1,3 +1,4 @@
+import { originalSourceMatches } from '../canvas/export.js'
 import { useEffect, useRef, useState } from 'react'
 import { buildImageShapeRecords, findPageIdForShape } from '../lib/placement.js'
 import { exportSelectionToDataUrl } from '../lib/selectionExport.js'
@@ -356,7 +357,7 @@ export default function StudioPanel({ open, onClose, getEditor, canvasEditor }) 
           if(!visionProviderId||!visionModel)throw Error('已启用看图分析，但尚未配置视觉模型。请选择视觉模型或关闭看图分析')
           setPhase('analyzing')
           setMessage('准备当前选中的真实图片，交给 Studio 的视觉模型观察布局、颜色和具体元素…')
-          if(imageForVision.meta?.studioHistoryId) {
+          if(imageForVision.meta?.studioHistoryId && originalSourceMatches(imageForVision,editor)) {
             visual={sourceId:imageForVision.meta.studioHistoryId}
           }else {
             const exported=await exportSelectionToDataUrl(editor,[imageForVision.id])
@@ -395,7 +396,7 @@ export default function StudioPanel({ open, onClose, getEditor, canvasEditor }) 
       const editing=action==='edit'
       if(editing&&!primary&&primaryChoice==='auto'&&inputs.images.length===1)primary=inputs.images[0]
       if(editing&&!primary)throw Error('请在「修改主图」中指定一张图片；其余图片可以分别作为参考')
-      source=editing ? primary.meta?.studioHistoryId||null : null
+      source=editing ? (originalSourceMatches(primary,editor)?primary.meta?.studioHistoryId:null)||null : null
       setPhase('preparing');setMessage('正在准备画布参考素材…')
       const refs=[],uploadRoles=[],referenceHistory=[],referenceOrder=[]
       const exportReference=async(shapeIds,role)=>{
@@ -407,7 +408,7 @@ export default function StudioPanel({ open, onClose, getEditor, canvasEditor }) 
       for(const image of inputs.images){
         if(editing&&image.id===primary.id)continue
         const role=referenceRoles[image.id]||'general'
-        if(image.meta?.studioHistoryId){referenceHistory.push({sourceId:image.meta.studioHistoryId,role});referenceOrder.push({kind:'history',index:referenceHistory.length-1})}
+        if(image.meta?.studioHistoryId && originalSourceMatches(image,editor)){referenceHistory.push({sourceId:image.meta.studioHistoryId,role});referenceOrder.push({kind:'history',index:referenceHistory.length-1})}
         else await exportReference([image.id],role)
       }
       const annotationIds=selected.filter(s=>s.type!=='image'&&!s.meta?.cowartAiImageHolder).map(s=>s.id)
@@ -457,7 +458,7 @@ export default function StudioPanel({ open, onClose, getEditor, canvasEditor }) 
 
   if (!open) return null
   return <section className="hamoki-studio-panel" role="dialog" aria-label="Hamoki Studio AI 生图">
-    <header><strong>🐵 Hamoki Studio</strong><button type="button" onClick={onClose} aria-label="关闭">×</button></header>
+    <header><strong><img className="hamoki-studio-avatar" src="/assets/hamoki-avatar-32.png" alt=""/>Hamoki Studio</strong><button type="button" onClick={onClose} aria-label="关闭">×</button></header>
     {context && <label className="hamoki-studio-field">当前项目
       <select value={context.projectId} disabled={!!jobId && !['done','failed','uncertain'].includes(phase)} onChange={event => {
         const url = new URL(window.location.href)
@@ -487,13 +488,13 @@ export default function StudioPanel({ open, onClose, getEditor, canvasEditor }) 
     <div className="hamoki-conversation" aria-label="当前项目 AI 对话记录">
       {!turns.length && <div className="hamoki-conversation-empty">在画布选一张图片，写下你的要求。我会分析标注和已确认的项目美术规范。</div>}
       {turns.map((turn,index)=><div key={turn.id||index} className={'hamoki-bubble '+(turn.role==='user'?'is-user':'is-assistant')}>
-        <small>{turn.role==='user'?'你':'🐵 AI 助手'}{turn.action==='edit'?' · 编辑计划':turn.action==='generate'?' · 生图计划':''}</small>
+        <small>{turn.role==='user'?'你':'AI 助手'}{turn.action==='edit'?' · 编辑计划':turn.action==='generate'?' · 生图计划':''}</small>
         <span>{turn.content}</span>
       </div>)}
     </div>
     {context && <div className="hamoki-legacy-tools">
       <button type="button" disabled={importing} onClick={importOldCanvas}>
-        {importing ? '正在导入旧素材…' : '↳ 导入旧 Studio 画布素材'}
+        {importing ? '正在导入旧素材…' : '导入旧 Studio 画布素材'}
       </button>
       {importNotice && <small aria-live="polite">{importNotice}</small>}
     </div>}
