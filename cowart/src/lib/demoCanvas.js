@@ -1,4 +1,4 @@
-import { createShapeId, toRichText } from 'tldraw'
+import { createShapeId, toRichText } from '../canvas/model.js'
 import { generateKeyBetween } from 'fractional-indexing'
 
 const DEMO_IMAGE_DISPLAY_W = 900

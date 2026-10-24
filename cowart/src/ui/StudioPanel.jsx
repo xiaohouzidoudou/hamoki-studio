@@ -78,6 +78,7 @@ export default function StudioPanel({ open, onClose, getEditor, canvasEditor }) 
   const [canvasSelection, setCanvasSelection] = useState([])
   const [primaryChoice, setPrimaryChoice] = useState('auto')
   const [referenceRoles, setReferenceRoles] = useState({})
+  const [inputsExpanded, setInputsExpanded] = useState(false)
   const [resolution, setResolution] = useState('1K')
   const [jobId, setJobId] = useState(null)
   const [phase, setPhase] = useState('idle')
@@ -132,6 +133,13 @@ export default function StudioPanel({ open, onClose, getEditor, canvasEditor }) 
     sync()
     return editor.store.listen(sync,{source:'all',scope:'all'})
   },[open,getEditor,primaryChoice,canvasEditor])
+
+  useEffect(()=>{
+    const editor=canvasEditor||getEditor();if(!editor)return
+    const reference=()=>{setInputsExpanded(true);setPrimaryChoice('');setPlanNotice('所选图片将作为参考生成新图，原图保持不变')}
+    editor.getContainer().addEventListener('cowart:reference-selection',reference)
+    return()=>editor.getContainer().removeEventListener('cowart:reference-selection',reference)
+  },[canvasEditor,getEditor])
 
   const selectedInputs=canvasInputSelection(canvasSelection,primaryChoice)
 
@@ -460,7 +468,7 @@ export default function StudioPanel({ open, onClose, getEditor, canvasEditor }) 
       </select>
     </label>}
     <p className="hamoki-studio-note">选中图片或 AI 占位框后输入要求。结果进入空占位框或排列在原图旁，使用已有 Studio 账号和中转站。</p>
-    {!!selectedInputs.images.length && <details className="hamoki-canvas-inputs" open={selectedInputs.images.length>1}>
+    {!!selectedInputs.images.length && <details className="hamoki-canvas-inputs" open={inputsExpanded||selectedInputs.images.length>1}>
       <summary>参考图与修改主图 · {selectedInputs.images.length} 张</summary>
       <label className="hamoki-studio-field">修改主图
         <select aria-label="修改主图" value={primaryChoice} onChange={e=>setPrimaryChoice(e.target.value)}>

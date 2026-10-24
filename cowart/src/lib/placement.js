@@ -95,6 +95,7 @@ function chooseIndex(store, parentId) {
   const siblingIndexes = Object.values(store)
     .filter((record) => record?.typeName === 'shape' && record.parentId === parentId && typeof record.index === 'string')
     .map((record) => record.index)
+    .filter(key => { try { generateKeyBetween(key, null); return true } catch { return false } })
     .sort()
   return generateKeyBetween(siblingIndexes.at(-1) ?? null, null)
 }

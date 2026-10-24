@@ -2,25 +2,11 @@ import { normalizeAssetSources } from './assetCapture.js'
 import { getStudioSnapshot, putStudioSnapshot, getStudioContext } from './studioBridge.js'
 import { acknowledgeSavedResult } from './jobRecovery.js'
 import { uploadCanvasAssets } from './canvasAssets.js'
-// IndexedDB-backed canvas persistence.
-//
-// Replaces the Vite dev-server middleware that previously stored the tldraw
-// snapshot, selection, and view state on the host filesystem. Everything now
-// lives in the browser so the app runs as a standalone static site with no
-// backend. Cross-tab live refresh uses a BroadcastChannel instead of SSE.
-//
-// Design notes:
-//  - A single merged canvas snapshot is stored under the "canvas" key. The old
-//    per-page file split existed to give the Codex MCP server file-level
-//    access; a browser-only, single-user app does not need it.
-//  - Studio saves local blob/data image bytes separately before the snapshot.
-//    The snapshot contains account-scoped media URLs; legacy inline assets are
-//    migrated during the next successful save without changing live records
-//    before persistence succeeds.
+// Account/project snapshots are persisted on Studio. IndexedDB holds view state only.
 
 import {
   isCanvasSnapshot,
-  sanitizeCanvasSnapshotForTldraw
+  sanitizeCanvasSnapshot
 } from '../canvasSnapshot.js'
 
 const DB_NAME = 'cowart'
@@ -98,7 +84,7 @@ export async function saveCanvasSnapshot(snapshot) {
   if (!isCanvasSnapshot(snapshot)) return { storage: 'invalid', skippedRecords: [] }
   const uploaded = await uploadCanvasAssets(snapshot)
   const normalized = await normalizeAssetSources(uploaded.snapshot)
-  const sanitized = sanitizeCanvasSnapshotForTldraw(normalized)
+  const sanitized = sanitizeCanvasSnapshot(normalized)
   if (!sanitized.snapshot) return { storage: 'invalid', skippedRecords: sanitized.skippedRecords }
   const response = await putStudioSnapshot(sanitized.snapshot, serverRevision)
   serverRevision = response.revision

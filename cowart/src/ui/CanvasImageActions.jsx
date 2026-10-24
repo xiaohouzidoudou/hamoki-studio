@@ -1,26 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ImageShapeUtil, useEditor, useValue } from 'tldraw'
+import { useSyncExternalStore } from 'react'
+import { safeImageSource as localImageSource } from '../canvas/model.js'
 import './canvas-image-actions.css'
-
-export class CowartImageShapeUtil extends ImageShapeUtil {
-  onDoubleClick(shape) {
-    const asset = this.editor.getAsset(shape.props.assetId)
-    if (!localImageSource(asset?.props?.src)) return
-    this.editor.getContainer().dispatchEvent(new CustomEvent('cowart:preview-image', { detail: shape.id }))
-    // A handled shape change keeps the select tool from entering crop mode.
-    return { id: shape.id, type: shape.type }
-  }
-}
-
-function localImageSource(source) {
-  if (typeof source !== 'string') return null
-  if (source.startsWith('data:image/') || source.startsWith('blob:')) return source
-  try {
-    const url = new URL(source, window.location.href)
-    return url.origin === window.location.origin && ['http:', 'https:'].includes(url.protocol) ? url.href : null
-  } catch { return null }
-}
 
 function ImagePreview({ image, onClose, returnFocusTo }) {
   const closeButton = useRef(null)
@@ -62,27 +44,26 @@ function ImagePreview({ image, onClose, returnFocusTo }) {
   </div>, document.body)
 }
 
-export default function CanvasImageActions() {
-  const editor = useEditor()
+export default function CanvasImageActions({ editor }) {
+  useSyncExternalStore(fn=>editor.store.listen(fn,{source:'all',scope:'all'}),()=>editor.revision)
   const [previewId, setPreviewId] = useState(null)
-  const preview = useValue('original image preview', () => {
+  const preview = (() => {
     const shape = previewId && editor.getShape(previewId)
     const asset = shape?.type === 'image' && editor.getAsset(shape.props.assetId)
     const src = localImageSource(asset?.props?.src)
     return src ? { src, altText: shape.props.altText, width: asset.props.w, height: asset.props.h } : null
-  }, [editor, previewId])
-  const selection = useValue('selected image actions', () => {
+  })()
+  const selection = (() => {
     const shapes = editor.getSelectedShapes()
     if (shapes.length !== 1 || shapes[0].type !== 'image' || !editor.isIn('select')) return null
     if (!localImageSource(editor.getAsset(shapes[0].props.assetId)?.props?.src)) return null
     const bounds = editor.getShapePageBounds(shapes[0])
     if (!bounds) return null
-    // tldraw's native image toolbar occupies the space above the selection.
     const point = editor.pageToScreen({ x: bounds.x, y: bounds.y + bounds.h })
     const viewport = editor.getContainer().getBoundingClientRect()
     return { id: shapes[0].id, left: Math.max(8, Math.min(point.x - viewport.left, viewport.width - 224)),
       top: Math.max(8, Math.min(point.y - viewport.top + 8, viewport.height - 96)) }
-  }, [editor])
+  })()
   useEffect(() => {
     const container = editor.getContainer()
     const open = event => setPreviewId(event.detail)

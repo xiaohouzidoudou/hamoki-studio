@@ -1,1385 +1,626 @@
-import { createSaveState } from './lib/saveState.js'
-import {
-  ArrowDownToolbarItem,
-  ArrowLeftToolbarItem,
-  ArrowRightToolbarItem,
-  ArrowToolbarItem,
-  ArrowUpToolbarItem,
-  AssetToolbarItem,
-  CheckBoxToolbarItem,
-  CloudToolbarItem,
-  DefaultToolbar,
-  DefaultColorStyle,
-  DefaultStylePanel,
-  DefaultStylePanelContent,
-  DiamondToolbarItem,
-  DrawToolbarItem,
-  EllipseToolbarItem,
-  EraserToolbarItem,
-  FrameToolbarItem,
-  FrameShapeUtil,
-  HandToolbarItem,
-  HeartToolbarItem,
-  HexagonToolbarItem,
-  HighlightToolbarItem,
-  LaserToolbarItem,
-  LineToolbarItem,
-  NoteToolbarItem,
-  OvalToolbarItem,
-  RectangleToolbarItem,
-  RhombusToolbarItem,
-  SelectToolbarItem,
-  StateNode,
-  StarToolbarItem,
-  TextToolbarItem,
-  Tldraw,
-  TldrawUiMenuToolItem,
-  TriangleToolbarItem,
-  XBoxToolbarItem,
-  createShapeId,
-  onDragFromToolbarToCreateShape,
-  startEditingShapeWithRichText,
-  toRichText,
-  useEditor,
-  useValue
-} from 'tldraw'
-import { AllSelection } from '@tiptap/pm/state'
-import 'tldraw/tldraw.css'
-import { getAssetUrlsByImport } from '@tldraw/assets/imports.vite'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import annotationToolIconRaw from './assets/tool-comment.svg?raw'
-import {
-  describeSkippedRecord,
-  isCanvasSnapshot,
-  sanitizeCanvasSnapshotForTldraw
-} from './canvasSnapshot.js'
+import { CanvasDocument, createShapeId } from './canvas/model.js'
+import CanvasView from './canvas/CanvasView.jsx'
+import { originalImagesZip } from './canvas/download.js'
+import { sanitizeCanvasSnapshot } from './canvasSnapshot.js'
 import {
   loadCanvasSnapshot,
   saveCanvasSnapshot,
-  writeSelection,
   readViewState,
   writeViewState,
-  subscribeCanvasChanges
 } from './lib/storage.js'
+import { createSaveState } from './lib/saveState.js'
 import { applySavedAssetSources } from './lib/canvasAssets.js'
 import StudioPanel from './ui/StudioPanel.jsx'
-import CanvasImageActions, { CowartImageShapeUtil } from './ui/CanvasImageActions.jsx'
-
-const TLDRAW_LICENSE_KEY = import.meta.env.VITE_TLDRAW_LICENSE_KEY
-// Bundle tldraw icons/fonts/translations locally: strict same-origin CSP, offline-friendly.
-const TLDRAW_ASSET_URLS = getAssetUrlsByImport()
-
-const SELECTION_STATE_ELEMENT_ID = 'cowart-selection-state'
-const AI_IMAGE_TOOL_ID = 'ai-image'
-const AI_IMAGE_HOLDER_LABEL = 'AI 图片'
-const AI_IMAGE_HOLDER_DEFAULT_W = 512
-const AI_IMAGE_HOLDER_DEFAULT_H = 683
-const AI_IMAGE_SIZE_MIN = 16
-const AI_IMAGE_SIZE_MAX = 8192
-const AI_IMAGE_ASPECT_PRESETS = [
-  { id: '1-1', label: '1:1', w: 512, h: 512 },
-  { id: '3-2', label: '3:2', w: 768, h: 512 },
-  { id: '2-3', label: '2:3', w: 512, h: 768 },
-  { id: '4-3', label: '4:3', w: 683, h: 512 },
-  { id: '3-4', label: '3:4', w: 512, h: 683 },
-  { id: '16-9', label: '16:9', w: 1024, h: 576 },
-  { id: '9-16', label: '9:16', w: 512, h: 910 }
-]
-const ANNOTATION_TOOL_ID = 'cowart-annotation'
-const ANNOTATION_TOOL_LABEL = '标注'
-const ANNOTATION_DEFAULT_COLOR = 'red'
-const ANNOTATION_MIN_LENGTH = 8
-const ANNOTATION_BEND_RATIO = 0.12
-const ANNOTATION_MIN_BEND = 16
-const ANNOTATION_MAX_BEND = 48
-const ANNOTATION_LABEL_POSITION = 0
-const ANNOTATION_SELECT_TEXT_MAX_ATTEMPTS = 8
-const ANNOTATION_SELECT_TEXT_SETTLE_ATTEMPTS = 4
-const annotationToolIconSvg = annotationToolIconRaw.replaceAll('black', 'currentColor')
-const annotationToolIcon = (
-  <div
-    className="cowart-annotation-tool-icon"
-    dangerouslySetInnerHTML={{ __html: annotationToolIconSvg }}
-  />
-)
-
-function recordsAreEqual(left, right) {
-  return JSON.stringify(left) === JSON.stringify(right)
-}
-
-function storeChangedSinceSnapshot(editor, baselineStore) {
-  const currentStore = editor.store.getStoreSnapshot().store
-  const baselineIds = new Set(Object.keys(baselineStore))
-
-  for (const [id, baselineRecord] of Object.entries(baselineStore)) {
-    const currentRecord = currentStore[id]
-    if (!currentRecord) return true
-    if (!recordsAreEqual(currentRecord, baselineRecord)) return true
+import './canvas/canvas.css'
+function Icon({ name }) {
+  const paths = {
+    select: 'M5 3 19 13 12 14 9 21Z',
+    hand: 'M8 12V6a2 2 0 0 1 4 0v5-7a2 2 0 0 1 4 0v8-5a2 2 0 0 1 4 0v8c0 5-3 7-7 7h-1c-2 0-4-2-5-4l-3-5a2 2 0 0 1 3-2l1 1Z',
+    holder: 'M4 4H20V20H4ZM8 10l3 3 5-6',
+    rectangle: 'M4 5H20V19H4Z',
+    ellipse: 'M20 12a8 7 0 1 1-16 0 8 7 0 1 1 16 0',
+    arrow: 'M4 20 20 4M9 4H20V15',
+    text: 'M4 5H20M12 5V20M8 20H16',
+    upload: 'M12 16V3M6 9 12 3 18 9M4 15V21H20V15',
+    download: 'M12 3V17M6 11 12 17 18 11M4 17V21H20V17',
+    undo: 'M8 4 3 9 8 14M3 9H14a6 6 0 0 1 0 12',
+    redo: 'M16 4 21 9 16 14M21 9H10a6 6 0 0 0 0 12',
+    fit: 'M3 9V3H9M15 3H21V9M21 15V21H15M9 21H3V15M8 8H16V16H8Z',
+    trash: 'M4 6H20M9 6V3H15V6M6 6 7 21H17L18 6',
+    plus: 'M12 4V20M4 12H20',
   }
-
-  for (const id of Object.keys(currentStore)) {
-    if (!baselineIds.has(id)) return true
-  }
-
-  return false
-}
-
-function applyRemoteCanvasSnapshot(editor, snapshot, { preserveLocalChanges = false } = {}) {
-  if (!isCanvasSnapshot(snapshot)) return { changedRecords: 0, skippedRecords: [] }
-
-  const sanitized = sanitizeCanvasSnapshotForTldraw(snapshot)
-  if (!sanitized.snapshot) return { changedRecords: 0, skippedRecords: sanitized.skippedRecords }
-
-  const recordsToPut = Object.values(sanitized.snapshot.store).filter((record) => {
-    const localRecord = editor.store.get(record.id)
-    if (!localRecord) return true
-    if (preserveLocalChanges) return false
-    return !recordsAreEqual(localRecord, record)
-  })
-
-  if (recordsToPut.length === 0) {
-    return { changedRecords: 0, skippedRecords: sanitized.skippedRecords }
-  }
-
-  let changedRecords = 0
-  editor.store.mergeRemoteChanges(() => {
-    for (const record of recordsToPut) {
-      try {
-        editor.store.put([record])
-        changedRecords += 1
-      } catch (error) {
-        sanitized.skippedRecords.push(describeSkippedRecord(record, error))
-      }
-    }
-  })
-
-  return { changedRecords, skippedRecords: sanitized.skippedRecords }
-}
-
-function getAiImageHolderMeta() {
-  return {
-    cowartAiImageHolder: true,
-    cowartAiImageHolderVersion: 1
-  }
-}
-
-function isAiImageHolderShape(shape) {
-  return shape?.type === 'frame' && shape.meta?.cowartAiImageHolder === true
-}
-
-function isAiImageAspectLocked(shape) {
-  return isAiImageHolderShape(shape) && shape.meta?.cowartAiAspectLocked === true
-}
-
-function clampAiImageSize(value) {
-  if (!Number.isFinite(value)) return null
-  return Math.round(Math.min(Math.max(value, AI_IMAGE_SIZE_MIN), AI_IMAGE_SIZE_MAX))
-}
-
-function getAiImageAspectRatio(shape) {
-  const metaRatio = Number(shape?.meta?.cowartAiAspectRatio)
-  if (Number.isFinite(metaRatio) && metaRatio > 0) return metaRatio
-
-  const w = Number(shape?.props?.w)
-  const h = Number(shape?.props?.h)
-  if (!Number.isFinite(w) || !Number.isFinite(h) || h === 0) return null
-
-  return w / h
-}
-
-function getAiImageAspectPreset(shape) {
-  if (!shape?.props) return null
-
-  const w = Number(shape.props.w)
-  const h = Number(shape.props.h)
-  if (!Number.isFinite(w) || !Number.isFinite(h) || h === 0) return null
-
-  const shapeRatio = w / h
-  return (
-    AI_IMAGE_ASPECT_PRESETS.find((preset) => {
-      const presetRatio = preset.w / preset.h
-      return Math.abs(shapeRatio - presetRatio) < 0.01
-    }) ?? null
-  )
-}
-
-function formatAiImageSize(value) {
-  return String(Math.round(Number.isFinite(value) ? value : 0))
-}
-
-function getAspectIconStyle(preset) {
-  const maxSize = 22
-  const scale = Math.min(maxSize / preset.w, maxSize / preset.h)
-  return {
-    width: `${Math.max(8, Math.round(preset.w * scale))}px`,
-    height: `${Math.max(8, Math.round(preset.h * scale))}px`
-  }
-}
-
-function createAiImageHolderShape(editor, id, shapeOverrides = {}) {
-  const scale = editor.getResizeScaleFactor()
-  const { meta, props, ...shapeRecordOverrides } = shapeOverrides
-  const { scale: _scale, ...frameProps } = props ?? {}
-
-  return editor.createShape({
-    ...shapeRecordOverrides,
-    id,
-    type: 'frame',
-    meta: {
-      ...getAiImageHolderMeta(),
-      ...meta
-    },
-    props: {
-      w: AI_IMAGE_HOLDER_DEFAULT_W * scale,
-      h: AI_IMAGE_HOLDER_DEFAULT_H * scale,
-      name: AI_IMAGE_HOLDER_LABEL,
-      color: 'blue',
-      ...frameProps
-    }
-  })
-}
-
-function createAiImageHolderAtViewportCenter(editor) {
-  const scale = editor.getResizeScaleFactor()
-  const w = AI_IMAGE_HOLDER_DEFAULT_W * scale
-  const h = AI_IMAGE_HOLDER_DEFAULT_H * scale
-  const center = editor.getViewportPageBounds().center
-  const id = createShapeId()
-
-  createAiImageHolderShape(editor, id, {
-    x: center.x - w / 2,
-    y: center.y - h / 2,
-    props: { w, h }
-  })
-  editor.select(id)
-  editor.setCurrentTool('select.idle')
-}
-
-function startEditingAnnotationArrowLabel(editor, arrowId) {
-  const shape = editor.getShape(arrowId)
-  if (!shape || !editor.canEditShape(shape)) {
-    return
-  }
-
-  editor.select(arrowId)
-  startEditingShapeWithRichText(editor, arrowId, { selectAll: true })
-  pinAnnotationArrowLabelPosition(editor, arrowId)
-  editor.getCurrentTool().setCurrentToolIdMask(ANNOTATION_TOOL_ID)
-  selectAnnotationTextWhenReady(editor, arrowId)
-}
-
-function pinAnnotationArrowLabelPosition(editor, arrowId, attempt = 0) {
-  editor.timers.setTimeout(() => {
-    const shape = editor.getShape(arrowId)
-    if (!shape || shape.meta?.cowartAnnotationArrow !== true) return
-    if (shape.props.labelPosition !== ANNOTATION_LABEL_POSITION) {
-      editor.updateShapes([
-        {
-          id: arrowId,
-          type: 'arrow',
-          props: {
-            labelPosition: ANNOTATION_LABEL_POSITION
-          }
-        }
-      ])
-    }
-
-    if (attempt < 2 && editor.getEditingShapeId() === arrowId) {
-      pinAnnotationArrowLabelPosition(editor, arrowId, attempt + 1)
-    }
-  }, 16)
-}
-
-function unlockGlobalToolLock(editor) {
-  if (!editor.getInstanceState().isToolLocked) return
-  editor.updateInstanceState({ isToolLocked: false })
-}
-
-function selectAnnotationTextWhenReady(editor, arrowId, attempt = 0) {
-  editor.timers.setTimeout(() => {
-    const editingShapeId = editor.getEditingShapeId()
-    if (editingShapeId !== arrowId) return
-
-    const textEditor = editor.getRichTextEditor()
-    if (textEditor) {
-      textEditor.view.focus()
-      textEditor.view.dispatch(
-        textEditor.state.tr.setSelection(new AllSelection(textEditor.state.doc)).scrollIntoView()
-      )
-    }
-
-    const didSelectText = selectAnnotationTextRange(editor, arrowId)
-    if (didSelectText && attempt >= ANNOTATION_SELECT_TEXT_SETTLE_ATTEMPTS) {
-      return
-    }
-
-    if (attempt < ANNOTATION_SELECT_TEXT_MAX_ATTEMPTS) {
-      selectAnnotationTextWhenReady(editor, arrowId, attempt + 1)
-    }
-  }, 16)
-}
-
-function selectAnnotationTextRange(editor, arrowId) {
-  const doc = editor.getContainerDocument()
-  const shapeElement = Array.from(doc.querySelectorAll('[data-shape-id]')).find(
-    (element) => element.getAttribute('data-shape-id') === arrowId
-  )
-  const editable = shapeElement?.querySelector('[contenteditable="true"]')
-
-  if (!editable || typeof editable.focus !== 'function') {
-    return false
-  }
-
-  editable.focus()
-
-  const textNodes = getTextNodes(editable)
-  if (textNodes.length === 0) {
-    return doc.activeElement === editable || editable.contains(doc.activeElement)
-  }
-
-  const range = doc.createRange()
-  const firstTextNode = textNodes[0]
-  const lastTextNode = textNodes[textNodes.length - 1]
-  range.setStart(firstTextNode, 0)
-  range.setEnd(lastTextNode, lastTextNode.textContent?.length ?? 0)
-
-  const selection = doc.getSelection()
-  if (!selection) return false
-
-  selection.removeAllRanges()
-  selection.addRange(range)
-  doc.execCommand?.('selectAll')
-
-  return selection.rangeCount > 0 && selection.toString() === editable.textContent
-}
-
-function getTextNodes(node, textNodes = []) {
-  for (const child of node.childNodes) {
-    if (child.nodeType === Node.TEXT_NODE && child.textContent) {
-      textNodes.push(child)
-    } else {
-      getTextNodes(child, textNodes)
-    }
-  }
-
-  return textNodes
-}
-
-function getDefaultAnnotationArrowBend(dx, dy, scale) {
-  const length = Math.hypot(dx, dy)
-  if (length === 0) return 0
-
-  const bend = Math.min(
-    Math.max(length * ANNOTATION_BEND_RATIO, ANNOTATION_MIN_BEND * scale),
-    ANNOTATION_MAX_BEND * scale
-  )
-
-  if (Math.abs(dx) >= Math.abs(dy)) {
-    return dx >= 0 ? -bend : bend
-  }
-
-  return bend
-}
-
-function getAnnotationColor(editor) {
-  const color = editor.getStyleForNextShape(DefaultColorStyle)
-  return color === DefaultColorStyle.defaultValue ? ANNOTATION_DEFAULT_COLOR : color
-}
-
-class CowartAnnotationTool extends StateNode {
-  static id = ANNOTATION_TOOL_ID
-  static initial = 'idle'
-
-  static children() {
-    return [CowartAnnotationIdle, CowartAnnotationPointing]
-  }
-
-  onEnter() {
-    unlockGlobalToolLock(this.editor)
-  }
-}
-
-class CowartAnnotationIdle extends StateNode {
-  static id = 'idle'
-
-  onEnter() {
-    this.editor.setCursor({ type: 'cross', rotation: 0 })
-  }
-
-  onPointerDown(info) {
-    this.parent.transition('pointing', info)
-  }
-
-  onCancel() {
-    this.editor.setCurrentTool('select')
-  }
-}
-
-class CowartAnnotationPointing extends StateNode {
-  static id = 'pointing'
-
-  arrowId = null
-  markId = ''
-  origin = null
-
-  onEnter() {
-    const origin = this.editor.inputs.getOriginPagePoint()
-    const scale = this.editor.getResizeScaleFactor()
-    const color = getAnnotationColor(this.editor)
-    const arrowId = createShapeId()
-
-    this.arrowId = arrowId
-    this.origin = { x: origin.x, y: origin.y }
-    this.markId = this.editor.markHistoryStoppingPoint(`creating_annotation:${arrowId}`)
-
-    this.editor.createShape({
-      id: arrowId,
-      type: 'arrow',
-      x: origin.x,
-      y: origin.y,
-      meta: {
-        cowartAnnotationArrow: true
-      },
-      props: {
-        kind: 'arc',
-        dash: 'draw',
-        size: 'm',
-        fill: 'none',
-        color,
-        labelColor: color,
-        bend: 0,
-        start: { x: 0, y: 0 },
-        end: { x: 1, y: 0 },
-        arrowheadStart: 'none',
-        arrowheadEnd: 'arrow',
-        richText: toRichText(''),
-        labelPosition: ANNOTATION_LABEL_POSITION,
-        font: 'draw',
-        scale
-      }
-    })
-  }
-
-  onPointerMove() {
-    this.updateArrowEnd()
-  }
-
-  onPointerUp() {
-    this.complete()
-  }
-
-  onCancel() {
-    this.cancel()
-  }
-
-  onInterrupt() {
-    this.cancel()
-  }
-
-  updateArrowEnd() {
-    if (!this.arrowId || !this.origin) return
-
-    const point = this.editor.inputs.getCurrentPagePoint()
-    this.editor.updateShapes([
-      {
-        id: this.arrowId,
-        type: 'arrow',
-        props: {
-          end: {
-            x: point.x - this.origin.x,
-            y: point.y - this.origin.y
-          }
-        }
-      }
-    ])
-  }
-
-  complete() {
-    if (!this.arrowId || !this.origin) {
-      this.editor.setCurrentTool(ANNOTATION_TOOL_ID)
-      return
-    }
-
-    this.updateArrowEnd()
-
-    const point = this.editor.inputs.getCurrentPagePoint()
-    const dx = point.x - this.origin.x
-    const dy = point.y - this.origin.y
-    const length = Math.hypot(dx, dy)
-
-    if (length < ANNOTATION_MIN_LENGTH / this.editor.getZoomLevel()) {
-      this.editor.bailToMark(this.markId)
-      this.parent.transition('idle')
-      return
-    }
-
-    this.editor.updateShapes([
-      {
-        id: this.arrowId,
-        type: 'arrow',
-        props: {
-          bend: getDefaultAnnotationArrowBend(dx, dy, this.editor.getResizeScaleFactor())
-        }
-      }
-    ])
-
-    startEditingAnnotationArrowLabel(this.editor, this.arrowId)
-  }
-
-  cancel() {
-    if (this.arrowId) {
-      this.editor.bailToMark(this.markId)
-    }
-    this.parent.transition('idle')
-  }
-}
-
-class CowartFrameShapeUtil extends FrameShapeUtil {
-  isAspectRatioLocked(shape) {
-    if (isAiImageHolderShape(shape)) {
-      return isAiImageAspectLocked(shape)
-    }
-
-    return super.isAspectRatioLocked(shape)
-  }
-}
-
-const cowartShapeUtils = [CowartFrameShapeUtil, CowartImageShapeUtil]
-
-const cowartUiOverrides = {
-  translations: {
-    en: {
-      'tool.ai-image': AI_IMAGE_HOLDER_LABEL,
-      'tool.cowart-annotation': ANNOTATION_TOOL_LABEL
-    },
-    'zh-cn': {
-      'tool.ai-image': AI_IMAGE_HOLDER_LABEL,
-      'tool.cowart-annotation': ANNOTATION_TOOL_LABEL
-    }
-  },
-  tools(editor, tools) {
-    return {
-      ...tools,
-      arrow: {
-        ...tools.arrow,
-        kbd: undefined
-      },
-      [AI_IMAGE_TOOL_ID]: {
-        id: AI_IMAGE_TOOL_ID,
-        label: 'tool.ai-image',
-        icon: 'tool-frame',
-        kbd: 'a',
-        onSelect() {
-          createAiImageHolderAtViewportCenter(editor)
-        },
-        onDragStart(source, info) {
-          const scale = editor.getResizeScaleFactor()
-          onDragFromToolbarToCreateShape(editor, info, {
-            createShape: (id) =>
-              createAiImageHolderShape(editor, id, {
-                props: {
-                  w: AI_IMAGE_HOLDER_DEFAULT_W * scale,
-                  h: AI_IMAGE_HOLDER_DEFAULT_H * scale
-                }
-              }),
-            onDragEnd: (id) => editor.select(id)
-          })
-        },
-        meta: {
-          cowartTool: 'ai-image-holder'
-        }
-      },
-      [ANNOTATION_TOOL_ID]: {
-        id: ANNOTATION_TOOL_ID,
-        label: 'tool.cowart-annotation',
-        icon: annotationToolIcon,
-        kbd: 'c',
-        onSelect() {
-          unlockGlobalToolLock(editor)
-          editor.setCurrentTool(ANNOTATION_TOOL_ID)
-        },
-        meta: {
-          cowartTool: 'annotation'
-        }
-      }
-    }
-  }
-}
-
-const cowartComponents = {
-  Toolbar: CowartToolbar,
-  StylePanel: CowartStylePanel,
-  InFrontOfTheCanvas: CanvasImageActions
-}
-
-function CowartStylePanel(props) {
-  return (
-    <DefaultStylePanel {...props}>
-      <DefaultStylePanelContent />
-      <CowartAiImageStyleControls />
-    </DefaultStylePanel>
-  )
-}
-
-function CowartAiImageStyleControls() {
-  const editor = useEditor()
-  const selectedAiImageShape = useValue(
-    'selected ai image holder shape',
-    () => {
-      const selectedShapeIds = editor.getSelectedShapeIds()
-      if (selectedShapeIds.length !== 1) return null
-
-      const shape = editor.getShape(selectedShapeIds[0])
-      return isAiImageHolderShape(shape) ? shape : null
-    },
-    [editor]
-  )
-  const [widthValue, setWidthValue] = useState('')
-  const [heightValue, setHeightValue] = useState('')
-
-  useEffect(() => {
-    if (!selectedAiImageShape) {
-      setWidthValue('')
-      setHeightValue('')
-      return
-    }
-
-    setWidthValue(formatAiImageSize(selectedAiImageShape.props.w))
-    setHeightValue(formatAiImageSize(selectedAiImageShape.props.h))
-  }, [selectedAiImageShape?.id, selectedAiImageShape?.props.w, selectedAiImageShape?.props.h])
-
-  if (!selectedAiImageShape) return null
-
-  const activePreset = getAiImageAspectPreset(selectedAiImageShape)
-  const currentWidth = Number(selectedAiImageShape.props.w)
-  const currentHeight = Number(selectedAiImageShape.props.h)
-  const currentRatio = currentHeight ? currentWidth / currentHeight : 1
-  const isAspectLocked = isAiImageAspectLocked(selectedAiImageShape)
-
-  function updateAiImageSize(nextWidth, nextHeight, historyMark = 'resize-ai-image-holder') {
-    const w = clampAiImageSize(nextWidth)
-    const h = clampAiImageSize(nextHeight)
-    if (!w || !h) return
-
-    editor.markHistoryStoppingPoint(historyMark)
-    editor.updateShapes([
-      {
-        id: selectedAiImageShape.id,
-        type: 'frame',
-        meta: {
-          ...selectedAiImageShape.meta,
-          cowartAiAspectRatio: w / h
-        },
-        props: { w, h }
-      }
-    ])
-  }
-
-  function toggleAspectLock() {
-    const nextIsLocked = !isAspectLocked
-    editor.markHistoryStoppingPoint('toggle-ai-image-aspect-lock')
-    editor.updateShapes([
-      {
-        id: selectedAiImageShape.id,
-        type: 'frame',
-        meta: {
-          ...selectedAiImageShape.meta,
-          cowartAiAspectLocked: nextIsLocked,
-          cowartAiAspectRatio: currentRatio
-        }
-      }
-    ])
-  }
-
-  function commitWidth(value) {
-    const nextWidth = clampAiImageSize(Number(value))
-    if (!nextWidth) {
-      setWidthValue(formatAiImageSize(currentWidth))
-      return
-    }
-
-    const nextHeight = isAspectLocked ? Math.round(nextWidth / currentRatio) : currentHeight
-    updateAiImageSize(nextWidth, nextHeight)
-  }
-
-  function commitHeight(value) {
-    const nextHeight = clampAiImageSize(Number(value))
-    if (!nextHeight) {
-      setHeightValue(formatAiImageSize(currentHeight))
-      return
-    }
-
-    const nextWidth = isAspectLocked ? Math.round(nextHeight * currentRatio) : currentWidth
-    updateAiImageSize(nextWidth, nextHeight)
-  }
-
-  function handleNumberKeyDown(event) {
-    if (event.key === 'Enter') {
-      event.currentTarget.blur()
-    }
-    if (event.key === 'Escape') {
-      setWidthValue(formatAiImageSize(currentWidth))
-      setHeightValue(formatAiImageSize(currentHeight))
-      event.currentTarget.blur()
-    }
-  }
-
-  return (
-    <div className="cowart-ai-image-style-panel" aria-label="AI 图片尺寸设置">
-      <section className="cowart-ai-style-section">
-        <div className="cowart-ai-style-heading">
-          <span>尺寸</span>
-        </div>
-        <div className="cowart-ai-size-row">
-          <label className="cowart-ai-size-field">
-            <span>W</span>
-            <input
-              aria-label="AI 图片宽度"
-              inputMode="numeric"
-              min={AI_IMAGE_SIZE_MIN}
-              max={AI_IMAGE_SIZE_MAX}
-              value={widthValue}
-              onChange={(event) => setWidthValue(event.target.value)}
-              onBlur={(event) => commitWidth(event.target.value)}
-              onKeyDown={handleNumberKeyDown}
-            />
-          </label>
-          <button
-            aria-label={isAspectLocked ? '解除宽高比例锁定' : '锁定宽高比例'}
-            aria-pressed={isAspectLocked}
-            className="cowart-ai-aspect-lock"
-            onClick={toggleAspectLock}
-            type="button"
-          >
-            <CowartAspectLockIcon locked={isAspectLocked} />
-          </button>
-          <label className="cowart-ai-size-field">
-            <span>H</span>
-            <input
-              aria-label="AI 图片高度"
-              inputMode="numeric"
-              min={AI_IMAGE_SIZE_MIN}
-              max={AI_IMAGE_SIZE_MAX}
-              value={heightValue}
-              onChange={(event) => setHeightValue(event.target.value)}
-              onBlur={(event) => commitHeight(event.target.value)}
-              onKeyDown={handleNumberKeyDown}
-            />
-          </label>
-        </div>
-      </section>
-
-      <section className="cowart-ai-style-section">
-        <div className="cowart-ai-style-heading">
-          <span>比例</span>
-        </div>
-        <div className="cowart-ai-aspect-grid">
-          {AI_IMAGE_ASPECT_PRESETS.map((preset) => (
-            <button
-              key={preset.id}
-              aria-pressed={activePreset?.id === preset.id}
-              className="cowart-ai-aspect-preset"
-              onClick={() =>
-                updateAiImageSize(preset.w, preset.h, `resize-ai-image-holder:${preset.id}`)
-              }
-              type="button"
-            >
-              <span
-                className="cowart-ai-aspect-icon"
-                style={getAspectIconStyle(preset)}
-              />
-              <span>{preset.label}</span>
-            </button>
-          ))}
-        </div>
-      </section>
-    </div>
-  )
-}
-
-function CowartAspectLockIcon({ locked }) {
-  if (locked) {
-    return (
-      <svg
-        aria-hidden="true"
-        className="cowart-ai-lock-icon"
-        viewBox="0 0 20 20"
-      >
-        <rect x="4.5" y="8.5" width="11" height="8" rx="2" />
-        <path d="M7 8.5V6a3 3 0 0 1 6 0v2.5" />
-      </svg>
-    )
-  }
-
   return (
     <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       aria-hidden="true"
-      className="cowart-ai-lock-icon"
-      viewBox="0 0 20 20"
     >
-      <rect x="4.5" y="8.5" width="11" height="8" rx="2" />
-      <path d="M7 8.5V6.5a3 3 0 0 1 5.8-1.1" />
+      <path d={paths[name] || paths.select} />
     </svg>
   )
 }
-
-function CowartToolbarItem({ toolId }) {
-  const editor = useEditor()
-  const isSelected = useValue(
-    `is ${toolId} selected`,
-    () => editor.getCurrentToolId() === toolId,
-    [editor, toolId]
-  )
-
-  return <TldrawUiMenuToolItem toolId={toolId} isSelected={isSelected} />
-}
-
-function CowartAnnotationToolbarItem() {
-  const editor = useEditor()
-  const isSelected = useValue(
-    'is annotation selected',
-    () => editor.getCurrentToolId() === ANNOTATION_TOOL_ID,
-    [editor]
-  )
-
-  return (
-    <button
-      aria-label={ANNOTATION_TOOL_LABEL}
-      aria-pressed={isSelected ? 'true' : 'false'}
-      className="tlui-button tlui-button__tool cowart-annotation-toolbar-button"
-      data-testid={`tools.${ANNOTATION_TOOL_ID}`}
-      data-value={ANNOTATION_TOOL_ID}
-      draggable={false}
-      onClick={() => {
-        unlockGlobalToolLock(editor)
-        editor.setCurrentTool(ANNOTATION_TOOL_ID)
-      }}
-      onTouchStart={(event) => {
-        event.preventDefault()
-        unlockGlobalToolLock(editor)
-        editor.setCurrentTool(ANNOTATION_TOOL_ID)
-      }}
-      title={ANNOTATION_TOOL_LABEL}
-      type="button"
-    >
-      {annotationToolIcon}
-      <span className="cowart-annotation-toolbar-label" draggable={false}>
-        {ANNOTATION_TOOL_LABEL}
-      </span>
-    </button>
-  )
-}
-
-function CowartToolbarDivider() {
-  return <div aria-orientation="vertical" className="cowart-toolbar-divider" role="separator" />
-}
-
-function CowartToolbar(props) {
-  return (
-    <DefaultToolbar {...props} maxItems={9}>
-      <CowartAnnotationToolbarItem />
-      <CowartToolbarDivider />
-      <SelectToolbarItem />
-      <HandToolbarItem />
-      <CowartToolbarItem toolId={AI_IMAGE_TOOL_ID} />
-      <CowartToolbarDivider />
-      <AssetToolbarItem />
-      <DrawToolbarItem />
-      <EraserToolbarItem />
-      <TextToolbarItem />
-      <ArrowToolbarItem />
-      <NoteToolbarItem />
-      <RectangleToolbarItem />
-      <EllipseToolbarItem />
-      <TriangleToolbarItem />
-      <DiamondToolbarItem />
-      <HexagonToolbarItem />
-      <OvalToolbarItem />
-      <RhombusToolbarItem />
-      <StarToolbarItem />
-      <CloudToolbarItem />
-      <HeartToolbarItem />
-      <XBoxToolbarItem />
-      <CheckBoxToolbarItem />
-      <ArrowLeftToolbarItem />
-      <ArrowUpToolbarItem />
-      <ArrowDownToolbarItem />
-      <ArrowRightToolbarItem />
-      <LineToolbarItem />
-      <HighlightToolbarItem />
-      <LaserToolbarItem />
-      <FrameToolbarItem />
-    </DefaultToolbar>
-  )
-}
-
-function getCowartSelection(editor) {
-  const selectedShapeIds = editor.getSelectedShapeIds()
-  return selectedShapeIds.map((id) => {
-    const shape = editor.getShape(id)
-    const asset = shape?.props?.assetId ? editor.getAsset(shape.props.assetId) : null
-    return {
-      id,
-      type: shape?.type ?? null,
-      parentId: shape?.parentId ?? null,
-      x: shape?.x ?? null,
-      y: shape?.y ?? null,
-      rotation: shape?.rotation ?? null,
-      meta: shape?.meta ?? null,
-      isAiImageHolder: shape?.meta?.cowartAiImageHolder === true,
-      props: shape?.props ?? null,
-      asset: asset
-        ? {
-            id: asset.id,
-            type: asset.type,
-            name: asset.props?.name ?? null,
-            src: asset.props?.src ?? null,
-            w: asset.props?.w ?? null,
-            h: asset.props?.h ?? null,
-            mimeType: asset.props?.mimeType ?? null,
-            fileSize: asset.props?.fileSize ?? null
-          }
-        : null
-    }
+const fileData = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => reject(Error('图片读取失败'))
+    reader.readAsDataURL(file)
   })
-}
-
-function getCowartSelectionSnapshot(editor) {
-  return {
-    selectedShapes: getCowartSelection(editor)
-  }
-}
-
-function getCowartViewState(editor) {
-  const camera = editor.getCamera()
-  return {
-    version: 1,
-    currentPageId: editor.getCurrentPageId(),
-    camera: {
-      x: camera.x,
-      y: camera.y,
-      z: camera.z
-    }
-  }
-}
-
-function isRestorableViewState(viewState) {
-  return (
-    viewState &&
-    typeof viewState === 'object' &&
-    typeof viewState.currentPageId === 'string' &&
-    viewState.camera &&
-    Number.isFinite(viewState.camera.x) &&
-    Number.isFinite(viewState.camera.y) &&
-    Number.isFinite(viewState.camera.z)
-  )
-}
-
-function restoreCowartViewState(editor, viewState) {
-  if (!isRestorableViewState(viewState)) return
-  if (!editor.getPage(viewState.currentPageId)) return
-
-  editor.setCurrentPage(viewState.currentPageId)
-  editor.setCamera(viewState.camera, { immediate: true, force: true })
-}
-
-function writeCowartSelectionState(selectionSnapshot) {
-  let stateElement = document.getElementById(SELECTION_STATE_ELEMENT_ID)
-  if (!stateElement) {
-    stateElement = document.createElement('script')
-    stateElement.id = SELECTION_STATE_ELEMENT_ID
-    stateElement.type = 'application/json'
-    document.body.append(stateElement)
-  }
-
-  stateElement.textContent = JSON.stringify({
-    ...selectionSnapshot,
-    updatedAt: new Date().toISOString()
+const sizeOf = (src) =>
+  new Promise((resolve, reject) => {
+    const image = new Image()
+    image.onload = () =>
+      resolve({ w: image.naturalWidth, h: image.naturalHeight })
+    image.onerror = () => reject(Error('图片文件无法解码'))
+    image.src = src
   })
+function downloadBlob(blob, name) {
+  const url = URL.createObjectURL(blob),
+    a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 30000)
 }
-
 export default function App() {
-  const [snapshot, setSnapshot] = useState()
-  const [viewState, setViewState] = useState()
-  const [loadError, setLoadError] = useState(null)
-  const [skippedRecords, setSkippedRecords] = useState([])
-  const [aiPanelOpen, setAiPanelOpen] = useState(true)
-  const [saveError, setSaveError] = useState('')
-  const [canvasEditor, setCanvasEditor] = useState(null)
-  const editorRef = useRef(null)
+  const container = useRef(null),
+    editorRef = useRef(null),
+    retrySave = useRef(null),
+    raw = useRef(null),
+    fileInput = useRef(null)
+  const [loaded, setLoaded] = useState(null),
+    [editor, setEditor] = useState(null),
+    [error, setError] = useState(''),
+    [saveError, setSaveError] = useState(''),
+    [status, setStatus] = useState('已同步'),
+    [warnings, setWarnings] = useState([]),
+    [open, setOpen] = useState(true),
+    [notice, setNotice] = useState(''),
+    [revision, setRevision] = useState(0)
   const getEditor = useCallback(() => editorRef.current, [])
-
   useEffect(() => {
-    const controller = new AbortController()
-
-    async function loadCanvas() {
+    let cancelled = false
+    ;(async () => {
       try {
-        const [canvasResult, viewStateResult] = await Promise.all([
+        const [canvas, view] = await Promise.all([
           loadCanvasSnapshot(),
-          readViewState()
+          readViewState(),
         ])
-        const sanitized = sanitizeCanvasSnapshotForTldraw(canvasResult.snapshot)
-        setSnapshot(sanitized.snapshot)
-        setSkippedRecords(sanitized.skippedRecords)
-        setViewState(viewStateResult.viewState ?? null)
-      } catch (error) {
-        if (error.name === 'AbortError') return
-        setLoadError(error)
-        setSnapshot(null)
-        setViewState(null)
+        if (cancelled) return
+        raw.current = canvas.snapshot
+        const safe = sanitizeCanvasSnapshot(canvas.snapshot)
+        setWarnings(safe.skippedRecords)
+        setLoaded({ snapshot: safe.snapshot, view: view.viewState })
+      } catch (e) {
+        if (!cancelled) setError(e.message)
       }
-    }
-
-    loadCanvas()
-
-    return () => controller.abort()
-  }, [])
-
-  const handleMount = useCallback((editor) => {
-    const container = editor.getContainer()
-    const focusAssistant = () => {
-      setAiPanelOpen(true)
-      window.requestAnimationFrame(() => document.querySelector('.hamoki-studio-panel textarea')?.focus())
-    }
-    container.addEventListener('cowart:edit-selection', focusAssistant)
-    editor.user.updateUserPreferences({ colorScheme: 'dark' })
-    editorRef.current = editor
-    setCanvasEditor(editor)
-    window.__cowartEditor = editor
-    window.__cowartSelection = () => getCowartSelection(editor)
-    window.__cowartViewState = () => getCowartViewState(editor)
-    let lastSyncedSelectionState = ''
-    let isSelectionStateSaving = false
-    let hasPendingSelectionState = false
-    let lastSyncedViewState = ''
-    let isViewStateSaving = false
-    let hasPendingViewState = false
-
-    async function syncSelectionState() {
-      const selectionSnapshot = getCowartSelectionSnapshot(editor)
-      writeCowartSelectionState(selectionSnapshot)
-
-      const selectionState = JSON.stringify(selectionSnapshot)
-      if (selectionState === lastSyncedSelectionState) return
-      lastSyncedSelectionState = selectionState
-
-      if (isSelectionStateSaving) {
-        hasPendingSelectionState = true
-        return
-      }
-
-      isSelectionStateSaving = true
-      try {
-        await writeSelection({
-          ...selectionSnapshot,
-          updatedAt: new Date().toISOString()
-        })
-      } catch (error) {
-        console.error(error)
-      } finally {
-        isSelectionStateSaving = false
-        if (hasPendingSelectionState) {
-          hasPendingSelectionState = false
-          syncSelectionState()
-        }
-      }
-    }
-
-    syncSelectionState()
-    const selectionStateTimer = window.setInterval(syncSelectionState, 250)
-
-    async function syncViewState() {
-      const viewStateSnapshot = {
-        ...getCowartViewState(editor),
-        updatedAt: new Date().toISOString()
-      }
-
-      const nextViewState = JSON.stringify(viewStateSnapshot)
-      if (nextViewState === lastSyncedViewState) return
-      lastSyncedViewState = nextViewState
-
-      if (isViewStateSaving) {
-        hasPendingViewState = true
-        return
-      }
-
-      isViewStateSaving = true
-      try {
-        await writeViewState(viewStateSnapshot)
-      } catch (error) {
-        console.error(error)
-      } finally {
-        isViewStateSaving = false
-        if (hasPendingViewState) {
-          hasPendingViewState = false
-          syncViewState()
-        }
-      }
-    }
-
-    const viewStateTimer = window.setInterval(syncViewState, 500)
-    editor.timers.setTimeout(syncViewState, 100)
-
-    let saveTimer = null
-    let isSaving = false
-    let hasPendingSave = false
-    const saveState = createSaveState()
-    let isSyncingAnnotationShape = false
-    let remoteLoadController = null
-
-    async function saveCanvas() {
-      if (!saveState.dirty) return
-
-      if (isSaving) {
-        hasPendingSave = true
-        return
-      }
-
-      isSaving = true
-      const capturedVersion = saveState.capture()
-      try {
-        const result = await saveCanvasSnapshot(editor.store.getStoreSnapshot())
-        if (result.storage === 'studio') applySavedAssetSources(editor, result.assetReplacements)
-        if (result.storage === 'invalid') {
-          setSkippedRecords(result.skippedRecords)
-          throw new Error('画布数据无效，当前修改尚未保存')
-        }
-        saveState.acknowledge(capturedVersion)
-        setSaveError('')
-      } catch (error) {
-        setSaveError(error.message || '保存失败，当前修改尚未同步到服务器')
-        console.error(error)
-      } finally {
-        isSaving = false
-        if (hasPendingSave) {
-          hasPendingSave = false
-          scheduleSave()
-        }
-      }
-    }
-
-    function scheduleSave() {
-      saveState.changed()
-      window.clearTimeout(saveTimer)
-      saveTimer = window.setTimeout(saveCanvas, 500)
-    }
-
-    editor.timers.requestAnimationFrame(() => {
-      restoreCowartViewState(editor, viewState)
-    })
-
-    async function loadRemoteCanvasSnapshot() {
-      remoteLoadController?.abort()
-      const controller = new AbortController()
-      remoteLoadController = controller
-
-      const preserveLocalChanges = saveState.dirty || isSaving
-      const preFetchStore = preserveLocalChanges ? null : editor.store.getStoreSnapshot().store
-
-      try {
-        const canvasResult = await loadCanvasSnapshot()
-        const effectivePreserve =
-          preserveLocalChanges || (preFetchStore && storeChangedSinceSnapshot(editor, preFetchStore))
-        const { changedRecords, skippedRecords: nextSkippedRecords } = applyRemoteCanvasSnapshot(
-          editor,
-          canvasResult.snapshot,
-          {
-            preserveLocalChanges: effectivePreserve
-          }
-        )
-        setSkippedRecords(nextSkippedRecords)
-
-        if (changedRecords > 0 && effectivePreserve) {
-          saveState.changed()
-          if (isSaving) {
-            hasPendingSave = true
-          } else {
-            scheduleSave()
-          }
-        }
-      } catch (error) {
-        if (error.name === 'AbortError') return
-        console.error(error)
-      } finally {
-        if (remoteLoadController === controller) {
-          remoteLoadController = null
-        }
-      }
-    }
-
-    const unsubscribe = editor.store.listen(scheduleSave, {
-      source: 'user',
-      scope: 'document'
-    })
-
-    let canvasEvents = null
-    const unsubscribeCanvasEvents = subscribeCanvasChanges(() => {
-      loadRemoteCanvasSnapshot()
-    })
-    canvasEvents = { close: unsubscribeCanvasEvents }
-
-    const unsubscribeAnnotationEditingToolLock = editor.store.listen(
-      ({ changes }) => {
-        for (const [previous, next] of Object.values(changes.updated)) {
-          if (previous?.typeName !== 'instance_page_state') continue
-          if (!previous.editingShapeId || next.editingShapeId) continue
-
-          const shape = editor.getShape(previous.editingShapeId)
-          if (shape?.meta?.cowartAnnotationArrow !== true) continue
-
-          editor.timers.requestAnimationFrame(() => {
-            if (editor.getEditingShapeId()) return
-            if (editor.getCurrentToolId() !== 'select') return
-            editor.setCurrentTool(ANNOTATION_TOOL_ID)
-          })
-        }
-      },
-      {
-        source: 'all',
-        scope: 'session'
-      }
-    )
-
-    const unsubscribeAnnotationShapeSync = editor.store.listen(
-      ({ changes }) => {
-        if (isSyncingAnnotationShape) return
-
-        const updates = []
-        for (const [_previous, next] of Object.values(changes.updated)) {
-          if (next?.typeName !== 'shape') continue
-          if (next.type !== 'arrow') continue
-          if (next.meta?.cowartAnnotationArrow !== true) continue
-
-          const props = {}
-          if (next.props?.color !== next.props?.labelColor) {
-            props.labelColor = next.props.color
-          }
-          if (next.props?.labelPosition !== ANNOTATION_LABEL_POSITION) {
-            props.labelPosition = ANNOTATION_LABEL_POSITION
-          }
-
-          if (Object.keys(props).length === 0) continue
-
-          updates.push({
-            id: next.id,
-            type: 'arrow',
-            props
-          })
-        }
-
-        if (updates.length === 0) return
-
-        isSyncingAnnotationShape = true
-        try {
-          editor.updateShapes(updates)
-        } finally {
-          isSyncingAnnotationShape = false
-        }
-      },
-      {
-        source: 'all',
-        scope: 'document'
-      }
-    )
-
+    })()
     return () => {
-      container.removeEventListener('cowart:edit-selection', focusAssistant)
-      window.clearTimeout(saveTimer)
-      window.clearInterval(selectionStateTimer)
-      window.clearInterval(viewStateTimer)
-      remoteLoadController?.abort()
-      canvasEvents?.close()
-      if (window.__cowartEditor === editor) {
-        delete window.__cowartEditor
-        delete window.__cowartSelection
-        delete window.__cowartViewState
-      }
-      if (editorRef.current === editor) {
-        editorRef.current = null
-      }
-      document.getElementById(SELECTION_STATE_ELEMENT_ID)?.remove()
-      unsubscribe()
-      unsubscribeAnnotationEditingToolLock()
-      unsubscribeAnnotationShapeSync()
-      syncViewState()
-      saveCanvas()
+      cancelled = true
     }
-  }, [viewState])
-
-  if (snapshot === undefined || viewState === undefined) {
-    return (
-      <main className="cowart-status" aria-live="polite">
-        Loading canvas...
-      </main>
+  }, [])
+  useEffect(() => {
+    if (!loaded || !container.current) return
+    const doc = new CanvasDocument(loaded.snapshot, container.current)
+    editorRef.current = doc
+    window.__cowartEditor = doc
+    if (loaded.view?.currentPageId)
+      doc.setCurrentPage(loaded.view.currentPageId)
+    if (loaded.view?.camera) doc.setCamera(loaded.view.camera)
+    setEditor(doc)
+    const state = createSaveState()
+    let timer,
+      viewTimer,
+      saving = false,
+      pending = false,
+      disposed = false
+    const schedule = () => {
+      state.changed()
+      setStatus('待保存')
+      clearTimeout(timer)
+      timer = setTimeout(save, 500)
+    }
+    async function save() {
+      if (!state.dirty || disposed) return
+      if (saving) {
+        pending = true
+        return
+      }
+      saving = true
+      setStatus('保存中…')
+      const captured = state.capture()
+      try {
+        const result = await saveCanvasSnapshot(doc.store.getStoreSnapshot())
+        if (result.storage !== 'studio')
+          throw Error('画布未保存，请保留备份并重试')
+        applySavedAssetSources(doc, result.assetReplacements)
+        state.acknowledge(captured)
+        if (!disposed) {
+          setSaveError('')
+          setStatus(state.dirty ? '待保存' : '已同步')
+        }
+      } catch (e) {
+        if (!disposed) {
+          setSaveError(e.message)
+          setStatus('未同步')
+        }
+      } finally {
+        saving = false
+        if (pending && !disposed) {
+          pending = false
+          clearTimeout(timer)
+          timer = setTimeout(save, 100)
+        }
+      }
+    }
+    retrySave.current = save
+    const off = doc.store.listen(schedule, {
+      source: 'user',
+      scope: 'document',
+    })
+    const session = doc.store.listen(
+      () => {
+        setRevision((x) => x + 1)
+        clearTimeout(viewTimer)
+        viewTimer = setTimeout(
+          () =>
+            writeViewState({
+              version: 1,
+              currentPageId: doc.pageId,
+              camera: doc.getCamera(),
+              updatedAt: new Date().toISOString(),
+            }).catch((e) => {
+              if (!disposed) setNotice('视图位置未保存：' + e.message)
+            }),
+          300,
+        )
+      },
+      { source: 'all', scope: 'all' },
     )
-  }
-
-  if (loadError) {
-    return (
-      <main className="cowart-status" aria-live="polite">
-        画布读取失败：{loadError?.message || '请检查是否登录 Studio'}
-      </main>
+    const edit = () => {
+      setOpen(true)
+      requestAnimationFrame(() =>
+        document.querySelector('.hamoki-studio-panel textarea')?.focus(),
+      )
+    }
+    const beforeUnload = (e) => {
+      if (state.dirty || saving) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    doc.container.addEventListener('cowart:edit-selection', edit)
+    doc.container.addEventListener('cowart:reference-selection', edit)
+    window.addEventListener('beforeunload', beforeUnload)
+    return () => {
+      disposed = true
+      clearTimeout(timer)
+      clearTimeout(viewTimer)
+      off()
+      session()
+      doc.container.removeEventListener('cowart:edit-selection', edit)
+      doc.container.removeEventListener('cowart:reference-selection', edit)
+      window.removeEventListener('beforeunload', beforeUnload)
+      if (window.__cowartEditor === doc) delete window.__cowartEditor
+      if (editorRef.current === doc) editorRef.current = null
+    }
+  }, [loaded])
+  const importFiles = useCallback(async (files, point) => {
+    const doc = editorRef.current
+    if (!doc) return
+    try {
+      if (files.length > 20) throw Error('每次最多导入 20 张图片')
+      const records = [],
+        origin = point || doc.getViewportPageBounds().center
+      let x = origin.x,
+        index = doc.nextIndex()
+      for (const file of files) {
+        if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type))
+          throw Error('请导入 PNG、JPG 或 WebP 图片')
+        if (!file.size || file.size > 12 * 1024 * 1024)
+          throw Error('单张图片需小于 12MB')
+        const src = await fileData(file),
+          size = await sizeOf(src),
+          w = Math.min(512, size.w),
+          h = (w * size.h) / size.w,
+          assetId = 'asset:' + crypto.randomUUID(),
+          id = createShapeId()
+        records.push(
+          {
+            id: assetId,
+            typeName: 'asset',
+            type: 'image',
+            meta: {},
+            props: {
+              src,
+              name: file.name,
+              mimeType: file.type,
+              w: size.w,
+              h: size.h,
+              fileSize: file.size,
+              isAnimated: false,
+            },
+          },
+          {
+            id,
+            typeName: 'shape',
+            type: 'image',
+            parentId: doc.getCurrentPageId(),
+            x,
+            y: origin.y,
+            rotation: 0,
+            index,
+            opacity: 1,
+            isLocked: false,
+            meta: {},
+            props: { w, h, assetId, altText: file.name, crop: null },
+          },
+        )
+        x += w + 40
+        index = doc.nextIndex(doc.pageId, index)
+      }
+      if (!point && records.length) {
+        const shapes = records.filter((record) => record.typeName === 'shape')
+        const span = x - origin.x - 40
+        const height = Math.max(...shapes.map((shape) => shape.props.h))
+        for (const shape of shapes) {
+          shape.x -= span / 2
+          shape.y -= height / 2
+        }
+      }
+      doc.store.put(records)
+      doc.select(
+        ...records.filter((r) => r.typeName === 'shape').map((r) => r.id),
+      )
+      setNotice('已导入 ' + files.length + ' 张图片，正在保存')
+    } catch (e) {
+      setNotice(e.message)
+    } finally {
+      if (fileInput.current) fileInput.current.value = ''
+    }
+  }, [])
+  const download = useCallback(async () => {
+    const doc = editorRef.current
+    if (!doc) return
+    try {
+      setNotice('正在准备下载…')
+      const originals = await originalImagesZip(doc)
+      if (originals) downloadBlob(originals.blob, originals.name)
+      else {
+        const result = await doc.toImageDataUrl(doc.getSelectedShapeIds(), {
+          pixelRatio: 2,
+          background: false,
+        })
+        downloadBlob(
+          await (await fetch(result.url)).blob(),
+          'hamoki-selection.png',
+        )
+      }
+      setNotice('下载已准备完成')
+    } catch (e) {
+      setNotice(e.message)
+    }
+  }, [])
+  const exportDocument = () =>
+    downloadBlob(
+      new Blob(
+        [
+          JSON.stringify(
+            editor ? editor.store.getStoreSnapshot() : raw.current,
+            null,
+            2,
+          ),
+        ],
+        { type: 'application/json' },
+      ),
+      'hamoki-canvas-backup.json',
     )
+  const run = (fn) => {
+    try {
+      fn()
+    } catch (e) {
+      setNotice(e.message)
+    }
   }
-
-  return (
-    <main className={`cowart-canvas${aiPanelOpen ? ' with-studio-panel' : ''}`} aria-label="Hamoki Studio · Cowart 自由画布">
-      <SkippedRecordsNotice records={skippedRecords} />
-      <Tldraw
-        licenseKey={TLDRAW_LICENSE_KEY}
-        assetUrls={TLDRAW_ASSET_URLS}
-        snapshot={snapshot ?? undefined}
-        colorScheme="dark"
-        onMount={handleMount}
-        overrides={cowartUiOverrides}
-        components={cowartComponents}
-        shapeUtils={cowartShapeUtils}
-        tools={[CowartAnnotationTool]}
-      />
-      {saveError && <aside className="hamoki-save-error" role="alert">
-        <strong>画布尚未同步</strong>：{saveError}
-        <button type="button" onClick={() => {
-          const editor = getEditor()
-          if (!editor) return
-          const blob = new Blob([JSON.stringify(editor.store.getStoreSnapshot())], { type: 'application/json' })
-          const url = URL.createObjectURL(blob)
-          const link = document.createElement('a')
-          link.href = url
-          link.download = 'hamoki-cowart-unsaved-' + Date.now() + '.json'
-          link.click()
-          URL.revokeObjectURL(url)
-        }}>导出当前画布备份</button>
-      </aside>}
-      <div className="cowart-ai-launcher">
-        <button type="button" onClick={() => setAiPanelOpen((open) => !open)}>
-          🐵 {aiPanelOpen ? '收起 Studio' : 'AI 生图'}
+  if (error)
+    return (
+      <main className="hamoki-load-error">
+        <h1>画布读取失败</h1>
+        <p>{error}</p>
+        <p>已停止保存，服务器原始画布不会被覆盖。</p>
+        <button disabled={!raw.current} onClick={exportDocument}>
+          导出原始画布备份
         </button>
-        <a className="hamoki-back-link" href="/" target="_blank" rel="noopener noreferrer">管理后台 ↗</a>
-      </div>
-      <StudioPanel open={aiPanelOpen} onClose={() => setAiPanelOpen(false)} getEditor={getEditor} canvasEditor={canvasEditor} />
-    </main>
-  )
-}
-
-function SkippedRecordsNotice({ records }) {
-  if (!records.length) return null
-
+        <button onClick={() => location.reload()}>重新加载</button>
+      </main>
+    )
+  if (!loaded) return <main className="cowart-status">正在读取画布…</main>
+  const selected = editor?.getSelectedShapes() || [],
+    one = selected.length === 1 ? selected[0] : null
+  function setDimension(key, value) {
+    if (!one) return
+    const size = Number(value)
+    if (!Number.isFinite(size) || size < 16 || size > 8192) return
+    const props = { [key]: size }
+    if (one.type === 'image' || one.meta?.cowartAiAspectLocked) {
+      const other = key === 'w' ? 'h' : 'w'
+      props[other] = size * (one.props[other] / one.props[key])
+    }
+    editor.updateShape({ id: one.id, props })
+  }
   return (
-    <aside className="cowart-skipped-records" aria-live="polite">
-      <strong>Skipped {records.length} invalid canvas record{records.length === 1 ? '' : 's'}.</strong>
-      <span>Valid content was loaded.</span>
-      <details>
-        <summary>Details</summary>
-        <ul>
-          {records.slice(0, 8).map((record, index) => (
-            <li key={`${record.id}:${index}`}>
-              <code>{record.id}</code>
-              {record.typeName ? ` ${record.typeName}` : ''}
-              {record.type ? `/${record.type}` : ''}: {record.reason}
-            </li>
+    <main
+      className={'cowart-canvas' + (open ? ' with-studio-panel' : '')}
+      data-canvas-engine="hamoki-native-v1"
+    >
+      <div ref={container} className="hamoki-canvas tl-container">
+        {editor && (
+          <CanvasView
+            editor={editor}
+            onImport={importFiles}
+            onDownload={download}
+            onNotice={setNotice}
+          />
+        )}
+        <div className="hamoki-canvas-header">
+          <img src="/assets/hamoki-avatar-32.png" alt="" />
+          <strong>Hamoki Canvas</strong>
+          <span className={'hamoki-sync ' + (saveError ? 'is-error' : '')}>
+            {status}
+          </span>
+        </div>
+        {editor && (
+          <>
+            <div className="hamoki-tools" role="toolbar" aria-label="画布工具">
+              {[
+                ['select', '选择 · V'],
+                ['hand', '移动画布 · H'],
+                ['holder', 'AI 占位框'],
+                ['rectangle', '矩形'],
+                ['ellipse', '椭圆'],
+                ['arrow', '箭头标注'],
+                ['text', '文字'],
+              ].map(([tool, label]) => (
+                <button
+                  key={tool}
+                  title={label}
+                  aria-label={label}
+                  aria-pressed={editor.tool === tool}
+                  onClick={() => editor.setCurrentTool(tool)}
+                >
+                  <Icon name={tool} />
+                </button>
+              ))}
+              <span className="hamoki-tool-divider" />
+              <button
+                title="导入图片"
+                aria-label="导入图片"
+                onClick={() => fileInput.current?.click()}
+              >
+                <Icon name="upload" />
+              </button>
+              <button
+                title="撤销"
+                aria-label="撤销"
+                disabled={!editor.history.length}
+                onClick={() => editor.undo()}
+              >
+                <Icon name="undo" />
+              </button>
+              <button
+                title="重做"
+                aria-label="重做"
+                disabled={!editor.future.length}
+                onClick={() => editor.redo()}
+              >
+                <Icon name="redo" />
+              </button>
+            </div>
+            <div className="hamoki-view-controls">
+              <button
+                aria-label="缩小"
+                onClick={() =>
+                  editor.zoomAt(
+                    {
+                      x:
+                        container.current.getBoundingClientRect().left +
+                        container.current.clientWidth / 2,
+                      y: container.current.clientHeight / 2,
+                    },
+                    0.8,
+                  )
+                }
+              >
+                −
+              </button>
+              <button
+                aria-label="重置缩放"
+                onClick={() => editor.setCamera({ ...editor.camera, z: 1 })}
+              >
+                {Math.round(editor.camera.z * 100)}%
+              </button>
+              <button
+                aria-label="放大"
+                onClick={() =>
+                  editor.zoomAt(
+                    {
+                      x:
+                        container.current.getBoundingClientRect().left +
+                        container.current.clientWidth / 2,
+                      y: container.current.clientHeight / 2,
+                    },
+                    1.25,
+                  )
+                }
+              >
+                +
+              </button>
+              <button
+                aria-label="适合画布"
+                title="适合画布"
+                onClick={() => editor.zoomToFit()}
+              >
+                <Icon name="fit" />
+              </button>
+              <span />
+              <select
+                aria-label="画布页面"
+                value={editor.pageId}
+                onChange={(e) => editor.setCurrentPage(e.target.value)}
+              >
+                {editor.getPages().map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name || '画布'}
+                  </option>
+                ))}
+              </select>
+              <button
+                aria-label="新增画布页面"
+                onClick={() => {
+                  const id = 'page:' + crypto.randomUUID()
+                  editor.createPage({
+                    id,
+                    name: '画布 ' + (editor.getPages().length + 1),
+                  })
+                  editor.setCurrentPage(id)
+                }}
+              >
+                <Icon name="plus" />
+              </button>
+            </div>
+            {!editor.getCurrentPageShapes().length && (
+              <div className="hamoki-empty-hint">
+                <strong>把灵感放上画布</strong>
+                <span>拖入图片，或创建 AI 占位框</span>
+                <small>空格 / 中键拖动画布 · 滚轮缩放 · 双击预览原图</small>
+              </div>
+            )}
+            {!!selected.length && (
+              <div
+                className="hamoki-selection-properties"
+                aria-label="所选元素属性"
+              >
+                <strong>{selected.length} 个元素</strong>
+                {one && one.type !== 'arrow' && one.type !== 'group' && (
+                  <>
+                    <label>
+                      宽
+                      <input
+                        aria-label="元素宽度"
+                        type="number"
+                        min="16"
+                        max="8192"
+                        value={Math.round(one.props.w || 180)}
+                        onChange={(e) => setDimension('w', e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      高
+                      <input
+                        aria-label="元素高度"
+                        type="number"
+                        min="16"
+                        max="8192"
+                        value={Math.round(one.props.h || 120)}
+                        onChange={(e) => setDimension('h', e.target.value)}
+                      />
+                    </label>
+                  </>
+                )}
+                <div className="hamoki-color-palette">
+                  {['green', 'yellow', 'red', 'blue', 'white', 'grey'].map(
+                    (color) => (
+                      <button
+                        key={color}
+                        aria-label={'颜色 ' + color}
+                        data-color={color}
+                        onClick={() =>
+                          editor.updateShapes(
+                            selected
+                              .filter((s) => s.type !== 'image' && !s.isLocked)
+                              .map((s) => ({ id: s.id, props: { color } })),
+                          )
+                        }
+                      />
+                    ),
+                  )}
+                </div>
+                <button aria-label="下载所选内容" onClick={download}>
+                  <Icon name="download" />
+                </button>
+                <button
+                  aria-label="删除所选内容"
+                  onClick={() =>
+                    editor.deleteShapes(
+                      selected.filter((s) => !s.isLocked).map((s) => s.id),
+                    )
+                  }
+                >
+                  <Icon name="trash" />
+                </button>
+              </div>
+            )}
+          </>
+        )}
+        <input
+          ref={fileInput}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          multiple
+          hidden
+          aria-label="选择导入图片"
+          onChange={(e) => importFiles([...e.target.files])}
+        />
+      </div>
+      <div className="cowart-ai-launcher">
+        <button onClick={() => setOpen((v) => !v)}>
+          {open ? '收起 Studio' : '打开 Studio'}
+        </button>
+        <a className="hamoki-back-link" href="/">
+          管理后台 ↗
+        </a>
+      </div>
+      {editor && (
+        <StudioPanel
+          open={open}
+          onClose={() => setOpen(false)}
+          getEditor={getEditor}
+          canvasEditor={editor}
+        />
+      )}
+      {saveError && (
+        <aside className="hamoki-save-error" role="alert">
+          <strong>画布尚未同步</strong>：{saveError}
+          <button onClick={() => retrySave.current?.()}>重试保存</button>
+          <button onClick={exportDocument}>导出当前画布备份</button>
+        </aside>
+      )}
+      {warnings.length > 0 && (
+        <details className="hamoki-legacy-warning">
+          <summary>{warnings.length} 条旧画布兼容提示（原始记录保留）</summary>
+          {warnings.slice(0, 12).map((r, i) => (
+            <p key={i}>
+              {r.id}：{r.reason}
+            </p>
           ))}
-        </ul>
-      </details>
-    </aside>
+          <button onClick={exportDocument}>导出完整备份</button>
+        </details>
+      )}
+      {notice && (
+        <div className="hamoki-toast" role="status">
+          {notice}
+          <button aria-label="关闭提示" onClick={() => setNotice('')}>
+            ×
+          </button>
+        </div>
+      )}
+    </main>
   )
 }

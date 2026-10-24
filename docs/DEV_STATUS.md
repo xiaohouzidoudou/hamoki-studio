@@ -89,3 +89,13 @@ See `docs/AI_COLLABORATION.md` for conflict-free working rules. Production remai
 - e4a1e0a 完整 CI success：Actions 40078079417。最终提交仍须匹配完整成功 CI；PR #33 保持 Draft 直至该门槛通过。
 - 审查时隔离 QA 已部署的仍是 0559e06，源码与运行后端哈希一致，health 200 / 匿名画布 401；本节不是新组合已部署的声明。实际后续集成/部署 SHA、浏览器验收以 #23 最新记录为准。
 - 未修改正式网站/用户数据，未调用付费模型；#22 保持 Draft，不合 main。真实上游效果、停止/计费语义、跨设备真实模型、许可及故障回滚演练仍是独立未完成门槛。
+
+
+## Independent Hamoki Canvas (2026-10-24)
+
+- Linked #23; task branch `chatgpt/23-independent-canvas`, based on e7e2655.
+- Independent project-owned document/geometry/history engine and SVG/Canvas renderer replace the editor SDK; no tldraw runtime/build dependency or license-key injection remains. React and fractional-indexing remain normal dependencies.
+- Existing authenticated upload/snapshot/job/recovery/cancellation endpoints are reused. Native schema adds hamokiCanvas=1 while keeping old IDs/metadata/opaque records; invalid/newer snapshots fail closed.
+- Full local 186/186 tests, build and isolated system-Chromium all four scripts passed. Actual new tool UI, mouse operations, file import and ZIP are covered, alongside existing result/save/asset/cancel regressions.
+- See `docs/hamoki-native-canvas-acceptance.md` for supported behavior and explicit legacy visual limitations. Exact CI and actually deployed QA SHA/browser status remain in Issue #23. This entry does not claim a deployment.
+- No paid model calls, no main/production update or existing user data migration. Native snapshots preserve the old envelope so a previous renderer still has the original raw records; retain pre-deploy backup and old image before QA promotion.
