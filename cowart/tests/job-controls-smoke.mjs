@@ -64,7 +64,16 @@ try{
   assert.equal(calls,0);assert.equal(submissions,1)
   let jobs=(await(await context.request.get(base+'/api/jobs?projectId='+projectId)).json()).jobs
   assert.equal(jobs[0].status,'cancelled');assert.equal(jobs[0].requestOutcome,'not_sent')
+  const queuedId=jobs[0].id
+  await page.evaluate(()=>sessionStorage.clear())
+  await page.reload({waitUntil:'domcontentloaded'})
+  await page.locator('.hamoki-job-controls').filter({hasText:'服务器已记录取消'}).waitFor()
+  let pending=(await(await context.request.get(base+'/api/cowart/jobs?projectId='+projectId)).json()).jobs
+  assert.deepEqual(pending.map(job=>job.id),[queuedId],'Reload without local recovery restores the same cancelled task')
+  assert.equal(await page.getByRole('button',{name:'直接生成 1 张',exact:true}).isDisabled(),true)
+  assert.equal(submissions,1);assert.equal(calls,0)
   await page.getByRole('button',{name:'开启下一轮',exact:true}).click()
+  await page.waitForFunction(async projectId=>(await(await fetch('/api/cowart/jobs?projectId='+projectId)).json()).jobs.length===0,projectId)
   await context.request.post(base+'/api/queue',{data:{action:'resume'}})
   await page.locator('textarea').fill('运行中取消验证')
   await page.getByRole('button',{name:'直接生成 1 张',exact:true}).click()
@@ -83,9 +92,20 @@ try{
   assert.equal(submissions,2)
   assert.equal(await page.getByRole('button',{name:'直接生成 1 张',exact:true}).isDisabled(),true)
   releaseUpstream();releaseUpstream=null
+  await page.evaluate(()=>sessionStorage.clear())
+  await page.reload({waitUntil:'domcontentloaded'})
+  await page.locator('.hamoki-job-controls').filter({hasText:'服务器已记录取消'}).waitFor()
+  pending=(await(await context.request.get(base+'/api/cowart/jobs?projectId='+projectId)).json()).jobs
+  assert.equal(pending.length,1);assert.equal(pending[0].id,jobs[0].id)
+  assert.equal(pending[0].requestOutcome,'unknown')
+  assert.equal(await page.evaluate(()=>window.__cowartEditor.getCurrentPageShapes().filter(shape=>shape.meta?.studioHistoryId).length),0,'Cancelled late response must not insert a result after reload')
+  page.once('dialog',d=>{assert.match(d.message(),/可能已计费/);d.accept()})
+  await page.getByRole('button',{name:'开启下一轮',exact:true}).click()
+  await page.waitForFunction(async projectId=>(await(await fetch('/api/cowart/jobs?projectId='+projectId)).json()).jobs.length===0,projectId)
+  assert.equal(submissions,2);assert.equal(calls,1)
   assert.deepEqual(errors,[])
   await page.screenshot({path:screenshot,fullPage:true})
-  console.log('PASS: real queued/running cancellation, declined confirmation, lost cancel response queried by original ID; two jobs, one upstream call')
+  console.log('PASS: real queued/running cancellation, declined confirmation, lost cancel response, durable terminal recovery/ack after reload; two jobs, one upstream call')
 }catch(error){
   await page?.screenshot({path:screenshot,fullPage:true}).catch(()=>{})
   throw error
