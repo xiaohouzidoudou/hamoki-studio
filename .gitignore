@@ -1,8 +1,4 @@
-.env
-.env.*
-!.env.example
-data/
 node_modules/
+.env
 *.log
 .DS_Store
-__pycache__/

@@ -1,17 +1,13 @@
 {
-  "name": "hamoki-studio",
+  "name": "hamoki-studio-rebuild",
   "private": true,
-  "version": "0.6.27",
-  "description": "Invite-only multi-account AI workspace with isolated per-user encrypted provider credentials",
+  "version": "1.0.0-alpha.1",
+  "description": "Stateless game UI prompt planner and optional image generation",
+  "type": "commonjs",
   "scripts": {
-    "start": "node gateway.js",
-    "test": "node --check server.js && node --check workspace.js && node --check gateway.js && node --check lib/upstream.js && node --check assets/app.js && node --test tests/*.test.js"
+    "start": "node server.js",
+    "test": "node --test tests/*.test.js",
+    "check": "node --check server.js && node --check lib/prompt.js && node --check public/app.js && npm test"
   },
-  "engines": {
-    "node": ">=20"
-  },
-  "dependencies": {
-    "mammoth": "^1.13.0",
-    "yaml": "^2.8.1"
-  }
+  "engines": {"node": ">=20"}
 }
