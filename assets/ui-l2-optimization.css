@@ -1,0 +1,560 @@
+/* Hamoki Studio UI/UX L1+L2 Optimization - 2026-11-03 */
+
+/* Level 1.1: Sidebar Collapsible Sections */
+.sidebar-section {
+  margin-bottom: 8px;
+}
+
+.section-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  color: #c5dad5;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.section-toggle:hover {
+  background: #24332f;
+}
+
+.section-toggle .icon:first-child {
+  width: 16px;
+  height: 16px;
+  color: #89c5b8;
+}
+
+.section-toggle span {
+  flex: 1;
+  text-align: left;
+}
+
+.section-chevron {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.22s ease;
+  color: #7a9892;
+}
+
+.sidebar-section.collapsed .section-chevron {
+  transform: rotate(0deg);
+}
+
+.sidebar-section:not(.collapsed) .section-chevron {
+  transform: rotate(90deg);
+}
+
+.section-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 8px;
+  overflow: hidden;
+  transition: max-height 0.28s ease, opacity 0.22s ease;
+}
+
+.sidebar-section.collapsed .section-content {
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sidebar-section:not(.collapsed) .section-content {
+  max-height: 500px;
+  opacity: 1;
+}
+
+.section-content .side-action {
+  font-size: 12px;
+  padding: 9px 12px;
+}
+
+/* Level 1.2: Canvas Toolbar in Header Center */
+.workspace-header {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) auto minmax(200px, 1fr);
+  align-items: center;
+  gap: 16px;
+}
+
+.header-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.canvas-toolbar-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #20262cf2;
+  border: 1px solid #3c4a53;
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.tool-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 56px;
+  height: 52px;
+  padding: 6px 8px;
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  color: #aab8bb;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.tool-top:hover {
+  background: #31433f;
+  color: #d2fff1;
+}
+
+.tool-top.active {
+  background: #10cc91;
+  color: #052b23;
+}
+
+.tool-top .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.tool-top span {
+  line-height: 1.2;
+}
+
+/* Hide old left-bottom toolbar when new top toolbar exists */
+.canvas-toolbar-top ~ * .tool-dock {
+  display: none;
+}
+
+/* Level 1.3: Generator Panel Layout Optimization */
+.lovart-inspired-panel .capability-switcher {
+  order: -1;
+  margin-bottom: 12px;
+}
+
+.lovart-inspired-panel .studio-model-card .model-row {
+  display: grid;
+  gap: 10px;
+}
+
+.lovart-inspired-panel .studio-provider-line {
+  grid-column: 1 / -1;
+  order: 1;
+}
+
+.lovart-inspired-panel .studio-primary-model {
+  grid-column: 1 / -1;
+  order: 2;
+}
+
+.lovart-inspired-panel .params-row {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  order: 3;
+  margin-top: 0;
+}
+
+.lovart-inspired-panel .params-row label:last-child {
+  grid-column: span 1;
+}
+
+/* Level 1.4: Provider Config Quick Templates */
+.provider-quick-templates {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.provider-template-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: linear-gradient(135deg, #1e342f, #1a2e2a);
+  border: 1px solid #3d6055;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.provider-template-card:hover {
+  border-color: #10cc91;
+  background: linear-gradient(135deg, #243a35, #1f332f);
+}
+
+.provider-template-card strong {
+  font-size: 13px;
+  color: #e9f7f3;
+}
+
+.provider-template-card small {
+  font-size: 11px;
+  color: #a0bcb4;
+  line-height: 1.5;
+}
+
+/* Level 2.1: First-time User Onboarding Modal */
+.onboarding-modal {
+  width: min(580px, 94vw);
+  max-height: 88dvh;
+}
+
+.onboarding-steps {
+  display: grid;
+  gap: 20px;
+  padding: 20px;
+}
+
+.onboarding-step {
+  display: none;
+}
+
+.onboarding-step.active {
+  display: block;
+}
+
+.onboarding-visual {
+  width: 100%;
+  height: 220px;
+  background: linear-gradient(145deg, #1e342f, #192a26);
+  border: 1px solid #3d5550;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 18px;
+}
+
+.onboarding-visual .icon {
+  width: 64px;
+  height: 64px;
+  color: #10cc91;
+}
+
+.onboarding-step h3 {
+  font-size: 20px;
+  color: #f3f8f7;
+  margin: 0 0 12px;
+}
+
+.onboarding-step p {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #aab8bb;
+  margin: 0 0 18px;
+}
+
+.onboarding-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.onboarding-progress {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.onboarding-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3d5550;
+  transition: background 0.2s ease, width 0.2s ease;
+}
+
+.onboarding-dot.active {
+  width: 24px;
+  border-radius: 4px;
+  background: #10cc91;
+}
+
+/* Level 2.2: Smart Model Recommendations */
+.composer-model-option.recommended {
+  position: relative;
+  background: linear-gradient(120deg, #1e3d35, #1a332e);
+  border: 1px solid #10cc9144;
+}
+
+.composer-model-option.recommended::before {
+  content: '推荐';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 6px;
+  background: #10cc91;
+  color: #052b23;
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 4px;
+}
+
+.composer-model-reason {
+  display: block;
+  font-size: 10px;
+  color: #8fc8b8;
+  margin-top: 3px;
+  font-weight: 400;
+}
+
+/* Level 2.3: Canvas Bulk Operation Toolbar */
+.bulk-operations-toolbar {
+  position: fixed;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #222a32f4;
+  border: 1px solid #3c4a53;
+  border-radius: 12px;
+  padding: 10px 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+  pointer-events: auto;
+}
+
+.bulk-operations-toolbar.hidden {
+  display: none;
+}
+
+.bulk-operations-toolbar button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #2a3439;
+  border: 1px solid #40504e;
+  border-radius: 8px;
+  color: #e9f3f0;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.bulk-operations-toolbar button:hover {
+  background: #284b3e;
+  border-color: #10cc91;
+}
+
+.bulk-operations-toolbar button .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.bulk-operations-count {
+  padding: 8px 12px;
+  color: #c5dad5;
+  font-size: 13px;
+  font-weight: 600;
+  border-right: 1px solid #3d4b4e;
+  margin-right: 4px;
+}
+
+/* Level 2.4: AI Workflow Quick/Pro Mode Toggle */
+.workflow-mode-switcher {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  background: #20262c;
+  border: 1px solid #354047;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.workflow-mode-label {
+  color: #aab8bb;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.workflow-mode-toggle {
+  display: flex;
+  gap: 0;
+  background: #171b20;
+  border: 1px solid #3a484b;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.workflow-mode-btn {
+  padding: 8px 16px;
+  background: transparent;
+  border: 0;
+  color: #aab8bb;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.workflow-mode-btn.active {
+  background: #10cc91;
+  color: #052b23;
+}
+
+.workflow-mode-btn:hover:not(.active) {
+  background: #24332f;
+  color: #d2fff1;
+}
+
+.creative-section.pro-mode-only {
+  display: none;
+}
+
+.workflow-mode-switcher.pro-mode .creative-section.pro-mode-only {
+  display: block;
+}
+
+/* Level 2 Advanced Parameters Toggle */
+.creative-section .advanced-params-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: transparent;
+  border: 1px solid #3d5550;
+  border-radius: 8px;
+  color: #aab8bb;
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.creative-section .advanced-params-toggle:hover {
+  border-color: #10cc91;
+}
+
+.creative-section .advanced-params-toggle .icon {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.22s ease;
+}
+
+.creative-section.collapsed .advanced-params-toggle .icon {
+  transform: rotate(0deg);
+}
+
+.creative-section:not(.collapsed) .advanced-params-toggle .icon {
+  transform: rotate(180deg);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 850px) {
+  .workspace-header {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  
+  .header-center {
+    order: 2;
+  }
+  
+  .header-right {
+    order: 1;
+  }
+  
+  .canvas-toolbar-top {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .tool-top {
+    min-width: 48px;
+    height: 46px;
+    font-size: 9px;
+  }
+  
+  .tool-top .icon {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .provider-quick-templates {
+    grid-template-columns: 1fr;
+  }
+  
+  .lovart-inspired-panel .params-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  
+  .bulk-operations-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    padding: 8px;
+  }
+  
+  .bulk-operations-count {
+    border-right: 0;
+    border-bottom: 1px solid #3d4b4e;
+    margin-right: 0;
+    padding-bottom: 8px;
+  }
+}
+
+@media (max-width: 450px) {
+  .section-content .side-action {
+    font-size: 11px;
+    padding: 8px 10px;
+  }
+  
+  .canvas-toolbar-top {
+    gap: 3px;
+    padding: 4px;
+  }
+  
+  .tool-top {
+    min-width: 42px;
+    height: 42px;
+    gap: 2px;
+  }
+  
+  .tool-top span {
+    font-size: 9px;
+  }
+  
+  .onboarding-visual {
+    height: 160px;
+  }
+  
+  .onboarding-visual .icon {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section-toggle,
+  .section-content,
+  .section-chevron,
+  .tool-top,
+  .provider-template-card,
+  .onboarding-dot,
+  .workflow-mode-btn,
+  .advanced-params-toggle .icon {
+    transition: none !important;
+  }
+}

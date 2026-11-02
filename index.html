@@ -7,6 +7,7 @@
 <link rel="icon" href="assets/hamoki-avatar-32.png" type="image/png"><link rel="apple-touch-icon" href="assets/hamoki-avatar-192.webp">
 <link rel="stylesheet" href="assets/style.css">
 <link rel="stylesheet" href="assets/ui-system.css">
+<link rel="stylesheet" href="assets/ui-l2-optimization.css">
 <link rel="stylesheet" href="assets/canvas-inline.css">
 <link rel="stylesheet" href="assets/creative-workflow.css">
 <link rel="stylesheet" href="assets/asset-derivation.css">
@@ -47,6 +48,8 @@
  <symbol id="ic-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 4h6M7 7l1 14h8l1-14M10 11v6M14 11v6"/></symbol>
  <symbol id="ic-max" viewBox="0 0 24 24"><path d="M8 3H3v5m18 8v5h-5M3 8l6-5m6 18 6-6"/></symbol>
  <symbol id="ic-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+ <symbol id="ic-folder" viewBox="0 0 24 24"><path d="M3 7v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-9l-2-2H5a2 2 0 0 0-2 2z"/></symbol>
+ <symbol id="ic-chevron-right" viewBox="0 0 24 24"><path d="m9 7 5 5-5 5"/></symbol>
 </svg>
 <div id="appShell" class="app-shell">
  <aside class="projects-panel" id="projectsPanel">
@@ -55,12 +58,30 @@
   <div class="projects-heading"><span>创作项目</span><button class="icon-btn" id="newProject" title="新建项目"><svg class="icon"><use href="#ic-plus"/></svg></button></div>
   <div id="projectList" class="project-list"></div>
   <div class="projects-bottom">
-   <button class="side-action" id="openCreativeWorkflow" type="button"><svg class="icon"><use href="#ic-spark"/></svg> AI 美术工作流 <span class="side-count">NEW</span></button>
-   <button class="side-action" id="openDelivery" type="button"><svg class="icon"><use href="#ic-image"/></svg> 组件交付 <span class="side-count">NEW</span></button>
-   <button class="side-action" id="openDeriveAssets" type="button"><svg class="icon"><use href="#ic-image"/></svg> 一图衍生素材 <span class="side-count">NEW</span></button>
-   <button class="side-action" id="openLibrary"><svg class="icon"><use href="#ic-image"/></svg> 作品图库 <span id="libraryCount" class="side-count">0</span></button>
-   <button class="side-action" id="openTasks"><svg class="icon"><use href="#ic-clock"/></svg> 生成任务 <span id="queueBadge" class="side-count">0</span></button>
-   <button class="side-action" id="manageProviders"><svg class="icon"><use href="#ic-settings"/></svg> 中转站管理</button>
+   <div class="sidebar-section" data-section="quick">
+    <button class="section-toggle" data-toggle="quick">
+     <svg class="icon"><use href="#ic-folder"/></svg>
+     <span>快速创作</span>
+     <svg class="icon section-chevron"><use href="#ic-chevron-right"/></svg>
+    </button>
+    <div class="section-content" data-content="quick">
+     <button class="side-action" id="openLibrary"><svg class="icon"><use href="#ic-image"/></svg> 作品图库 <span id="libraryCount" class="side-count">0</span></button>
+     <button class="side-action" id="openTasks"><svg class="icon"><use href="#ic-clock"/></svg> 生成任务 <span id="queueBadge" class="side-count">0</span></button>
+    </div>
+   </div>
+   <div class="sidebar-section" data-section="pro">
+    <button class="section-toggle" data-toggle="pro">
+     <svg class="icon"><use href="#ic-folder"/></svg>
+     <span>专业工具</span>
+     <svg class="icon section-chevron"><use href="#ic-chevron-right"/></svg>
+    </button>
+    <div class="section-content" data-content="pro">
+     <button class="side-action" id="openCreativeWorkflow" type="button"><svg class="icon"><use href="#ic-spark"/></svg> AI 美术工作流 <span class="side-count">NEW</span></button>
+     <button class="side-action" id="openDelivery" type="button"><svg class="icon"><use href="#ic-image"/></svg> 组件交付 <span class="side-count">NEW</span></button>
+     <button class="side-action" id="openDeriveAssets" type="button"><svg class="icon"><use href="#ic-image"/></svg> 一图衍生素材 <span class="side-count">NEW</span></button>
+    </div>
+   </div>
+   <button class="side-action" id="manageProviders"><svg class="icon"><use href="#ic-settings"/></svg> 模型配置</button>
    <button class="side-action" id="viewErrorLogs" title="查看生图、连接与网页错误"><svg class="icon"><use href="#ic-logs"/></svg> 查看日志 <span class="side-count log-count" id="logCount" title="当前日志数">···</span></button>
    <button class="side-action help-side-action" id="openHelp" type="button" title="注册、模型设置、生图与画布操作说明"><svg class="icon"><use href="#ic-help"/></svg> 使用帮助</button>
    <div class="storage-meter" title="每账号最多 1GB，全站共 5GB；空间不足时自动清理最旧图片，请提前备份重要作品"><div><span>图片存储空间</span><small id="storageUsage">读取中…</small></div><div class="storage-track"><span id="storageFill"></span></div></div>
@@ -68,7 +89,7 @@
   </div>
  </aside>
  <main class="workspace">
-  <header class="workspace-header"><div class="header-start"><button class="icon-btn mobile-only" id="mobileProjects" title="项目列表"><svg class="icon"><use href="#ic-grid"/></svg></button><div class="breadcrumb"><span>工作空间</span><span class="slash">/</span><strong id="currentProjectTitle">我的第一块画布</strong><button class="icon-btn" id="renameProject" title="重命名项目"><svg class="icon sm"><use href="#ic-edit"/></svg></button></div></div><div class="header-right"><div class="canvas-actions">
+  <header class="workspace-header"><div class="header-start"><button class="icon-btn mobile-only" id="mobileProjects" title="项目列表"><svg class="icon"><use href="#ic-grid"/></svg></button><div class="breadcrumb"><span>工作空间</span><span class="slash">/</span><strong id="currentProjectTitle">我的第一块画布</strong><button class="icon-btn" id="renameProject" title="重命名项目"><svg class="icon sm"><use href="#ic-edit"/></svg></button></div></div><div class="header-center"><div class="canvas-toolbar-top" role="toolbar" aria-label="画布工具"><button class="tool-top active" data-tool="select" title="选择/左键框选 (V)"><svg class="icon"><use href="#ic-pointer"/></svg><span>选择</span></button><button class="tool-top" data-tool="hand" title="抓手移动画布 (H)"><svg class="icon"><use href="#ic-hand"/></svg><span>抓手</span></button><button class="tool-top" id="uploadCanvasTop" title="添加参考图"><svg class="icon"><use href="#ic-image"/></svg><span>图片</span></button><button class="tool-top" data-tool="note" title="添加便签 (N)"><svg class="icon"><use href="#ic-note"/></svg><span>便签</span></button></div></div><div class="header-right"><div class="canvas-actions">
    <button class="icon-btn" id="undoAction" title="撤销布局操作 Ctrl+Z" aria-label="撤销" disabled><svg class="icon"><use href="#ic-back"/></svg></button>
    <button class="icon-btn redo-icon" id="redoAction" title="重做布局操作 Ctrl+Y" aria-label="重做" disabled><svg class="icon"><use href="#ic-back"/></svg></button>
    <button class="quiet-btn" id="canvasMenuToggle" aria-expanded="false" aria-haspopup="menu" title="画布工具、对齐与项目备份"><svg class="icon"><use href="#ic-layers"/></svg> 画布工具</button>
@@ -319,9 +340,78 @@
   </div>
  </section>
 </div>
+<div class="modal-back hidden" id="onboardingModal">
+ <div class="modal onboarding-modal" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
+  <div class="onboarding-content">
+   <div class="onboarding-header">
+    <div class="onboarding-logo"><img src="assets/hamoki-avatar-128.webp" alt="Hamoki"></div>
+    <h2 id="onboardingTitle">欢迎来到 Hamoki Studio</h2>
+    <p>三步快速开始 AI 创作</p>
+   </div>
+   <div class="onboarding-progress">
+    <div class="onboarding-step-indicator" data-step="1">
+     <span class="step-number active">1</span>
+     <span class="step-line"></span>
+     <span class="step-number">2</span>
+     <span class="step-line"></span>
+     <span class="step-number">3</span>
+    </div>
+   </div>
+   <div class="onboarding-steps">
+    <div class="onboarding-step active" data-step="1">
+     <div class="step-icon"><svg class="icon"><use href="#ic-settings"/></svg></div>
+     <h3>配置第一个中转站</h3>
+     <p>选择模板快速填充，或手动输入 API 信息</p>
+     <div class="onboarding-templates">
+      <button class="template-card" data-template="openai">
+       <strong>OpenAI 官方</strong>
+       <small>api.openai.com</small>
+      </button>
+      <button class="template-card" data-template="custom">
+       <strong>常见中转站</strong>
+       <small>兼容 OpenAI API</small>
+      </button>
+     </div>
+     <div class="onboarding-form hidden" id="onboardingProviderForm">
+      <input class="field" id="onboardingApiUrl" placeholder="API Base URL (例如: https://api.example.com/v1)">
+      <input class="field" id="onboardingApiKey" type="password" placeholder="API Key (sk-...)">
+      <button class="primary-btn" id="onboardingSaveProvider">保存并继续</button>
+     </div>
+     <button class="soft-btn" id="onboardingSkipProvider">跳过，稍后配置</button>
+    </div>
+    <div class="onboarding-step" data-step="2">
+     <div class="step-icon"><svg class="icon"><use href="#ic-upload"/></svg></div>
+     <h3>上传第一张参考图</h3>
+     <p>可以是任何图片，用于参考风格或进行修改</p>
+     <div class="onboarding-upload">
+      <button class="upload-area" id="onboardingUploadBtn">
+       <svg class="icon"><use href="#ic-upload"/></svg>
+       <span>点击上传图片</span>
+      </button>
+      <div class="onboarding-preview hidden" id="onboardingPreview">
+       <img alt="参考图预览">
+       <span>已上传</span>
+      </div>
+     </div>
+     <button class="primary-btn hidden" id="onboardingContinueUpload">继续下一步</button>
+     <button class="soft-btn" id="onboardingSkipUpload">跳过，稍后上传</button>
+    </div>
+    <div class="onboarding-step" data-step="3">
+     <div class="step-icon"><svg class="icon"><use href="#ic-spark"/></svg></div>
+     <h3>完成第一次生图</h3>
+     <p>输入描述，点击生成，作品会出现在画布上</p>
+     <textarea class="field" id="onboardingPrompt" rows="3" placeholder="例如：一只可爱的小猴子，卡通风格，温暖色调"></textarea>
+     <button class="primary-btn" id="onboardingGenerate">开始生成</button>
+     <button class="soft-btn" id="onboardingSkipGenerate">跳过，稍后尝试</button>
+    </div>
+   </div>
+  </div>
+ </div>
+</div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <script src="assets/app.js" defer></script>
 <script src="assets/ui-system.js" defer></script>
+<script src="assets/ui-l2-optimization.js" defer></script>
 <script src="assets/creative-workflow-v2.js" defer></script>
 <script src="assets/asset-derivation.js" defer></script>
 <script src="assets/game-ui-delivery.js" defer></script>
