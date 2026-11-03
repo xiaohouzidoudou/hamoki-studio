@@ -1,3 +1,10 @@
+FROM node:22-alpine AS cowart-builder
+WORKDIR /cowart
+COPY cowart/package.json cowart/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY cowart/ ./
+RUN npm run build
+
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=8028 DATA_DIR=/app/data
@@ -8,6 +15,7 @@ COPY --chown=node:node server.js workspace.js gateway.js index.html ./
 COPY --chown=node:node lib ./lib
 COPY --chown=node:node vendor ./vendor
 COPY --chown=node:node assets ./assets
+COPY --from=cowart-builder --chown=node:node /cowart/dist ./cowart-dist
 RUN mkdir -p /app/data && chown -R node:node /app/data
 USER node
 EXPOSE 8028
