@@ -136,9 +136,11 @@
  </aside>
 </div>
 <input id="projectArchiveFile" type="file" accept=".hamoki,application/octet-stream" hidden>
+<input type="file" id="onboardingFiles" accept="image/png,image/jpeg,image/webp" hidden>
 <input type="file" id="canvasFiles" accept="image/png,image/jpeg,image/webp" multiple hidden>
 <input type="file" id="referenceFiles" accept="image/png,image/jpeg,image/webp" multiple hidden>
 <div id="dialogLayer">
+<div class="modal-back hidden" id="providerTemplateSelector"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="providerTemplateTitle"><div class="modal-head"><h2 id="providerTemplateTitle">快速配置 · 新建中转站</h2><button type="button" class="icon-btn" data-close="providerTemplateSelector" aria-label="关闭">×</button></div><p>模板只新建未保存草稿，不修改已有服务商；请填写新 Key 后手动保存。</p><div class="provider-quick-templates"></div></section></div>
 
  <div class="modal-back hidden" id="creativeModal"><section class="modal creative-modal" role="dialog" aria-modal="true" aria-labelledby="creativeTitle">
   <header class="creative-head"><div><span class="eyebrow">CREATIVE ART TEAM</span><h2 id="creativeTitle">AI 美术创作工作流</h2><p>策划文档 → 风格与原型理解 → 美术总监方案 → 画布生图 → 视觉质检</p></div>
@@ -345,7 +347,7 @@
   <div class="onboarding-content">
    <div class="onboarding-header">
     <div class="onboarding-logo"><img src="assets/hamoki-avatar-128.webp" alt="Hamoki"></div>
-    <h2 id="onboardingTitle">欢迎来到 Hamoki Studio</h2>
+    <button type="button" id="onboardingClose" class="icon-btn" aria-label="关闭向导">×</button><h2 id="onboardingTitle">欢迎来到 Hamoki Studio</h2>
     <p>三步快速开始 AI 创作</p>
    </div>
    <div class="onboarding-progress">
@@ -399,9 +401,9 @@
     <div class="onboarding-step" data-step="3">
      <div class="step-icon"><svg class="icon"><use href="#ic-spark"/></svg></div>
      <h3>完成第一次生图</h3>
-     <p>输入描述，点击生成，作品会出现在画布上</p>
+     <p>填写描述后返回创作区，选择模型并确认参数；手动点击开始生成才会调用付费 API。</p>
      <textarea class="field" id="onboardingPrompt" rows="3" placeholder="例如：一只可爱的小猴子，卡通风格，温暖色调"></textarea>
-     <button class="primary-btn" id="onboardingGenerate">开始生成</button>
+     <button class="primary-btn" id="onboardingGenerate">带入创作区（不生成）</button>
      <button class="soft-btn" id="onboardingSkipGenerate">跳过，稍后尝试</button>
     </div>
    </div>

@@ -558,3 +558,48 @@
     transition: none !important;
   }
 }
+
+/* Actual DOM integration: collapsed sections must leave the focus order. */
+.sidebar-section .section-content[hidden] { display: none; }
+.sidebar-section.expanded .section-content { max-height: none; overflow: visible; }
+.quick-template-btn { margin-bottom: 12px; }
+.provider-template-card { text-align: left; min-width: 0; }
+.provider-template-card small { overflow-wrap: anywhere; }
+#providerTemplateSelector .modal { padding: 20px; width: min(620px, 96vw); }
+#providerTemplateSelector .modal-head { padding: 0; }
+#providerTemplateSelector p { line-height: 1.6; }
+#onboardingModal .onboarding-content { padding: 22px; }
+#onboardingModal .onboarding-header { text-align: center; position: relative; }
+#onboardingClose { position: absolute; right: 0; top: 0; }
+#onboardingModal .onboarding-logo img { width: 56px; height: 56px; }
+#onboardingModal .step-icon { color: var(--accent); margin-bottom: 10px; }
+#onboardingModal .onboarding-step-indicator { display: flex; align-items: center; gap: 10px; }
+#onboardingModal .step-number { padding: 5px 10px; border-radius: 50%; background: #293b35; }
+#onboardingModal .step-number.active { color: #052b23; background: #10cc91; }
+#onboardingModal .step-line { width: 30px; height: 1px; background: #3d5550; }
+#onboardingModal .onboarding-templates { display: flex; gap: 10px; flex-wrap: wrap; }
+#onboardingModal .template-card, #onboardingModal .upload-area { padding: 14px; border: 1px solid #3d6055; border-radius: 10px; background: #1e342f; }
+#onboardingModal .template-card strong, #onboardingModal .template-card small { display: block; }
+#onboardingModal .onboarding-form { display: grid; gap: 10px; margin-top: 14px; }
+#onboardingModal .onboarding-preview img { max-width: 100%; max-height: 160px; object-fit: contain; }
+#onboardingModal .onboarding-step > button { margin-top: 12px; }
+#onboardingModal .onboarding-step p { overflow-wrap: anywhere; }
+.composer-model-option.recommended { padding-right: 40px; }
+.composer-model-reason { white-space: normal; }
+.workflow-mode-switcher { gap: 4px; padding: 4px; margin: 10px 0; }
+.workflow-quick #moreSettings, .workflow-quick #advanced { display: none !important; }
+/* Quality and quantity remain visible: they affect the next paid request. */
+.workspace-header { grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); gap: 8px; }
+.header-start, .header-right { min-width: 0; }
+.canvas-toolbar-top { padding: 3px; gap: 2px; }
+.tool-top { min-width: 36px; height: 42px; padding: 4px; }
+.tool-top .icon { width: 16px; height: 16px; }
+@media (max-width: 1400px) {
+ .workspace-header { display: flex; flex-wrap: wrap; height: auto !important; min-height: 60px; padding-top: 6px !important; padding-bottom: 6px !important; }
+ .header-start { flex: 1 1 90px; }
+ .header-center { order: 3; flex: 1 0 100%; }
+ .canvas-toolbar-top { width: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+ .sidebar-section .section-content, .workflow-mode-btn { transition: none; }
+}

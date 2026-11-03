@@ -15,6 +15,7 @@ let enhanceMode=false;
 let referenceInputs=[],reverseImage=null,reverseResult='',reverseBusy=false,selectedTab='history',tool='select';
 let cam={x:220,y:130,scale:1},gesture=null,spaceDown=false,activePointers=new Map(),saveViewportTimer=null,lastProjectRevision=-1,projectSaveBusy=0;
 let repaintMask=null,visualMask=null,maskMarked=0,maskErase=false,maskDrawing=false,maskCanvasRaw=null,maskSourcePng=null;
+let studioReady=false;
 let demoMode=false,authorized=false,polling=false,toastTimer=null,forceProjectRefresh=false;
 let compareSelection=new Set(),currentImgSuggestions=[];
 let referenceNodeRoles=[], editingPrompt=null;
@@ -139,10 +140,10 @@ function fillAccountHeader(){if(!$('accountTitle'))return;$('accountTitle').text
 async function init(){bindEvents();setAuthMode('login');try{const r=await api('status');if(!r.backend)throw Error('找不到服务端');demoMode=!!r.demoMode;if(!r.authenticated){show('loginModal');$('loginStatus').textContent='请输入账号密码后继续';fillAccountHeader();return}authorized=true;currentUser=r.user||null;loadQuickModelPreferences();fillAccountHeader();hide('loginModal');await boot()}catch(e){$('loginStatus').textContent=e.message;show('loginModal')}setInterval(()=>{if(!authorized||document.visibilityState==='hidden')return;const busy=jobs.some(j=>['queued','running'].includes(j.status));if(busy||currentProject?.creativeWorkflow?.autoRun?.status==='running'||Date.now()-lastIdlePoll>12000){lastIdlePoll=Date.now();refreshProjectData()}},3000);setInterval(()=>{if(authorized&&document.visibilityState!=='hidden')refreshStorage()},60000);setInterval(()=>{if(authorized&&document.visibilityState!=='hidden')updateGenerationElapsed()},1000);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&authorized){lastIdlePoll=0;drainPreviewQueue();refreshProjectData()}})}
 async function login(){const username=$('loginUser').value.trim(),password=$('loginPass').value;try{$('loginStatus').textContent='正在登录…';const r=await api('/api/login',{method:'POST',body:{username,password}});authorized=true;currentUser=r.user||{name:username};loadQuickModelPreferences();fillAccountHeader();hide('loginModal');$('loginPass').value='';await boot()}catch(e){authorized=false;$('loginStatus').textContent=e.message}}
 async function register(){const inviteCode=$('inviteCode').value.trim(),username=$('registerUser').value.trim(),password=$('registerPass').value;try{$('loginStatus').textContent='正在创建账号…';const r=await api('/api/register',{method:'POST',body:{inviteCode,username,password}});authorized=true;currentUser=r.user||{name:username};loadQuickModelPreferences();fillAccountHeader();hide('loginModal');$('registerPass').value='';await boot()}catch(e){authorized=false;$('loginStatus').textContent=e.message}}
-async function logoutAccount(){textChatController?.abort();try{await api('/api/logout',{method:'POST',body:{}})}catch{}closeCanvasMenu();closeQuickProviderMenu();closeQuickModelMenu();quickModelPrefs.clear();quickModelFetches.clear();modelCatalogByProvider.clear();populateComposerModelSuggestions(null);authorized=false;currentUser=null;providers=[];projectList=[];currentProject=null;historyItems=[];jobs=[];diagnosticItems=[];hide('logsModal');hide('settingsModal');hide('libraryModal');for(const cap of ['text','vision'])runtimeRoutes[cap]={providerId:'',model:''};runtimeCatalog.clear();fillAccountHeader();$('connectionStatus').textContent='已退出';$('logCount').textContent='···';show('loginModal');setAuthMode('login');$('loginStatus').textContent='你已退出账号'}
+async function logoutAccount(){studioReady=false;textChatController?.abort();try{await api('/api/logout',{method:'POST',body:{}})}catch{}closeCanvasMenu();closeQuickProviderMenu();closeQuickModelMenu();quickModelPrefs.clear();quickModelFetches.clear();modelCatalogByProvider.clear();populateComposerModelSuggestions(null);authorized=false;currentUser=null;providers=[];projectList=[];currentProject=null;historyItems=[];jobs=[];diagnosticItems=[];hide('logsModal');hide('settingsModal');hide('libraryModal');for(const cap of ['text','vision'])runtimeRoutes[cap]={providerId:'',model:''};runtimeCatalog.clear();fillAccountHeader();$('connectionStatus').textContent='已退出';$('logCount').textContent='···';show('loginModal');setAuthMode('login');$('loginStatus').textContent='你已退出账号'}
 function niceBytes(n){return n>=1024**3?(n/1024**3).toFixed(2)+' GB':n>=1024**2?(n/1024**2).toFixed(1)+' MB':n>=1024?(n/1024).toFixed(0)+' KB':'0 KB'}
 async function refreshStorage(){if(!authorized)return;try{const s=await api('storage');$('storageUsage').textContent=niceBytes(s.totalBytes)+' / '+niceBytes(s.quotaBytes);$('storageFill').style.width=clamp(s.totalBytes/Math.max(1,s.quotaBytes)*100,0,100)+'%';$('storageFill').style.background=s.totalBytes/s.quotaBytes>.9?'#ef897e':''}catch{if($('storageUsage'))$('storageUsage').textContent='稍后重试'}}
-async function boot(){await Promise.all([loadProviders(),loadProjects(),refreshStorage()]);if(!providers.length)openSettings(true);$('connectionStatus').textContent=(currentUser?.name?currentUser.name+' · ':'')+(demoMode?'演示模式':'已登录');if(demoMode)toast('安全演示站：只用占位图、不消耗额度；请前往独立站进行真实生图');$('assistantDescription').textContent=demoMode?'演示工作台 · 不会调用模型':'账号独立工作区 · 真实 AI 生图';}
+async function boot(){studioReady=false;await Promise.all([loadProviders(),loadProjects(),refreshStorage()]);if(!providers.length)openSettings(true);studioReady=true;document.dispatchEvent(new Event('studio:ready'));$('connectionStatus').textContent=(currentUser?.name?currentUser.name+' · ':'')+(demoMode?'演示模式':'已登录');if(demoMode)toast('安全演示站：只用占位图、不消耗额度；请前往独立站进行真实生图');$('assistantDescription').textContent=demoMode?'演示工作台 · 不会调用模型':'账号独立工作区 · 真实 AI 生图';}
 async function loadProviders(){const result=await api('providers');providers=result.providers||[];activeId=result.activeId||providers[0]?.id||null;renderProviderSelect();renderProviderCards();renderRuntimeSelectors();}
 function renderProviderSelect(){closeQuickModelMenu();populateComposerModelSuggestions(activeId);const s=$('providerSelect');s.replaceChildren();if(!providers.length)s.add(new Option('＋ 添加中转站',''));
  for(const p of providers)s.add(new Option(p.name+(demoMode?' · 演示':p.hasKey?'':' · 未配置 Key'),p.id));if(activeId)s.value=activeId;
@@ -298,8 +299,8 @@ async function applySceneChange(updates,options={}){const before=snapshotScene(u
  for(const update of updates){const n=currentProject.nodes.find(n=>n.id===update.id);if(n)Object.assign(n,update)}
  if(options.front||options.back){const ids=new Set(updates.map(x=>x.id)),selected=currentProject.nodes.filter(n=>ids.has(n.id)),other=currentProject.nodes.filter(n=>!ids.has(n.id));currentProject.nodes=options.front?[...other,...selected]:[...selected,...other]}
  const after=snapshotScene(updates.map(n=>n.id)),afterOrder=currentProject.nodes.map(n=>n.id);
- historyRecord(before,after,beforeOrder,afterOrder);renderNodes();setSaving('已同步');
- }catch(e){toast('画布保存失败：'+e.message);forceProjectRefresh=true;await refreshProjectData()}}
+ historyRecord(before,after,beforeOrder,afterOrder);renderNodes();setSaving('已同步');return true;
+ }catch(e){toast('画布保存失败：'+e.message);forceProjectRefresh=true;await refreshProjectData();return false}}
 async function stepHistory(kind){if(!currentProject)return;const from=kind==='undo'?undoStack:redoStack,to=kind==='undo'?redoStack:undoStack;if(!from.length)return;const item=from.pop();
  if(item.kind==='bulk-remove'){
   try{
@@ -317,9 +318,10 @@ async function stepHistory(kind){if(!currentProject)return;const from=kind==='un
  const updates=kind==='undo'?item.before:item.after,order=kind==='undo'?item.beforeOrder:item.afterOrder;
  try{await persistScene(updates,order?{orderIds:order}:{});for(const entry of updates){const n=currentProject.nodes.find(n=>n.id===entry.id);if(n)Object.assign(n,entry)}if(order){const byId=new Map(currentProject.nodes.map(n=>[n.id,n]));currentProject.nodes=order.map(id=>byId.get(id)).filter(Boolean).concat(currentProject.nodes.filter(n=>!order.includes(n.id)))}to.push(item);renderNodes();toast(kind==='undo'?'已撤销画布操作':'已重做画布操作')}
  catch(e){from.push(item);toast('撤销或重做失败：'+e.message)}updateUndoButtons();}
-async function arrangeSelection(mode){const nodes=selectedSceneNodes();if(nodes.length<(mode==='grid'?1:2))return toast('请先 Shift+单击或框选至少两张图片');const changes=[];if(mode==='left'||mode==='top'){const axis=mode==='left'?'x':'y',v=Math.min(...nodes.map(n=>n[axis]));for(const n of nodes)changes.push({id:n.id,[axis]:v})}
+async function arrangeSelection(mode){const nodes=selectedSceneNodes();if(nodes.length<(mode==='grid'?1:mode.startsWith('distribute-')?3:2))return toast(mode.startsWith('distribute-')?'均分需要至少三个元素':'请先 Shift+单击或框选至少两张图片');const changes=[];if(mode==='left'||mode==='top'){const axis=mode==='left'?'x':'y',v=Math.min(...nodes.map(n=>n[axis]));for(const n of nodes)changes.push({id:n.id,[axis]:v})}
  if(mode==='grid'){const list=[...nodes].sort((a,b)=>a.y-b.y||a.x-b.x);const cols=Math.min(5,Math.max(1,Math.ceil(Math.sqrt(list.length)))),x=Math.min(...list.map(n=>n.x)),y=Math.min(...list.map(n=>n.y)),cellW=Math.max(...list.map(n=>n.w))+32,cellH=Math.max(...list.map(n=>n.h))+42;for(let i=0;i<list.length;i++)changes.push({id:list[i].id,x:x+(i%cols)*cellW,y:y+Math.floor(i/cols)*cellH})}
- await applySceneChange(changes);toast(mode==='grid'?'已按网格自动排列':'已完成对齐')}
+ if(mode==='distribute-h'||mode==='distribute-v'){const axis=mode==='distribute-h'?'x':'y',list=[...nodes].sort((a,b)=>a[axis]-b[axis]),start=list[0][axis],gap=(list.at(-1)[axis]-start)/(list.length-1);list.forEach((n,i)=>changes.push({id:n.id,[axis]:start+gap*i}))}
+ if(!await applySceneChange(changes))return;toast(mode==='grid'?'已按网格自动排列':mode.startsWith('distribute-')?'已完成均分':'已完成对齐')}
 async function groupSelection(ungroup=false){const nodes=selectedSceneNodes();if(!nodes.length)return toast('请先选择画布元素');if(!ungroup&&nodes.length<2)return toast('组合需要至少两个元素');const group=ungroup?null:crypto.randomUUID();await applySceneChange(nodes.map(n=>({id:n.id,groupId:group})));toast(ungroup?'已取消组合':'已组合所选元素')}
 async function layerSelection(front){const nodes=selectedSceneNodes();if(!nodes.length)return toast('请先选择画布元素');await applySceneChange(nodes.map(n=>({id:n.id})),front?{front:true}:{back:true});toast(front?'已移至最上层':'已移至最下层')}
 function positionFloatingMenu(anchor,menu,preferAbove=false){
@@ -571,7 +573,7 @@ function placeToolbar(){
  if(images.length>1){
   const heading=el('div','bulk-selection-count'),title=el('span','','已选择 '+images.length+' 张图片'),close=el('button','','取消选择');
   close.type='button';close.onclick=()=>selectNode(null);heading.append(title,close);toolbar.append(heading);
-  const actions=[['download','批量下载',downloadSelectedImages],['plus','作为参考图',addSelectedReferences],['fit','整齐排列',()=>arrangeSelection('grid')],['zoom','图片对比',compareSelectedImages],['copy','提取提示词',copySelectedPrompts],['trash','批量移除',removeSelectedImages]];
+  const actions=[['download','批量下载',downloadSelectedImages],['plus','作为参考图',addSelectedReferences],['fit','整齐排列',()=>arrangeSelection('grid')],['arrow','左对齐',()=>arrangeSelection('left')],['arrow','顶部对齐',()=>arrangeSelection('top')],['layers','水平均分',()=>arrangeSelection('distribute-h')],['layers','垂直均分',()=>arrangeSelection('distribute-v')],['zoom','图片对比',compareSelectedImages],['copy','提取提示词',copySelectedPrompts],['trash','批量移除',removeSelectedImages]];
   for(const [icon,label,action] of actions){
    const button=el('button',label==='批量移除'?'destructive':'');button.type='button';button.innerHTML=ico(icon);button.append(document.createTextNode(label));button.onclick=action;toolbar.append(button);
   }
@@ -1504,6 +1506,30 @@ async function submitTextChat(){
 function syncProviderMode(){const mode=$('pfMode').value;const sel=$('pfImageMode');sel.replaceChildren();const modes=mode==='gemini'?[['gemini','Gemini generateContent']]:mode==='grsai'?[['grsai','Grsai /v1/api/generate']]:[['images','Images API'],['chat','Chat Completions'],['responses','Responses 工具']];for(const [v,label] of modes)sel.add(new Option(label,v));syncResponses()}
 function syncResponses(){$('responseModelRow').classList.toggle('hidden',$('pfImageMode').value!=='responses')}
 function formProvider(){const capabilities=collectCapabilityEditor();return{name:$('pfName').value.trim(),url:$('pfUrl').value.trim(),mode:$('pfMode').value,imageMode:$('pfImageMode').value,imageModel:capabilities.image?.defaultModel||'',visionModel:capabilities.vision?.defaultModel||'',responseModel:$('pfResponse').value.trim(),apiKey:$('pfKey').value.trim(),capabilities}}
+// L1/L2 extensions use this bridge instead of window aliases for lexical state.
+window.HamokiStudioUI=Object.freeze({
+ state:()=>({authorized,ready:studioReady,userId:currentUser?.id||currentUser?.name||'',providerCount:providers.length,projectId:currentProject?.id||null}),
+ newProviderTemplate(template){
+  if(($('pfName').value||$('pfUrl').value||$('pfKey').value||editId)&&!confirm('快速模板将打开全新的未保存配置，当前表单输入将被替换；已有服务商不会修改。是否继续？'))return false;
+  selectEdit(null);$('pfName').value=template.name;$('pfUrl').value=template.url;
+  $('pfMode').value=template.mode;syncProviderMode();$('pfImageMode').value=template.imageMode;syncResponses();updateDraftTestControls();show('settingsModal');return true;
+ },
+ async createOnboardingProvider(url,key){
+  if(!url||!key)throw Error('请填写 API 地址和新 API Key');
+  if(!this.newProviderTemplate({name:'我的中转站',url,mode:'openai',imageMode:'images'}))return false;
+  $('pfKey').value=key;updateDraftTestControls();
+  const saved=await saveProvider();if(saved)closeSettingsModal();return !!saved;
+ },
+ async uploadOnboarding(files){
+  if(!currentProject)throw Error('请先打开项目');
+  const project=currentProject,before=new Set(project.nodes.map(n=>n.id));
+  await uploadToCanvas(files,currentBoardPoint(.3,.25));
+  if(currentProject!==project)throw Error('项目已切换，请在当前画布确认上传结果');
+  return project.nodes.find(n=>!before.has(n.id)&&n.kind==='reference')?.url||null;
+ },
+ preparePrompt(value){if(!$('prompt').value.trim())$('prompt').value=value;setComposerMode('image');$('prompt').focus()},
+ toast
+});
 async function saveProvider(){
  const body=formProvider();
  if(!body.name||!body.url)return toast('请填写名称和基础 API 地址');
@@ -1513,8 +1539,8 @@ async function saveProvider(){
   const r=await api(path,{method:editId?'PUT':'POST',body});
   editId=r.provider.id;draftProvider=false;
   await loadProviders();selectEdit(editId);
-  toast('中转站已保存，模型可以在操作台随时选择');
- }catch(e){toast(e.message)}
+  toast('中转站已保存，模型可以在操作台随时选择');return true;
+ }catch(e){toast(e.message);return false}
 }
 async function deleteProvider(){if(draftProvider){draftProvider=false;selectEdit(activeId||providers[0]?.id||null);toast('未保存配置已放弃');return}if(!editId)return;if(!confirm('真的删除这个中转站吗？密钥将从服务端配置中移除。'))return;try{modelCatalogByProvider.delete(editId);forgetQuickModel(editId);closeQuickModelMenu();await api(`providers/${editId}`,{method:'DELETE',body:{}});editId=null;await loadProviders();selectEdit(null);toast('中转站已删除')}catch(e){toast(e.message)}}
 function draftTestPayload(capability='image',baseOnly=true){return {...formProvider(),savedId:editId||null,capability,baseOnly}}

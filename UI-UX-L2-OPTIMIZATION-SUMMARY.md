@@ -1,4 +1,33 @@
-# Hamoki Studio UI/UX L1+L2 完整优化方案 - 实施总结
+# L1/L2 实际接入修复与回归验收（2026-11-03）
+
+本节为当前状态；下方原实施总结保留为历史，不代表浏览器功能已验收。
+
+- 使用 `HamokiStudioUI` 小范围桥接真实词法状态；自动向导等待 `studio:ready`，按账号保存完成状态，复用 `onboardingModal`。没有新增登录轮询和多选轮询。
+- 向导模板可填写新配置并手动保存；上传取消或失败不前进，成功才展示服务端原图地址。最后一步只带入描述，保留创作区已有描述，由用户手动确认生成，不提交或重试付费任务。
+- 快速模板入口独立于会被重绘的 `formTitle`。选择模板只创建未保存的新记录，重置基础 Key、能力独立地址/Key、建议模型；不会修改原服务商或继承其已保存密钥。替换已有表单前保留取消选择。
+- 模型推荐断开观察器后更新，避免自触发循环；说明幂等且能清除过期推荐，不切换模型或发请求。名称仅作为参考，不冒充实际能力验证。
+- 删除原 L2 对应用状态的重复实现：对齐/均分复用现有 `applySceneChange`、服务端批量保存和撤销/重做；保存失败保留原位置且不报成功。移除复用现有确认与可恢复批次，下载复用原图 ZIP 接口。无原图、历史或任务删除逻辑变更。
+- 侧栏同步 `expanded/collapsed`、`aria-expanded`、`hidden/inert`；顶部工具沿用 `changeTool`，仅为新增上传入口绑定一次。快速/专业模式同步按钮，不改变付费参数值，保留画质和数量可见。
+
+可执行验证：
+
+```sh
+npm run test:ui-l2
+node --test --experimental-test-isolation=none tests/ui-l2-integration.test.js tests/bulk-canvas-ui.test.js tests/model-picker.test.js tests/runtime-ui.test.js tests/help-quick-model.test.js tests/canvas-toolbar-clickfix.test.js tests/ui-system.test.js tests/ui-polish.test.js tests/toast-position.test.js tests/canvas-placement.test.js
+node --check assets/app.js
+node --check assets/ui-l2-optimization.js
+git -c core.whitespace=cr-at-eol diff --check
+```
+
+- 新增 10 项交互回归通过；相关回归合计 43 项通过。解析仓库实际 HTML，以最小 DOM 替身执行 L2 脚本，并执行实际应用中的编辑器、保存、均分、撤销、移除和下载函数；每项使用独立内存数据和请求替身，不读写用户配置、原图和任务，不调用外部 API。DOM 替身不等于真实浏览器布局或 HTTP 持久化验收。
+- `npm test` 已执行但未全绿：当时 55 个测试文件中 32 通过、23 失败；独立运行既有 `provider-draft-api.test.js` 明确报 `listen EPERM: operation not permitted 127.0.0.1`。当前沙箱禁止 socket，无法运行本地 HTTP 集成测试或预览，也无法连接 BrowserOS neo MCP（`curl` 报 `failed to open socket: Operation not permitted`）。禁止将这些受阻项视为通过；新增测试强化后以 `npm run test:ui-l2` 与上述 43 项结果为准。
+- 待完成：在允许回环 socket 的环境重跑 `npm test`、BrowserOS neo 实际桌面/手机布局、配置保存与刷新后的 HTTP 持久化、原图 ZIP 内容及移除恢复端到端验收。付费上游不在本次自动验收范围。
+- 本地提交受阻：执行精确文件列表的 `git add` 时，创建 `.git/index.lock` 报 `Read-only file system`。环境将 `.git` 设为只读且不允许提权，未能暂存或创建修复提交；修改保留在工作区。
+- 本轮只修改本仓库，不推送、合并或部署。指定 Windows 全局规范路径在 lin 不存在；仓库外 `/home/hamoki/LIN-AI-README.md` 已读取，但按本轮“只修改本仓库”约束未回写。
+
+---
+
+# 历史：UI/UX L1+L2 原实施总结
 
 ## 提交信息
 - **分支**: `ui-ux-l2-optimization`
