@@ -252,7 +252,12 @@
       previewImage.style.top=(g.top/g.outH*100)+'%';
       previewImage.style.width=(g.w/g.outW*100)+'%';
       previewImage.style.height=(g.h/g.outH*100)+'%';
-      $('.haop-dimensions').textContent='原图 '+g.w+' × '+g.h+' → 预览 '+g.outW+' × '+g.outH;
+      let targetNote='';
+      try{
+        const plan=window.HamokiOutpaintPlan?.plan(g.w,g.h,margins,modelNow());
+        if(plan)targetNote=' · 输出 '+plan.width+' × '+plan.height;
+      }catch(error){targetNote=' · '+error.message;}
+      $('.haop-dimensions').textContent='原图 '+g.w+' × '+g.h+' → 预览 '+g.outW+' × '+g.outH+targetNote;
       const directions=SIDES.filter(([id])=>margins[id]>0).map(([id,title])=>title+' '+margins[id]+'%');
       const hint=$('.haop-preview-hint');
       if(directions.length){
@@ -322,21 +327,49 @@
       const p=selectedProvider;
       if(!p)return alertUser('请先配置中转商');
       if(p.hasKey===false)return alertUser('所选中转商没有可用的 API Key');
+      if(p.mode!=='openai'||(p.imageMode||'images')!=='images')
+        return alertUser('真正的扩图需要支持透明蒙版的 OpenAI Images Edits 模型；请切换相应的中转商');
       const model=modelNow();
       if(!model)return alertUser('请先选择或填写生图模型 ID');
       const g=geometry();
-      const plan=SIDES.filter(([id])=>margins[id]>0).map(([id,title])=>title+'侧 '+margins[id]+'%').join('、');
-      const spec='【扩图参数】以附带的第一张原图为严格基准，保持原图内部内容、人物身份、已有文字及核心构图不变。只在原图以外的'+plan+'方向生成自然连续的新画面。以原图 '+g.w+'×'+g.h+' 为起点，扩展画布比例目标 '+g.outW+':'+g.outH+'；原图应处于扩展图中对应的位置，不要拉伸、重画或裁掉原图本身。';
+      let layout;
+      try{
+        layout=window.HamokiOutpaintPlan.plan(g.w,g.h,margins,model);
+      }catch(error){return alertUser('无法扩图：'+error.message);}
+      const directions=SIDES.filter(([id])=>margins[id]>0).map(([id,title])=>title+'侧 '+margins[id]+'%').join('、');
+      const rect=layout.original;
+      const spec='【精准蒙版扩图】随请求附上了透明外围画布与对应蒙版。原图完整保留在画布坐标 ('+rect.x+','+rect.y+') 的 '+rect.w+'×'+rect.h+' 区域中，不得修改或拉伸该区域。只补画外侧透明的 '+directions+'，新画面应与原图边缘自然衔接。最终画布为 '+layout.width+'×'+layout.height+' 像素，必须保持原图主体大小和比例不变。';
       let finalPrompt=instructions+'\n\n'+spec;
       if(finalPrompt.length>1000)return alertUser('提示词与扩图参数合计超出 1000 字，请精简提示词');
       waiting=true;submit.disabled=true;submit.textContent='正在提交…';
       $('.haop-cancel').disabled=$('.haop-close').disabled=true;
       try{
+        // A real image edit: transparent margins are the only writable area.
+        // Both canvases are precisely the output size, with equal X/Y scale.
+        const sourceCanvas=document.createElement('canvas');
+        sourceCanvas.width=layout.width;sourceCanvas.height=layout.height;
+        const sourceContext=sourceCanvas.getContext('2d',{willReadFrequently:false});
+        if(!sourceContext)throw Error('浏览器无法创建扩图画布');
+        sourceContext.clearRect(0,0,layout.width,layout.height);
+        sourceContext.drawImage(previewImage,rect.x,rect.y,rect.w,rect.h);
+        const maskCanvas=document.createElement('canvas');
+        maskCanvas.width=layout.width;maskCanvas.height=layout.height;
+        const maskContext=maskCanvas.getContext('2d');
+        if(!maskContext)throw Error('浏览器无法生成扩图蒙版');
+        maskContext.clearRect(0,0,layout.width,layout.height);
+        maskContext.fillStyle='#000';
+        maskContext.fillRect(rect.x,rect.y,rect.w,rect.h);
+        const maskSourceImage=sourceCanvas.toDataURL('image/png');
+        const mask=maskCanvas.toDataURL('image/png');
+        if(maskSourceImage.length>24*1024*1024)throw Error('扩图画布过大，请降低扩展幅度后再试');
+        if(mask.length>5.4*1024*1024)throw Error('扩图蒙版过大，请降低扩展幅度');
         const accepted=await config.onGenerate({
-          prompt:finalPrompt,providerId:p.id,model,ratio:nearest(g.outW,g.outH),
+          prompt:finalPrompt,providerId:p.id,model,ratio:layout.ratio,
           resolution:inheritedResolution,quality:inheritedQuality,
           count:1,includeSource:true,transparentBg:false,outpaint:true,
-          references:files.map(r=>({file:r.file,title:r.file.name})),customSize:null
+          mask,maskSourceImage,
+          outpaintRect:{width:layout.width,height:layout.height,...rect},
+          references:files.map(r=>({file:r.file,title:r.file.name})),customSize:layout.customSize
         });
         if(accepted!==true)throw Error('队列未确认提交成功，请先核对任务状态，避免重复扣费');
         waiting=false;close();
