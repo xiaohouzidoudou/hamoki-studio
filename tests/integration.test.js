@@ -94,3 +94,31 @@ test('providers, reverse, multiple image adapters, masks, compare, queue, downlo
   proc=await start(port,tmp);cookie='';const relog=await api('/api/login','POST',{password:'very-strong-password-123'});cookie=relog.headers.get('set-cookie').split(';')[0];
   assert.equal((await api('/api/providers')).data.providers.length,4);assert.ok((await api('/api/history')).data.history.length>=9);
 });
+
+test('outpaint submits mask to mock upstream and survives server restart',async t=>{
+  const {spawnSync}=require('node:child_process');
+  function png(code){const p=spawnSync('python3',['-c',code],{encoding:'base64'});assert.equal(p.status,0);return p.stdout}
+  const orig=png("from PIL import Image;import sys;Image.new('RGBA',(256,256),(200,20,50,255)).save(sys.stdout.buffer,'PNG')");
+  const padded=png("from PIL import Image;import sys;im=Image.new('RGBA',(512,512));im.paste((200,20,50,255),(0,128,256,384));im.save(sys.stdout.buffer,'PNG')");
+  const mask=png("from PIL import Image;import sys;im=Image.new('RGBA',(512,512));im.paste((0,0,0,255),(0,128,256,384));im.save(sys.stdout.buffer,'PNG')");
+  const output=png("from PIL import Image;import sys;Image.new('RGBA',(512,512),(20,50,200,255)).save(sys.stdout.buffer,'PNG')");
+  let editBody='';const upstream=http.createServer(async(req,res)=>{const chunks=[];for await(const c of req)chunks.push(c);const raw=Buffer.concat(chunks);res.setHeader('content-type','application/json');if(req.url.endsWith('/images/edits')){editBody=raw.toString('latin1');res.end(JSON.stringify({data:[{b64_json:output}]}))}else res.end(JSON.stringify({data:[{b64_json:orig}]}));});
+  await new Promise(r=>upstream.listen(0,'127.0.0.1',r));t.after(()=>upstream.close());
+  const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'hs-outpaint-'));t.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));const port=await PORT();let proc=await start(port,tmp);t.after(()=>proc.kill('SIGTERM'));
+  const base=`http://127.0.0.1:${port}`;let cookie='';
+  async function api(route,method='GET',body){const r=await fetch(base+route,{method,headers:{'Content-Type':'application/json',...(cookie?{Cookie:cookie}:{})},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,headers:r.headers,data:await r.json()}}
+  async function login(){const r=await api('/api/login','POST',{password:'very-strong-password-123'});cookie=r.headers.get('set-cookie').split(';')[0]}
+  await login();
+  const p=(await api('/api/providers','POST',{name:'mock',url:`http://127.0.0.1:${upstream.address().port}/v1`,mode:'openai',imageMode:'images',imageModel:'gpt-image-2',visionModel:'gpt-4o-mini',apiKey:'mock'})).data.provider.id;
+  const input=await api('/api/jobs','POST',{providerId:p,prompt:'fixture',ratio:'1:1',resolution:'1K',count:1});assert.equal(input.status,201);
+  await waitFor(async()=>{const j=(await api('/api/jobs')).data.jobs.find(x=>x.id===input.data.jobs[0].id);return j.status==='done'});
+  const parent=(await api('/api/history')).data.history[0];
+  const request={providerId:p,model:'gpt-image-2',prompt:'extend',ratio:'1:1',resolution:'1K',count:1,customSize:'512x512',sourceId:parent.id,mask:'data:image/png;base64,'+mask,maskSourceImage:'data:image/png;base64,'+padded,outpaintRect:{width:512,height:512,x:0,y:128,w:256,h:256}};
+  const submitted=await api('/api/jobs','POST',request);assert.equal(submitted.status,201,JSON.stringify(submitted.data));
+  await waitFor(async()=>{const j=(await api('/api/jobs')).data.jobs.find(x=>x.id===submitted.data.jobs[0].id);if(j.status==='failed')throw Error(j.error);return j.status==='done'});
+  assert.match(editBody,/name="mask"/);assert.match(editBody,/name="image"/);assert.match(editBody,/512x512/);
+  let history=(await api('/api/history')).data.history;const result=history.find(x=>x.parentId===parent.id);assert.ok(result?.outpaint);
+  const image=await fetch(base+result.url,{headers:{Cookie:cookie}});const bytes=Buffer.from(await image.arrayBuffer());
+  const verify=spawnSync('python3',['-c',"from PIL import Image;import io,sys;im=Image.open(io.BytesIO(sys.stdin.buffer.read())).convert('RGBA');assert im.size==(512,512);assert all(im.getpixel((x,y))==(200,20,50,255) for x in range(256) for y in range(128,384));assert im.getpixel((400,200))==(20,50,200,255)"],{input:bytes});assert.equal(verify.status,0,String(verify.stderr));
+  await new Promise(r=>{proc.once('exit',r);proc.kill('SIGTERM')});proc=await start(port,tmp);cookie='';await login();history=(await api('/api/history')).data.history;assert.ok(history.some(x=>x.id===result.id&&x.parentId===parent.id&&x.outpaint));
+});

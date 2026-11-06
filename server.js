@@ -251,9 +251,10 @@ async function execute(job){const abort=new AbortController();controllers.set(jo
   // Restore the original patch after AI editing. No original pixels are redrawn.
   if(job.outpaintRect){
    if(!job.maskSourceMedia)throw Error('扩图原始画布缺失');
-   output=await preserveOutpaint(output,fetchMedia(job.maskSourceMedia),job.outpaintRect);
+   try{output=await preserveOutpaint(output,fetchMedia(job.maskSourceMedia),job.outpaintRect)}
+   catch(error){error.completionUncertain=true;throw error}
   }
-  recordCapability(p,mask?'mask':job.transparentBg?'transparentBackground':media.length?'referenceImage':'textToImage',true,job.model,{ratio:job.ratio,resolution:job.resolution,customSize:job.customSize||null,durationMs:Date.now()-t0});
+  if(!job.outpaintRect)recordCapability(p,mask?'mask':job.transparentBg?'transparentBackground':media.length?'referenceImage':'textToImage',true,job.model,{ratio:job.ratio,resolution:job.resolution,customSize:job.customSize||null,durationMs:Date.now()-t0});
   if(job.status==='cancelled')return;
   const file=storeMedia(output),id=crypto.randomUUID();const entry={id,file,createdAt:time(),projectId:job.projectId||defaultProject()?.id,providerId:job.providerId,providerName:job.providerName,model:job.model,prompt:job.prompt,ratio:job.ratio,resolution:job.resolution,customSize:job.customSize||null,parentId:job.sourceId||null,groupId:job.groupId||null,referenceMedia:job.referenceMedia||[],masked:!!mask,outpaint:!!job.outpaintRect,transparentBg:!!job.transparentBg,editInstruction:job.editInstruction||'',roleHints:job.roleHints||[],jobId:job.id,favorite:false,durationMs:Date.now()-t0};
   history.unshift(entry);saveHistory();appendGeneratedNode(entry,job);job.resultId=id;jobStatusOk(job,'done');
@@ -322,6 +323,13 @@ function validateCreation(b){
  const outpaintRect=b.outpaintRect?checkRect(b.outpaintRect):null;
  if(outpaintRect){
   if(!source||!b.mask||!b.maskSourceImage)throw Error('扩图必须包含原图、透明留白画布和对应蒙版');
+  if(targets.some(t=>!/^gpt-image-(?:1|2)(?:$|[.\-])/i.test(String(t.model||provider(t.providerId)?.imageModel||''))))
+   throw Error('该模型尚未接入蒙版扩图，不能使用普通图生图代替');
+  for(const data of [b.mask,b.maskSourceImage]){
+   const img=imageFromDataURL(data);
+   const dimensions=pngDimensions(img.bytes);
+   if(dimensions[0]!==outpaintRect.width||dimensions[1]!==outpaintRect.height)throw Error('扩图蒙版与原图画布的尺寸必须与扩图坐标一致');
+  }
   if(customSize&&customSize!==outpaintRect.width+'x'+outpaintRect.height)
    throw Error('扩图尺寸与蒙版画布不匹配');
   if(targets.some(t=>{const p=provider(t.providerId);return !p||p.mode!=='openai'||(p.imageMode||'images')!=='images'}))
