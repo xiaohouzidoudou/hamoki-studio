@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.v2
-    image: hamoki-studio:1.1.0-secure
+    image: hamoki-studio:1.2.0-sub2-only
     network_mode: host
     restart: unless-stopped
     environment:
@@ -13,6 +13,7 @@ services:
       STUDIO_DATA_DIR: /app/backend-v2/data
       STUDIO_SECURE_COOKIES: "1"
       STUDIO_MAX_USERS: ${STUDIO_MAX_USERS:-12}
+      STUDIO_ADMIN_SUB2_ID: ${STUDIO_ADMIN_SUB2_ID:-}
       SUB2_BASE_URL: ${SUB2_BASE_URL:-}
     volumes:
       - studio_v2_data:/app/backend-v2/data

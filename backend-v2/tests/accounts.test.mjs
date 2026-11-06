@@ -4,134 +4,151 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
+import http from 'node:http';
+import crypto from 'node:crypto';
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {Accounts} from '../src/accounts.ts';
+
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const wait=ms=>new Promise(r=>setTimeout(r,ms));
-async function port(){
- return new Promise((resolve,reject)=>{const s=net.createServer();s.once('error',reject);s.listen(0,'127.0.0.1',()=>{const p=s.address().port;s.close(()=>resolve(p))})});
-}
-test('multi-account isolation, admin bootstrap, reset, Sub2 integration', {timeout:45000},async()=>{
- const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hamoki-v2-test-'));
- const mockPort=await port();
- const mock=httpMock(mockPort);
- await new Promise(r=>mock.listen(mockPort,'127.0.0.1',r));
- const studioPort=await port();
- const child=spawn(process.execPath,[path.join(root,'src/index.ts')],{
-  cwd:root,
-  env:{...process.env,STUDIO_DATA_DIR:dir,STUDIO_PORT:String(studioPort),SUB2_BASE_URL:'http://127.0.0.1:'+mockPort,STUDIO_MAX_USERS:'12'},
-  stdio:['ignore','pipe','pipe','ipc'],windowsHide:true
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const users={'owner@example.com':{id:1,role:'admin'},'a@example.com':{id:2,role:'user'},'b@example.com':{id:3,role:'user'}};
+let paidCalls=0;
+const paidIds=[];
+async function port(){return new Promise((resolve,reject)=>{const server=net.createServer();server.once('error',reject);server.listen(0,'127.0.0.1',()=>{const p=server.address().port;server.close(()=>resolve(p))})})}
+function mockSub2(){
+ return http.createServer(async(req,res)=>{
+  let raw='';for await(const chunk of req)raw+=chunk;
+  let result={},status=200;
+  const token=String(req.headers.authorization||'').replace(/^Bearer /,'');
+  const id=Number(token.replace(/^mock-/,''));
+  if(req.url==='/api/v1/auth/login'){
+   let params={};try{params=JSON.parse(raw)}catch{};
+   const found=users[params.email];
+   if(!found||params.password!=='RealSub2Password'){status=401;result={message:'Sub2 邮箱或密码不正确'}}
+   else result={data:{access_token:'mock-'+found.id,expires_in:1800}};
+  }else if(req.url==='/api/v1/user/profile'){
+   if(![1,2,3].includes(id)){status=401;result={message:'bad token'}}
+   else result={data:{id,username:'account'+id,balance:14.25,frozen_balance:0,role:id===1?'admin':'user'}};
+  }else if(req.url==='/api/v1/keys'&&req.method==='POST'){
+   result={data:{key:'sk-mock-key-'+id}};
+  }else if(req.url==='/v1/models'){result={data:[{id:'gpt-image-1'},{id:'gpt-6'}]};}
+  else if(req.url==='/v1/images/generations/async'&&req.method==='POST'){
+   paidCalls++;paidIds.push(req.headers['idempotency-key']);
+   if(raw.includes('upstream-uncertain')){req.socket.destroy();return}
+   result={task_id:'mock-task-123456',status:'processing'};
+  }else if(req.url==='/v1/images/tasks/mock-task-123456'){
+   result={task_id:'mock-task-123456',status:'completed',result:{data:[{url:'https://example.invalid/hidden.webp'}]}};
+  }else{status=404;result={error:'not found'};}
+  res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify(result));
  });
- let log='';
- child.stdout.on('data',chunk=>{log+=chunk.toString()});
- let errors='';
- child.stderr.on('data',chunk=>{errors+=chunk.toString()});
- const base='http://127.0.0.1:'+studioPort;
- async function api(route,opts={}){
-   const r=await fetch(base+route,{method:opts.method||'GET',headers:{'Content-Type':'application/json','X-Studio-Request':'1',...(opts.cookie?{Cookie:opts.cookie}:{})},body:opts.method&&opts.method!=='GET'?JSON.stringify(opts.body??{}):undefined,redirect:'manual',signal:AbortSignal.timeout(6000)});
-   const text=await r.text();
-   let data;try{data=JSON.parse(text)}catch{data=text}
-   return{code:r.status,data,cookie:r.headers.get('set-cookie')?.split(';')[0]};
+}
+test('only verified Sub2 accounts can login; admin pinned, data isolated, dedupe durable', {timeout:60000},async()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hamoki-sub2-only-'));
+ const portMock=await port(), server=mockSub2(); await new Promise(resolve=>server.listen(portMock,'127.0.0.1',resolve));
+ const portStudio=await port();
+ const child=spawn(process.execPath,[path.join(root,'src/index.ts')],{
+  cwd:root,env:{...process.env,STUDIO_DATA_DIR:dir,STUDIO_PORT:String(portStudio),STUDIO_ADMIN_SUB2_ID:'1',SUB2_BASE_URL:'http://127.0.0.1:'+portMock,STUDIO_SECURE_COOKIES:'0'},stdio:['ignore','pipe','pipe','ipc'],windowsHide:true
+ });
+ let stdout='',stderr='';
+ child.stdout.on('data',c=>{stdout+=c.toString()});
+ child.stderr.on('data',c=>{stderr+=c.toString()});
+ const base='http://127.0.0.1:'+portStudio;
+ async function api(route,{method='GET',cookie,body,origin}={}){
+  let r;try{r=await fetch(base+route,{method,headers:{'Content-Type':'application/json','X-Studio-Request':'1',...(cookie?{Cookie:cookie}:{}),...(origin?{Origin:origin}:{})},body:method==='GET'?undefined:JSON.stringify(body||{}),redirect:'manual',signal:AbortSignal.timeout(7500)})}catch(e){throw Error(method+' '+route+': '+e.message)}
+  const raw=await r.text();let json;try{json=JSON.parse(raw)}catch{json=raw}
+  return {code:r.status,data:json,cookie:r.headers.get('set-cookie')?.split(';')[0],headers:r.headers};
  }
+ const login=async(email,password='RealSub2Password')=>api('/api/auth/sub2-login',{method:'POST',body:{email,password}});
  try{
-  for(let i=0;i<80&&!log.includes('backend-v2 available');i++)await wait(100);
-  assert.match(log,/backend-v2 available/,errors);
-  const code=log.match(/激活码.*?: ([0-9a-f]{32})/)?.[1];assert.ok(code,'activation code must appear only in private console');
-   const initial=await api('/api/auth/status');
-   assert.equal(initial.code,200);assert.equal(initial.data.needsActivation,true);
-   const prereg=await api('/api/auth/register',{method:'POST',body:{username:'beforeadmin',password:'long-password-123'}});
-   assert.equal(prereg.code,503,'public signup must not be possible before admin is secured');
-   const anonHome=await fetch(base+'/',{redirect:'manual'});assert.equal(anonHome.status,302);assert.equal(anonHome.headers.get('location'),'/login');
-   const csrf=await fetch(base+'/api/auth/login',{method:'POST',headers:{'Origin':'https://evil.invalid','Content-Type':'application/json','X-Studio-Request':'1'},body:'{}'});
-   assert.equal(csrf.status,403,'cross-origin login attempts must be rejected');
-   assert.match(initial.data.needsActivation?'yes':'no',/yes/);
-  const admin=await api('/api/auth/activate',{method:'POST',body:{code,password:'AdminStrong_123456'}});assert.equal(admin.code,200,JSON.stringify(admin.data));
-  const a=await api('/api/auth/register',{method:'POST',body:{username:'useraaa',password:'SomePassword_111'}}),b=await api('/api/auth/register',{method:'POST',body:{username:'userbbb',password:'SomePassword_222'}});
-  assert.equal(a.code,200,JSON.stringify(a.data));assert.equal(b.code,200,JSON.stringify(b.data));
-  assert.equal(a.data.quota.quotaBytes,1024**3);
-  const unauth=await api('/api/projects');assert.equal(unauth.code,401);
-  const u1=await api('/api/projects',{cookie:a.cookie});const u2=await api('/api/projects',{cookie:b.cookie});
-  assert.equal(u1.code,200,JSON.stringify(u1.data));assert.equal(u2.code,200,JSON.stringify(u2.data));
-  assert.notEqual(u1.data.defaultId,u2.data.defaultId,'each account must get own canvas');
-  const createProject=await api('/api/projects',{cookie:a.cookie,method:'POST',body:{title:'private-canvas-of-A'}});
-  assert.equal(createProject.code,201,JSON.stringify(createProject.data));
-  const bCannotSeeA=await api('/api/projects/'+u1.data.defaultId,{cookie:b.cookie});
-  assert.equal(bCannotSeeA.code,404,'other account project must not be reachable');
-  const aNewProjects=await api('/api/projects',{cookie:a.cookie}),bSameProjects=await api('/api/projects',{cookie:b.cookie});
-  assert.equal(aNewProjects.data.projects.length,2);
-  assert.equal(bSameProjects.data.projects.length,1);
-  const restricted=await api('/api/admin/users',{cookie:a.cookie});assert.equal(restricted.code,403);
-  const users=await api('/api/admin/users',{cookie:admin.cookie});assert.equal(users.data.users.length,3);
-  const accountA=users.data.users.find(x=>x.username==='useraaa');
-  const reset=await api('/api/admin/users/'+accountA.id+'/reset',{method:'POST',cookie:admin.cookie,body:{adminPassword:'AdminStrong_123456'}});
-  assert.equal(reset.code,200,JSON.stringify(reset.data));assert.ok(reset.data.temporaryPassword.length>=20);
-  const expired=await api('/api/projects',{cookie:a.cookie});assert.equal(expired.code,401);
-  const login=await api('/api/auth/login',{method:'POST',body:{username:'useraaa',password:reset.data.temporaryPassword}});assert.equal(login.code,200);
-  const cannotUseCanvas=await api('/api/projects',{cookie:login.cookie});assert.equal(cannotUseCanvas.code,403);
-  const me=await api('/api/account/me',{cookie:login.cookie});assert.equal(me.code,200);
-  const pw=await api('/api/account/password',{method:'POST',cookie:login.cookie,body:{oldPassword:reset.data.temporaryPassword,newPassword:'MyNewPassword_998'}});assert.equal(pw.code,200);
-  const sub2Login=await api('/api/auth/sub2-login',{method:'POST',body:{email:'sub@example.com',password:'MockSecret_123'}});
-  assert.equal(sub2Login.code,200,JSON.stringify(sub2Login.data));
-  assert.equal(sub2Login.data.sub2Sync?.configured,true,JSON.stringify(sub2Login.data));
-  const connectedProviders=await api('/api/providers',{cookie:sub2Login.cookie});
-  assert.equal(connectedProviders.code,200);
-  assert.ok(connectedProviders.data.providers.some(p=>p.name==='Sub2 · 账号专属'));
-  const sb=await api('/api/account/sub2/balance',{cookie:sub2Login.cookie});
-  assert.equal(sb.code,200);assert.equal(sb.data.balance,14.25);
-  const provision=await api('/api/account/sub2/provision',{cookie:sub2Login.cookie,method:'POST'});
-  assert.equal(provision.code,200,JSON.stringify(provision.data));
-  const models=await api('/api/account/sub2/models',{cookie:sub2Login.cookie});
-  assert.equal(models.code,200);assert.deepEqual(models.data.models,['gpt-image-1']);
-  const requestBody={requestId:'client_task_unique_1',model:'gpt-image-1',prompt:'tiny cat in a meadow',size:'1024x1024'};
-  const firstJob=await api('/api/account/sub2/jobs',{method:'POST',cookie:sub2Login.cookie,body:requestBody});
-  assert.equal(firstJob.code,200,JSON.stringify(firstJob.data));
-  assert.equal(firstJob.data.job.status,'processing');
-  const duplicate=await api('/api/account/sub2/jobs',{method:'POST',cookie:sub2Login.cookie,body:requestBody});
-  assert.equal(duplicate.code,200);assert.equal(duplicate.data.reused,true);
-  assert.equal(asyncSubmitted,1,'duplicate requests must never dispatch a second paid generation');
-  const polled=await api('/api/account/sub2/jobs/'+firstJob.data.job.id,{cookie:sub2Login.cookie});
-  assert.equal(polled.data.job.status,'done');assert.ok(polled.data.result);
-  const cross=await api('/api/account/sub2/jobs/'+firstJob.data.job.id,{cookie:b.cookie});
-  assert.equal(cross.code,404);
-  const changed=await api('/api/account/sub2/jobs',{method:'POST',cookie:sub2Login.cookie,body:{...requestBody,prompt:'different prompt'}});
-  assert.equal(changed.code,409);
-  const unknown=await api('/api/account/sub2/jobs',{method:'POST',cookie:sub2Login.cookie,body:{...requestBody,requestId:'client_task_network_fail',prompt:'timeout-uncertain'}});
-  assert.equal(unknown.code,200);assert.equal(unknown.data.job.status,'uncertain');
-  const knownCount=asyncSubmitted;
-  const unknownAgain=await api('/api/account/sub2/jobs',{method:'POST',cookie:sub2Login.cookie,body:{...requestBody,requestId:'client_task_network_fail',prompt:'timeout-uncertain'}});
-  assert.equal(unknownAgain.data.reused,true);assert.equal(asyncSubmitted,knownCount);
-  const original=await api('/api/account/me',{cookie:b.cookie});assert.equal(original.code,200);
- }finally{
-  if(child.exitCode===null){
-    await Promise.race([new Promise(resolve=>{child.once('exit',resolve);try{child.send('shutdown')}catch{child.kill()}}),wait(3000)]);
-    if(child.exitCode===null)child.kill();
+  for(let n=0;n<90&&!stdout.includes('backend-v2 available');n++)await sleep(100);
+  assert.match(stdout,/backend-v2 available/,stderr);
+  assert.doesNotMatch(stdout,/激活码/);
+  const anon=await api('/api/auth/status');assert.equal(anon.code,200);
+  assert.equal(anon.data.loginProvider,'sub2');assert.equal(anon.data.user,null);
+  assert.equal(anon.data.needsActivation,undefined);
+  const form=await api('/login');assert.equal(form.code,200);
+  assert.match(form.data,/使用 Sub2 账号登录/);assert.doesNotMatch(form.data,/首次激活码|data-mode="register"/);
+  for(const route of ['/api/auth/register','/api/auth/login','/api/auth/activate']){
+    const res=await api(route,{method:'POST',body:{username:'hamoki',password:'anything',code:'fake'}});
+    assert.notEqual(res.code,200,'old auth endpoint must not grant access: '+route);
+    assert.equal(res.cookie,undefined);
   }
-  await new Promise(r=>mock.close(r));
-  await wait(200);
-  try{fs.rmSync(dir,{recursive:true,force:true,maxRetries:10,retryDelay:200})}catch(e){console.error('test cleanup pending:',e.code)}
+  assert.equal((await api('/')).code,302);
+  assert.equal((await api('/api/projects')).code,401);
+  assert.equal((await api('/api/account/me')).code,401);
+  assert.equal((await login('owner@example.com','wrong')).code,401);
+  const csrf=await api('/api/auth/sub2-login',{method:'POST',origin:'https://evil.example',body:{email:'owner@example.com',password:'RealSub2Password'}});
+  assert.equal(csrf.code,403);
+  const b=await login('b@example.com'),a=await login('a@example.com'),owner=await login('owner@example.com');
+  assert.equal(a.code,200,JSON.stringify(a.data));
+  assert.equal(b.code,200,JSON.stringify(b.data));
+  assert.equal(owner.code,200,JSON.stringify(owner.data));
+  assert.equal(a.data.user.role,'user');
+  assert.equal(b.data.user.role,'user');
+  assert.equal(owner.data.user.role,'admin');
+  const provider=await api('/api/providers',{cookie:a.cookie});assert.equal(provider.code,200,JSON.stringify(provider.data));
+  assert.ok(provider.data.providers.some(p=>p.name==='Sub2 · 账号专属'));
+  const pA=await api('/api/projects',{cookie:a.cookie}),pB=await api('/api/projects',{cookie:b.cookie});
+  assert.equal(pA.code,200,JSON.stringify(pA.data));
+  assert.equal(pB.code,200,JSON.stringify(pB.data));
+  assert.notEqual(pA.data.defaultId,pB.data.defaultId);
+  const project=await api('/api/projects',{method:'POST',cookie:a.cookie,body:{title:'privateA'}});
+  assert.equal(project.code,201);
+  assert.equal((await api('/api/projects/'+pA.data.defaultId,{cookie:b.cookie})).code,404);
+  assert.equal((await api('/api/admin/users',{cookie:a.cookie})).code,403);
+  const balance=await api('/api/account/sub2/balance',{cookie:a.cookie});
+  assert.equal(balance.code,200);assert.equal(balance.data.balance,14.25);
+  const admins=await api('/api/admin/users',{cookie:owner.cookie});assert.equal(admins.code,200);
+  assert.equal(admins.data.users.length,3);
+  const aId=admins.data.users.find(u=>u.sub2_id==='2')?.id;
+  assert.ok(aId);
+  const taskBody={requestId:'safe-generated-id-001',model:'gpt-image-1',prompt:'red apple on table',size:'1024x1024'};
+  const paid=await api('/api/account/sub2/jobs',{method:'POST',cookie:a.cookie,body:taskBody});
+  assert.equal(paid.code,200,JSON.stringify(paid.data));
+  assert.equal(paid.data.job.status,'processing');
+  assert.equal(paidIds[0],taskBody.requestId);
+  const repeat=await api('/api/account/sub2/jobs',{method:'POST',cookie:a.cookie,body:taskBody});
+  assert.equal(repeat.data.reused,true);assert.equal(paidCalls,1);
+  const polling=await api('/api/account/sub2/jobs/'+paid.data.job.id,{cookie:a.cookie});
+  assert.equal(polling.data.job.status,'done');
+  assert.equal((await api('/api/account/sub2/jobs/'+paid.data.job.id,{cookie:b.cookie})).code,404);
+  const changed=await api('/api/account/sub2/jobs',{method:'POST',cookie:a.cookie,body:{...taskBody,prompt:'different'}});
+  assert.equal(changed.code,409);
+  const uncertainBody={...taskBody,requestId:'safe-generated-id-002',prompt:'upstream-uncertain'};
+  const uncertain=await api('/api/account/sub2/jobs',{method:'POST',cookie:a.cookie,body:uncertainBody});
+  assert.equal(uncertain.code,200);assert.equal(uncertain.data.job.status,'uncertain');
+  const count=paidCalls;
+  const uncertainRepeat=await api('/api/account/sub2/jobs',{method:'POST',cookie:a.cookie,body:uncertainBody});
+  assert.equal(uncertainRepeat.data.reused,true);assert.equal(paidCalls,count);
+  const disable=await api('/api/admin/users/'+aId+'/disable',{method:'POST',cookie:owner.cookie,body:{disabled:true}});
+  assert.equal(disable.code,200);
+  assert.equal((await api('/api/projects',{cookie:a.cookie})).code,401);
+  assert.equal((await login('a@example.com')).code,403);
+  const restore=await api('/api/admin/users/'+aId+'/disable',{method:'POST',cookie:owner.cookie,body:{disabled:false}});
+  assert.equal(restore.code,200);
+  const rebound=await login('a@example.com');assert.equal(rebound.code,200);
+  const adminId=admins.data.users.find(u=>u.sub2_id==='1')?.id;
+  assert.equal((await api('/api/admin/users/'+adminId+'/disable',{method:'POST',cookie:owner.cookie,body:{disabled:true}})).code,403);
+  assert.equal((await api('/api/account/password',{cookie:owner.cookie,method:'POST',body:{oldPassword:'x',newPassword:'y'}})).code,404);
+  assert.equal((await api('/api/admin/users/'+aId+'/reset',{cookie:owner.cookie,method:'POST'})).code,404);
+ }finally{
+   if(child.exitCode===null){
+    await Promise.race([new Promise(resolve=>{child.once('exit',resolve);try{child.send('shutdown')}catch{child.kill()}}),sleep(3000)]);
+    if(child.exitCode===null)child.kill();
+   }
+   await new Promise(resolve=>server.close(resolve));
+   await sleep(200);
+   try{fs.rmSync(dir,{recursive:true,force:true,maxRetries:12,retryDelay:180})}catch(e){console.error('cleanup:',e.code)}
  }
 });
-function httpMock(){
- const http=requireHTTP();
- return http.createServer(async(req,res)=>{
-  const body=await new Promise(r=>{let s='';req.on('data',c=>s+=c);req.on('end',()=>r(s))});
-  let value,status=200;
-  if(req.url==='/api/v1/auth/login'){
-   const p=JSON.parse(body); if(p.email!=='sub@example.com'||p.password!=='MockSecret_123'){status=401;value={message:'login failed'}}
-   else value={data:{access_token:'mock-access',expires_in:1800}};
-  }else if(req.url==='/api/v1/user/profile')value={data:{id:55,username:'mockuser',balance:14.25,frozen_balance:1.5}};
-  else if(req.url==='/api/v1/keys'&&req.method==='POST')value={data:{key:'sk-mock-secret'}};
-  else if(req.url==='/v1/models')value={data:[{id:'gpt-image-1'},{id:'gpt-6'}]};
-  else if(req.url==='/v1/images/generations/async'&&req.method==='POST'){
-    asyncSubmitted++;
-    if(JSON.parse(body).prompt==='timeout-uncertain'){req.socket.destroy();return}
-    value={task_id:'imgtask_dummy12345',status:'processing'};
-  }
-  else if(req.url==='/v1/images/tasks/imgtask_dummy12345')value={task_id:'imgtask_dummy12345',status:'completed',result:{data:[{url:'https://example.invalid/image.webp'}]}};
-  else {status=404;value={error:'not found'}}
-  res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify(value));
- });
-}
-import http from 'node:http';
-let asyncSubmitted=0;
-function requireHTTP(){return http}
+test('legacy local accounts and their sessions never authorize',()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hamoki-legacy-session-'));
+ const accounts=new Accounts(dir);
+ try{
+  accounts.db.prepare('INSERT INTO users(id,username,role,status,created) VALUES(?,?,?,?,?)').run('legacy','hamoki','admin','active',new Date().toISOString());
+  assert.throws(()=>accounts.createSession('legacy'),/只允许 Sub2/);
+  accounts.db.prepare('INSERT INTO sessions(token_hash,user_id,expires) VALUES(?,?,?)').run(crypto.createHash('sha256').update('a'.repeat(64)).digest('hex'),'legacy',Date.now()+10000);
+  assert.equal(accounts.session('a'.repeat(64)),null);
+ }finally{accounts.db.close();fs.rmSync(dir,{recursive:true,force:true})}
+});

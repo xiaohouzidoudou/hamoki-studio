@@ -1,16 +1,15 @@
-# Hamoki Studio V1.1 · Secure Accounts
+# Hamoki Studio V1.2 · Sub2 唯一登录
 
-This release adds the isolated backend-v2 account gateway while preserving the frozen V1 canvas interface and original V1 Git tag.
+2026-11-06 变更：从 V1.1 账户网关升级到单一 Sub2 身份系统。主页面和自由画布仍沿用 V1 封版界面。
 
-- Admin username is reserved as `hamoki`. On a fresh deployment, an unpredictable one-time activation code is printed to the server operator console. Only the owner can activate the administrator and choose a password.
-- Registration uses username/password without invitation code; each account gets its own worker, canvas, project history, provider secrets and private 1 GiB media storage.
-- Account management includes role-restricted user disabling and password resets (one-time temporary password, admin password re-verification, password change required).
-- Sub2 credential/token and API key are encrypted; Sub2 login and balance/model synchronization endpoints are included. No real paid generation test is performed during release.
-- Legacy `POST /api/jobs` accepts jobs quickly and the existing queue polls completion. Upstream 429 may retry with a limit; 504/524 uncertain-charge results do not automatically resubmit.
-- Dedicated Sub2 async task ledger keeps one persisted request ID per user. Upstream async support and actual accounting must still be validated with the intended Sub2 model before paid production use.
-- Account API and session responses use `Cache-Control: private, no-store`; configure your CDN not to cache `/api/*`.
+- 登录页面仅提供 Sub2 邮箱、密码；不再生成或使用管理员激活码，不再有 Studio 本地注册/密码/重置入口。
+- 只有在 Sub2 认证成功且返回有效身份 ID 时才建立 Studio 会话。旧本地账户的历史会话被拒绝。
+- 管理员权限来自经过核实的 `STUDIO_ADMIN_SUB2_ID` 环境设置（无配置则无人拥有管理员权限），不由用户名或首次访问决定。
+- 单用户独立画布、工作空间、加密提供商 Key 和媒体 1 GiB 限额继续保留。
+- 余额和生图模型从 Sub2 同步。已存在的个人数据卷不删除、不清空。
+- 请求去重、错误状态不重复自动付费请求及 504/524 警告机制继续保留。原有画布队列暂未全面整合独立 Sub2 异步任务账本。
+- 安全边界：管理 API `Cache-Control: private, no-store`；不信任从其他站点来的跨站请求；除登录与状态检查外，访问画布需有效的 Sub2 关联会话。
 
-For Docker, see `Dockerfile.v2` and `compose.v2.yaml`. The gateway and private workers listen on loopback only; HTTPS belongs on a separate reverse proxy. Deploy V2 with a **new named data volume**; do not attach or delete the old V1 data volume. Keep the SQLite WAL files and master.key together for recovery.
+部署入口：`Dockerfile.v2`、`compose.v2.yaml`。切换生产容器前备份账号数据卷和代理配置，不修改 CPA 或 Sub2 本身的容器。新代码使用原 V2 数据卷，保留已有用户与私有配置。
 
-The V1 workspaces are NOT automatically migrated into any V2 account. Any future migration should be explicit, verified, and reversible.
-
+此版本的自动化测试使用模拟 Sub2 服务。真实账号登录和真实扣费生图须另行做线上验收。

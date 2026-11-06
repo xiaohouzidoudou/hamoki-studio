@@ -1,14 +1,49 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hamoki Studio · 账号设置</title><style>body{margin:0;color:#e8f3ef;background:radial-gradient(circle at top left,#1c4339,#081113 62%);font:14px system-ui,"Microsoft YaHei"}main{max-width:930px;margin:25px auto;padding:18px}section{padding:23px;margin:15px 0;border:1px solid #ffffff23;border-radius:18px;background:#ffffff0d;backdrop-filter:blur(20px)}h2{font-size:17px}a{color:#88dcb7}input{background:#071812;color:#fff;border:1px solid #527565;border-radius:9px;padding:10px;margin:4px;max-width:210px}button{background:#2a8e60;color:#fff;border:0;padding:10px 14px;margin:4px;border-radius:10px;cursor:pointer}.secondary{background:#2e3e3c}.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between;padding:10px 0;border-bottom:1px solid #ffffff12}.muted{color:#aabcb7}#notice{color:#f8bba6;white-space:pre-wrap}#admin{display:none}.flag{color:#8ee8af}</style></head><body><main><a href="/">← 返回自由画布</a><h1>账号与管理</h1><p id="notice"></p><section><h2>当前账户</h2><p id="who">加载中...</p><p id="quota"></p><button id="logout" class="secondary">退出登录</button></section><section><h2>修改密码</h2><input id="old" type="password" placeholder="原密码 / 临时密码"><input id="new" type="password" placeholder="新密码（至少10位）"><button id="change">修改密码</button></section><section><h2>Sub2 连接</h2><p class="muted">绑定后余额直接读取 Sub2，不另设余额账本。无需共享 API Key。</p><input id="email" type="email" placeholder="Sub2 邮箱"><input id="subpass" type="password" placeholder="Sub2 密码"><button id="connect">连接 Sub2</button><div class="row"><span id="balance">尚未查询余额</span><button id="balanceBtn" class="secondary">刷新余额</button></div><div class="row"><span id="models">生图模型尚未读取</span><button id="keyBtn" class="secondary">创建专用 Key</button><button id="modelsBtn" class="secondary">查询模型</button></div></section><section id="admin"><h2>用户管理 <small class="muted">· 仅管理员可见</small></h2><div id="users"></div></section></main><script>
-const $=id=>document.getElementById(id),hdr={'Content-Type':'application/json','X-Studio-Request':'1'};let me=null;
-async function call(url,method='GET',body){const r=await fetch(url,{method,headers:hdr,body:body?JSON.stringify(body):undefined});const d=await r.json();if(!r.ok)throw Error(d.error||'失败');return d}
-async function act(fn){try{$('notice').textContent='';await fn()}catch(e){$('notice').textContent=e.message}}
-async function init(){const data=await call('/api/account/me');me=data.user;$('who').textContent=me.username+' · '+(me.role==='admin'?'管理员':'普通用户')+(data.sub2Connected?' · 已连接 Sub2':'');$('quota').textContent='存储占用 '+(data.quota.usedBytes/1048576).toFixed(1)+' MiB / 1024 MiB';if(me.role==='admin'){$('admin').style.display='block';await list()}}
-async function list(){const {users}=await call('/api/admin/users');const box=$('users');box.replaceChildren();users.forEach(u=>{const div=document.createElement('div');div.className='row';const text=document.createElement('span');text.textContent=u.username+' · '+u.status+' · '+(u.quota.usedBytes/1048576).toFixed(1)+' MiB';div.append(text);if(u.role!=='admin'){const btn=document.createElement('button');btn.textContent=u.status==='active'?'禁用':'启用';btn.className='secondary';btn.onclick=()=>act(async()=>{await call('/api/admin/users/'+u.id+'/disable','POST',{disabled:u.status==='active'});await list()});const reset=document.createElement('button');reset.textContent='重置密码';reset.onclick=()=>act(async()=>{const pw=prompt('请再次输入你自己的管理员密码');if(!pw)return;const d=await call('/api/admin/users/'+u.id+'/reset','POST',{adminPassword:pw});alert('只显示一次的临时密码：\n'+d.temporaryPassword)});div.append(btn,reset)}box.append(div)})}
-$('change').onclick=()=>act(async()=>{await call('/api/account/password','POST',{oldPassword:$('old').value,newPassword:$('new').value});alert('密码已修改，请重新登录');location.href='/login'});
-$('connect').onclick=()=>act(async()=>{await call('/api/account/sub2/connect','POST',{email:$('email').value,password:$('subpass').value});$('email').value='';$('subpass').value='';await init()});
-$('balanceBtn').onclick=()=>act(async()=>{const d=await call('/api/account/sub2/balance');$('balance').textContent='Sub2 余额：'+d.balance+' USD'});
-$('keyBtn').onclick=()=>act(async()=>{const d=await call('/api/account/sub2/provision','POST');$('models').textContent='专用 API Key 已创建（仅后端保存），可查询 '+d.modelCount+' 个模型'});
-$('modelsBtn').onclick=()=>act(async()=>{const d=await call('/api/account/sub2/models');$('models').textContent=d.needsProvision?'请先创建专用 Key':(d.models.length?d.models.join('、'):'未发现可用的生图模型')});
-$('logout').onclick=()=>act(async()=>{await call('/api/auth/logout','POST');location.href='/login'});
-init().catch(()=>location.href='/login');
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hamoki Studio · 账号管理</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 10% 0,#204338,#081012 58%);color:#e3f3eb;font-size:14px}
+main{width:min(900px,100%);padding:24px 18px 70px;margin:0 auto}a{color:#88dcac;text-decoration:none}a:hover{text-decoration:underline}
+h1{font-size:25px;font-weight:650;margin:20px 0 9px}h2{font-size:16px;font-weight:600;margin:0 0 13px}
+.desc,.muted{color:#9db9aa;line-height:1.65}section{padding:24px;margin:18px 0;border:1px solid #b5ddc527;border-radius:18px;background:#deffef0b;box-shadow:0 18px 42px #0002;backdrop-filter:blur(18px)}
+.row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:12px 0;border-bottom:1px solid #c4ebd018}.row:last-child{border:0}
+button{border:1px solid #73c99e3e;background:#2e7354;color:#e7f7ed;font:inherit;padding:9px 13px;border-radius:11px;cursor:pointer;transition:background .2s,transform .2s}
+button:hover{background:#378e67}button:active{transform:scale(.985)}button.secondary{background:#ffffff11;border-color:#ffffff26}button:disabled{opacity:.5}
+#notice{min-height:18px;color:#ffc0ad;white-space:pre-wrap}#admin{display:none}#models{overflow-wrap:anywhere}small{font-size:12px}
+@media(max-width:480px){section{padding:18px}h1{font-size:22px}}
+@media(prefers-reduced-motion:reduce){button{transition:none}}
+</style></head>
+<body><main>
+<a href="/">← 返回自由画布</a><h1>账号与管理</h1><p class="desc">与 Sub2 账号自动关联，无需额外的 Studio 密码。</p><p id="notice" role="alert" aria-live="polite"></p>
+<section><h2>当前账号</h2><div class="row"><span id="who">加载中…</span><button id="logout" class="secondary">退出登录</button></div><div class="row"><span id="quota" class="muted">正在读取空间使用情况…</span></div></section>
+<section><h2>Sub2 生图账号</h2><p class="desc">余额和可用模型来自你登录的 Sub2 账号，API Key 仅保存在服务器个人加密空间。</p>
+<div class="row"><span id="balance">尚未读取余额</span><button id="balanceBtn" class="secondary">刷新余额</button></div>
+<div class="row"><span id="models" class="muted">尚未读取生图模型</span><button id="modelsBtn" class="secondary">查询模型</button></div>
+<div class="row"><span id="sync" class="muted">生图模型未同步</span><button id="keyBtn">同步到画布</button></div></section>
+<section id="admin"><h2>用户管理 <small class="muted">· 仅 Sub2 管理员可见</small></h2><p class="desc">可以禁用或恢复用户在 Studio 的访问。密码由用户在 Sub2 自行管理。</p><div id="users"></div></section>
+</main>
+<script>
+const $=id=>document.getElementById(id),hdr={'Content-Type':'application/json','X-Studio-Request':'1'};
+let me=null;
+async function call(url,method='GET',body){const res=await fetch(url,{method,headers:hdr,credentials:'same-origin',cache:'no-store',body:body?JSON.stringify(body):undefined});const data=await res.json().catch(()=>({}));if(!res.ok)throw Error(data.error||'请求失败');return data}
+async function act(fn){$('notice').textContent='';try{await fn()}catch(e){$('notice').textContent=e.message||'请求失败'}}
+async function usersList(){
+ const {users}=await call('/api/admin/users');const box=$('users');box.replaceChildren();
+ for(const u of users){const line=document.createElement('div');line.className='row';const name=document.createElement('span');name.textContent=u.username+' · '+(u.status==='active'?'正常':'已禁用')+' · '+(u.quota.usedBytes/1048576).toFixed(1)+' MiB';line.append(name);
+ if(u.role!=='admin'){const btn=document.createElement('button');btn.className='secondary';btn.textContent=u.status==='active'?'禁用':'恢复';btn.addEventListener('click',()=>act(async()=>{await call('/api/admin/users/'+encodeURIComponent(u.id)+'/disable','POST',{disabled:u.status==='active'});await usersList()}));line.append(btn);}
+ box.append(line);}
+}
+async function init(){
+ const data=await call('/api/account/me');me=data.user;
+ $('who').textContent=me.username+(me.role==='admin'?' · 管理员':' · 普通用户')+' · Sub2 已关联';
+ $('quota').textContent='已用 '+(data.quota.usedBytes/1048576).toFixed(1)+' MiB / 1024 MiB';
+ if(me.role==='admin'){$('admin').style.display='block';await usersList();}
+ await act(async()=>{$('balance').textContent='读取中…';const x=await call('/api/account/sub2/balance');$('balance').textContent=x.balance==null?'Sub2 未返回余额':'Sub2 余额：'+x.balance+' USD';});
+}
+$('balanceBtn').addEventListener('click',()=>act(async()=>{const x=await call('/api/account/sub2/balance');$('balance').textContent=x.balance==null?'余额暂不可用':'Sub2 余额：'+x.balance+' USD';}));
+$('modelsBtn').addEventListener('click',()=>act(async()=>{const x=await call('/api/account/sub2/models');$('models').textContent=x.needsProvision?'需要先同步生图密钥':(x.models.length?x.models.join('、'):'未找到图像模型');}));
+$('keyBtn').addEventListener('click',()=>act(async()=>{const x=await call('/api/account/sub2/provision','POST');$('sync').textContent=x.configured?'已同步 '+x.modelCount+' 个生图模型':'已保存专用 Key，画布模型尚未同步';}));
+$('logout').addEventListener('click',()=>act(async()=>{await call('/api/auth/logout','POST');location.replace('/login');}));
+init().catch(()=>location.replace('/login'));
 </script></body></html>

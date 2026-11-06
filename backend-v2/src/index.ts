@@ -33,7 +33,6 @@ let isClosing=false;
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 function reject(message,statusCode=400){throw Object.assign(Error(message),{statusCode})}
 function sourceIP(req){return String(req.headers['x-real-ip']||req.ip||'unknown').slice(0,48)}
-function adminActivated(){return !!accounts.db.prepare("SELECT id FROM users WHERE username='hamoki'").get()}
 function cookie(req){
   const part=(req.headers.cookie||'').split(';').find(p=>p.trim().startsWith('hs_v2='));
   return part?part.trim().slice(6):null;
@@ -49,7 +48,6 @@ function throttle(key,max,period){
 function requireLogin(req){
   const u=accounts.session(cookie(req));
   if(!u)reject('请先登录',401);
-  if(u.must_change&&!['/api/account/password','/api/account/me'].includes(req.url))reject('请先修改临时密码',403);
   return u;
 }
 function checkAdmin(req){const u=requireLogin(req);if(u.role!=='admin')reject('需要管理员权限',403);return u}
@@ -66,7 +64,6 @@ app.addHook('onRequest',async(req,reply)=>{
   if(route.startsWith('/api/')&&!/^\/api\/(auth|account|admin)\//.test(route)){
     const user=accounts.session(cookie(req));
     if(!user)return reply.code(401).send({error:'请先登录'});
-    if(user.must_change)return reply.code(403).send({error:'请先修改临时密码'});
     if(!['GET','HEAD','OPTIONS'].includes(req.method)){
       const origin=req.headers.origin;
       if(origin){let o;try{o=new URL(origin)}catch{return reply.code(403).send({error:'跨站请求被拒绝'})};if(o.host!==req.headers.host)return reply.code(403).send({error:'跨站请求被拒绝'})}
@@ -88,26 +85,9 @@ function loginReply(reply,user,req){
   reply.header('Set-Cookie',sessionCookie(token,req));
   return {user,quota:accounts.quota(user.id)};
 }
-app.get('/api/auth/status',async(req)=>({user:accounts.session(cookie(req)),needsActivation:!adminActivated(),sub2Enabled:sub2.enabled}));
-app.post('/api/auth/activate',async(req,reply)=>{
-  throttle('activate:'+sourceIP(req),5,3600000);
-  const u=accounts.activate(req.body?.code,req.body?.password);
-  return loginReply(reply,u,req);
-});
-app.post('/api/auth/register',async(req,reply)=>{
-  if(!adminActivated())reject('请先由管理员激活网站',503);
-  throttle('register:'+sourceIP(req),4,86400000);
-  if(accounts.listUsers().length>=Number(process.env.STUDIO_MAX_USERS||12))reject('注册人数已达上限',403);
-  const u=accounts.create(req.body?.username,req.body?.password);
-  return loginReply(reply,u,req);
-});
-app.post('/api/auth/login',async(req,reply)=>{
-  throttle('login:'+sourceIP(req),12,15*60000);
-  const u=accounts.authenticate(req.body?.username,req.body?.password);
-  return loginReply(reply,u,req);
-});
+app.get('/api/auth/status',async(req)=>({user:accounts.session(cookie(req)),loginProvider:'sub2',sub2Enabled:sub2.enabled}));
 app.post('/api/auth/sub2-login',async(req,reply)=>{
-  if(!adminActivated())reject('请先由管理员激活网站',503);
+  if(!sub2.enabled)reject('Sub2 登录暂不可用',503);
   throttle('sub2-login:'+sourceIP(req),6,15*60000);
   const {profile,tokens}=await sub2.login(req.body?.email,req.body?.password);
   const u=accounts.sub2Identity(profile.id,profile.username||profile.email||'',tokens);
@@ -122,20 +102,6 @@ app.post('/api/auth/logout',async(req,reply)=>{
 app.get('/api/account/me',async(req)=>{
   const u=requireLogin(req);
   return {user:u,quota:accounts.quota(u.id),sub2Connected:!!u.sub2_id,sub2Enabled:sub2.enabled};
-});
-app.post('/api/account/password',async(req)=>{
-  const u=accounts.session(cookie(req));if(!u)reject('请先登录',401);
-  accounts.changePassword(u.id,req.body?.oldPassword,req.body?.newPassword);
-  return {ok:true,requiresRelogin:true};
-});
-app.post('/api/account/sub2/connect',async(req)=>{
-  const u=requireLogin(req);
-  throttle('sub2-connect:'+sourceIP(req),6,900000);
-  const {profile,tokens}=await sub2.login(req.body?.email,req.body?.password);
-  accounts.bindSub2(u.id,profile.id,tokens);
-  let sub2Sync,sub2Warning;
-  try{sub2Sync=await ensureSub2Ready(u)}catch(e){sub2Warning='账号绑定成功，但自动配置生图 API 失败：'+String(e.message).slice(0,140)}
-  return {ok:true,sub2Id:String(profile.id),sub2Sync,sub2Warning};
 });
 async function sub2Session(u){
   const tokens=accounts.sub2Tokens(u.id);
@@ -230,12 +196,6 @@ app.post('/api/admin/users/:id/disable',async(req)=>{
   accounts.disable(req.params.id,admin.id,req.body?.disabled===true);
   return {ok:true};
 });
-app.post('/api/admin/users/:id/reset',async(req)=>{
-  const admin=checkAdmin(req);
-  throttle('admin-reset:'+admin.id,5,3600000);
-  if(!req.body?.adminPassword||!accounts.authenticate(admin.username,req.body.adminPassword))reject('验证失败',403);
-  return {temporaryPassword:accounts.reset(req.params.id,admin.id),showOnce:true};
-});
 async function internalWorkerRequest(w,route,method='GET',payload){
   const r=await fetch('http://127.0.0.1:'+w.port+route,{
     method,
@@ -298,12 +258,13 @@ async function worker(id){
   return record.ready;
 }
 async function proxy(req,reply){
+  // Unknown account/auth/admin endpoints must never be proxied to a canvas worker.
+  if(/^\/api\/(?:auth|account|admin)\//.test(new URL(req.url,'http://localhost').pathname))return reply.code(404).send({error:'接口不存在'});
   const u=accounts.session(cookie(req));
   if(!u){
     if(!req.url.startsWith('/api/'))return reply.redirect('/login');
     return reply.code(401).send({error:'请先登录'});
   }
-  if(u.must_change)return reply.code(403).send({error:'请先修改临时密码'});
   const active=await worker(u.id);
   const isIndex=req.method==='GET'&&['/','/index.html'].includes(new URL(req.url,'http://localhost').pathname);
   if(isIndex){

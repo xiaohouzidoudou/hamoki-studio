@@ -5,25 +5,6 @@ import { DatabaseSync } from 'node:sqlite';
 
 const quotaBytes = 1024 ** 3;
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
-const equal = (a,b) => {
-  const x=Buffer.from(a||''),y=Buffer.from(b||'');
-  return x.length===y.length&&crypto.timingSafeEqual(x,y);
-};
-function passwordHash(password,salt=crypto.randomBytes(16).toString('hex')){
-  const hash=crypto.scryptSync(password,salt,64).toString('hex');
-  return salt+':'+hash;
-}
-function verifyPassword(password,encoded){
-  if(!encoded||!encoded.includes(':'))return false;
-  const [salt]=encoded.split(':');
-  try{return equal(passwordHash(password,salt),encoded)}catch{return false}
-}
-function securityCheck(password){
-  if(typeof password!=='string'||password.length<10||password.length>128)throw Object.assign(new Error('密码至少10位，最多128位'),{statusCode:400});
-}
-function usernameCheck(name){
-  if(typeof name!=='string'||! /^[a-zA-Z][a-zA-Z0-9_-]{2,29}$/.test(name)||name.toLowerCase()==='hamoki')throw Object.assign(new Error('用户名必须为3-30位字母数字/下划线，hamoki是保留管理员名'),{statusCode:400});
-}
 export class Accounts {
   constructor(dir){
     fs.mkdirSync(dir,{recursive:true});
@@ -44,47 +25,17 @@ export class Accounts {
     if(!fs.existsSync(this.keyFile))fs.writeFileSync(this.keyFile,crypto.randomBytes(32),{flag:'wx',mode:0o600});
     this.master=fs.readFileSync(this.keyFile);
     if(this.master.length!==32)throw Error('Master key length invalid');
-    this.admin=this.db.prepare("SELECT id FROM users WHERE username='hamoki'").get();
-    this.activationFile=path.join(dir,'activation.hash');
-    if(!this.admin&&!fs.existsSync(this.activationFile)){
-      this.activation=crypto.randomBytes(16).toString('hex');
-      fs.writeFileSync(this.activationFile,digest(this.activation),{flag:'wx',mode:0o600});
-      console.log('[Hamoki Studio] 首次管理员激活码（只在控制台显示一次）:',this.activation);
-    }
+    // Administrator authority is mapped to an explicitly configured, verified
+    // Sub2 user ID. A first visitor never becomes administrator automatically.
+    this.adminSub2Id=String(process.env.STUDIO_ADMIN_SUB2_ID||'');
+    if(this.adminSub2Id&&!/^[1-9][0-9]*$/.test(this.adminSub2Id))throw Error('STUDIO_ADMIN_SUB2_ID must be a positive integer');
+    // Old activation.hash may remain in a pre-existing volume; it is ignored.
   }
   transaction(fn){this.db.exec('BEGIN IMMEDIATE');try{const r=fn();this.db.exec('COMMIT');return r}catch(e){this.db.exec('ROLLBACK');throw e}}
   audit(actor,action,target){this.db.prepare('INSERT INTO audit(actor,action,target,created) VALUES(?,?,?,?)').run(actor,action,target,new Date().toISOString())}
-  activate(code,password){
-    securityCheck(password);
-    return this.transaction(()=>{
-      if(this.db.prepare("SELECT id FROM users WHERE username='hamoki'").get())throw Object.assign(Error('管理员已激活'),{statusCode:409});
-      const expected=fs.readFileSync(this.activationFile,'utf8');
-      if(!equal(expected,digest(code||'')))throw Object.assign(Error('激活码错误'),{statusCode:403});
-      const id=crypto.randomUUID();
-      this.db.prepare('INSERT INTO users(id,username,hash,role,status,created) VALUES(?,?,?,?,?,?)').run(id,'hamoki',passwordHash(password),'admin','active',new Date().toISOString());
-      fs.unlinkSync(this.activationFile);
-      this.audit(id,'admin.activate',id);
-      return this.getById(id);
-    });
-  }
-  create(username,password){
-    usernameCheck(username);securityCheck(password);
-    const id=crypto.randomUUID();
-    try{
-      this.db.prepare('INSERT INTO users(id,username,hash,role,status,created) VALUES(?,?,?,?,?,?)').run(id,username,passwordHash(password),'user','active',new Date().toISOString());
-    }catch(e){if(String(e).includes('UNIQUE'))throw Object.assign(Error('用户名已存在'),{statusCode:409});throw e}
-    this.audit(id,'user.register',id);
-    return this.getById(id);
-  }
   getById(id){return this.db.prepare('SELECT id,username,role,status,created,must_change,sub2_id FROM users WHERE id=?').get(id)}
-  getByName(username){return this.db.prepare('SELECT * FROM users WHERE username=?').get(username)}
-  authenticate(username,password){
-    const u=this.getByName(username);
-    if(!u||!verifyPassword(password,u.hash)||u.status!=='active')throw Object.assign(Error('用户名或密码错误'),{statusCode:401});
-    if(u.must_change&&u.temp_expires&&u.temp_expires<Date.now())throw Object.assign(Error('临时密码已过期，请联系管理员重新重置'),{statusCode:401});
-    return this.getById(u.id);
-  }
   createSession(id){
+    if(!this.getById(id)?.sub2_id)throw Object.assign(Error('只允许 Sub2 账号登录'),{statusCode:403});
     const t=crypto.randomBytes(32).toString('hex');
     this.db.prepare('INSERT INTO sessions(token_hash,user_id,expires) VALUES(?,?,?)').run(digest(t),id,Date.now()+30*864e5);
     return t;
@@ -92,35 +43,18 @@ export class Accounts {
   session(token){
     if(!token||! /^[0-9a-f]{64}$/.test(token))return null;
     const row=this.db.prepare('SELECT u.id,u.username,u.role,u.status,u.must_change,u.sub2_id FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires>?').get(digest(token),Date.now());
-    return row?.status==='active'?row:null;
+    if(row?.status!=='active'||!row.sub2_id)return null;
+    return {...row,role:this.adminSub2Id&&String(row.sub2_id)===this.adminSub2Id?'admin':'user',must_change:0};
   }
   revokeSessions(id){this.db.prepare('DELETE FROM sessions WHERE user_id=?').run(id)}
   logout(token){if(token)this.db.prepare('DELETE FROM sessions WHERE token_hash=?').run(digest(token))}
   listUsers(){return this.db.prepare('SELECT id,username,role,status,created,must_change,sub2_id FROM users ORDER BY created DESC').all()}
   disable(id,actor,disabled){
     const u=this.getById(id);
-    if(!u||u.role==='admin')throw Object.assign(Error('不允许禁用管理员'),{statusCode:403});
+    if(!u||u.role==='admin'||String(u.sub2_id)===this.adminSub2Id)throw Object.assign(Error('不允许禁用管理员'),{statusCode:403});
     this.db.prepare('UPDATE users SET status=? WHERE id=?').run(disabled?'disabled':'active',id);
     if(disabled)this.revokeSessions(id);
     this.audit(actor,disabled?'user.disable':'user.enable',id);
-  }
-  reset(id,actor){
-    const u=this.getById(id);
-    if(!u||u.role==='admin')throw Object.assign(Error('不能重置管理员'),{statusCode:403});
-    const temp=crypto.randomBytes(18).toString('base64url');
-    this.db.prepare('UPDATE users SET hash=?,must_change=1,temp_expires=? WHERE id=?').run(passwordHash(temp),Date.now()+24*3600*1000,id);
-    this.revokeSessions(id);
-    this.audit(actor,'user.password.reset',id);
-    return temp;
-  }
-  changePassword(id,oldPassword,newPassword){
-    securityCheck(newPassword);
-    const u=this.db.prepare('SELECT hash,must_change,temp_expires FROM users WHERE id=?').get(id);
-    if(!u||!verifyPassword(oldPassword,u.hash))throw Object.assign(Error('原密码不正确'),{statusCode:401});
-    if(u.must_change&&u.temp_expires&&u.temp_expires<Date.now())throw Object.assign(Error('临时密码已过期，请联系管理员重新重置'),{statusCode:401});
-    this.db.prepare('UPDATE users SET hash=?,must_change=0,temp_expires=NULL WHERE id=?').run(passwordHash(newPassword),id);
-    this.revokeSessions(id);
-    this.audit(id,'user.password.change',id);
   }
   encrypt(obj){
     const iv=crypto.randomBytes(12),cipher=crypto.createCipheriv('aes-256-gcm',this.master,iv);
@@ -133,25 +67,23 @@ export class Accounts {
     const dec=crypto.createDecipheriv('aes-256-gcm',this.master,iv);dec.setAuthTag(tag);
     return JSON.parse(Buffer.concat([dec.update(bytes.subarray(28)),dec.final()]).toString('utf8'));
   }
-  bindSub2(userId,sub2Id,tokens){
-    const current=this.db.prepare('SELECT id FROM users WHERE sub2_id=?').get(String(sub2Id));
-    if(current&&current.id!==userId)throw Object.assign(Error('Sub2账号已关联其他用户'),{statusCode:409});
-    this.db.prepare('UPDATE users SET sub2_id=?,sub2_tokens=? WHERE id=?').run(String(sub2Id),this.encrypt(tokens),userId);
-    this.audit(userId,'sub2.bind',userId);
-  }
   sub2Identity(sub2Id,username,tokens){
     const id=String(sub2Id);
+    if(!/^[1-9][0-9]*$/.test(id))throw Object.assign(Error('Sub2 身份 ID 不合法'),{statusCode:502});
     return this.transaction(()=>{
       let u=this.db.prepare('SELECT id FROM users WHERE sub2_id=?').get(id);
       if(!u){
         const uid=crypto.randomUUID();
         const clean=String(username||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,20);
         const display='sub2_'+(clean||'user')+'_'+digest(id).slice(0,6);
-        this.db.prepare('INSERT INTO users(id,username,hash,role,status,created,sub2_id) VALUES(?,?,?,?,?,?,?)').run(uid,display,null,'user','active',new Date().toISOString(),id);
+        const role=this.adminSub2Id===id?'admin':'user';
+        this.db.prepare('INSERT INTO users(id,username,hash,role,status,created,sub2_id) VALUES(?,?,?,?,?,?,?)').run(uid,display,null,role,'active',new Date().toISOString(),id);
         u={id:uid};
       }
-      this.db.prepare('UPDATE users SET sub2_tokens=? WHERE id=?').run(this.encrypt(tokens),u.id);
-      return this.getById(u.id);
+      const role=this.adminSub2Id===id?'admin':'user';
+      this.db.prepare('UPDATE users SET sub2_tokens=?,role=?,must_change=0 WHERE id=?').run(this.encrypt(tokens),role,u.id);
+      const result=this.getById(u.id);
+      return {...result,role};
     });
   }
   sub2Tokens(id){

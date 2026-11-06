@@ -1,8 +1,59 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hamoki Studio · 登录</title><style>*,*:before,*:after{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;font:15px system-ui,"Microsoft YaHei";color:#e9f5f0;background:radial-gradient(circle at 16% 14%,#214c3e,#0a1114 52%)}.panel{width:min(425px,93vw);padding:32px;border:1px solid #ffffff24;background:#ffffff12;backdrop-filter:blur(24px);border-radius:23px;box-shadow:0 25px 80px #0006}h1{font-size:25px;margin:0 0 10px}p{color:#a6bdb4;font-size:13px}.tabs{display:flex;gap:7px;margin:22px 0}.tabs button{flex:1}.tabs button.active{background:#376e57;color:white;border-color:#629782}button,input{font:inherit;border-radius:11px}input{display:block;margin:12px 0;padding:12px;width:100%;color:white;background:#0714128a;border:1px solid #647e7559;outline:none}input:focus{border-color:#78d1aa}button{padding:11px;border:1px solid #ffffff29;background:#ffffff0f;color:#dfebe6;cursor:pointer}button[type=submit]{background:#43b67e;border:0;color:#092217;font-weight:700;width:100%;margin-top:12px}button:disabled{opacity:.6}#message{color:#ffb6ac;min-height:18px}small{color:#a0b5ad}a{color:#7fe0ab}.hidden{display:none}</style></head><body><div class="panel"><h1>Hamoki Studio</h1><p>你的创作空间 · 独立账号 · 独立素材</p><div class="tabs" id="tabs"><button data-mode="login" class="active">登录</button><button data-mode="register">注册</button><button data-mode="sub2">Sub2 登录</button></div><form id="form"><input id="username" autocomplete="username" placeholder="用户名" required><input id="password" type="password" autocomplete="current-password" placeholder="密码（至少10位）" required><input id="code" class="hidden" placeholder="首次激活码" autocomplete="off"><button type="submit" id="submit">登录</button></form><p id="message"></p><small id="hint">无邀请码 · 不提供公共 API 额度</small></div><script>
-const form=document.querySelector('#form'),buttons=[...document.querySelectorAll('[data-mode]')],message=document.querySelector('#message'),username=document.querySelector('#username'),password=document.querySelector('#password'),code=document.querySelector('#code'),submit=document.querySelector('#submit'),hint=document.querySelector('#hint');let mode='login';
-function pick(next){mode=next;buttons.forEach(b=>b.classList.toggle('active',b.dataset.mode===next));username.placeholder=next==='sub2'?'Sub2 账号邮箱':'用户名';username.type=next==='sub2'?'email':'text';code.classList.toggle('hidden',next!=='activate');submit.textContent={login:'登录',register:'创建账号',sub2:'使用 Sub2 登录',activate:'激活管理员 hamoki'}[next];hint.textContent=next==='sub2'?'不会在 Studio 保存你的 Sub2 密码':next==='activate'?'激活码仅从本地服务器控制台获取':'每个账号有独立 1 GiB 图片空间';message.textContent=''}
-buttons.forEach(b=>b.addEventListener('click',()=>pick(b.dataset.mode)));
-async function post(url,payload){const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-Studio-Request':'1'},body:JSON.stringify(payload)});const data=await res.json();if(!res.ok)throw Error(data.error||'操作失败');return data}
-form.onsubmit=async e=>{e.preventDefault();message.textContent='';submit.disabled=true;try{const data=await post(({login:'/api/auth/login',register:'/api/auth/register',sub2:'/api/auth/sub2-login',activate:'/api/auth/activate'})[mode],mode==='sub2'?{email:username.value,password:password.value}:mode==='activate'?{code:code.value,password:password.value}:{username:username.value,password:password.value});location.href='/'}catch(e){message.textContent=e.message}finally{submit.disabled=false}};
-fetch('/api/auth/status').then(r=>r.json()).then(d=>{if(d.user){location.href='/';return}if(d.needsActivation){buttons.forEach(b=>b.classList.add('hidden'));pick('activate');username.classList.add('hidden');username.required=false}else if(!d.sub2Enabled)buttons.find(b=>b.dataset.mode==='sub2').classList.add('hidden')}).catch(()=>{});
-</script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hamoki Studio · Sub2 登录</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif}
+*{box-sizing:border-box}
+body{margin:0;min-height:100svh;display:grid;place-items:center;padding:24px;color:#e7f2ed;background:radial-gradient(ellipse at 24% 12%,#20483d 0,transparent 46%),radial-gradient(ellipse at 85% 85%,#102824 0,transparent 45%),#091011}
+.panel{width:min(440px,100%);padding:36px 32px;background:rgba(221,255,236,.065);border:1px solid #c0f0d72b;border-radius:23px;box-shadow:0 28px 75px #0008;backdrop-filter:blur(25px);-webkit-backdrop-filter:blur(25px)}
+.eyebrow{font-size:12px;letter-spacing:.16em;color:#71cda5;text-transform:uppercase;margin-bottom:12px}
+h1{font-size:25px;letter-spacing:-.025em;margin:0 0 10px;font-weight:650}
+p{color:#adc1b8;font-size:13px;line-height:1.7;margin:0 0 26px}
+label{display:block;color:#c5d6ce;font-size:13px;font-weight:500;margin:18px 0 8px}
+input{display:block;width:100%;padding:14px 15px;font:inherit;font-size:15px;color:#f5fff9;background:#061713a6;border:1px solid #86b69b42;border-radius:12px;outline:0;transition:border-color .2s,box-shadow .2s}
+input:focus{border-color:#75d8aa;box-shadow:0 0 0 3px #6bd2a421}
+input::placeholder{color:#6c8a7c}
+button{margin-top:26px;display:block;width:100%;padding:13px;border:0;border-radius:12px;color:#062215;font-size:15px;font-weight:650;background:#64ce94;cursor:pointer;transition:background .2s,transform .18s}
+button:hover{background:#80dfaa}button:active{transform:scale(.985)}button:disabled{opacity:.55;cursor:wait}
+#message{min-height:21px;margin:12px 0 0;color:#ffb9ac;font-size:13px}
+.foot{display:flex;gap:8px;align-items:center;padding-top:19px;margin-top:5px;border-top:1px solid #a3c5b223;color:#8da79b;font-size:12px;line-height:1.6}
+.foot b{color:#85dcb0;font-weight:500}
+@media(max-width:390px){.panel{padding:27px 22px}h1{font-size:23px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main class="panel">
+  <div class="eyebrow">Hamoki Studio</div>
+  <h1>使用 Sub2 账号登录</h1>
+  <p>直接使用已有的 Sub2 账号。登录后自动关联你的余额、可用模型和独立创作空间。</p>
+  <form id="form">
+    <label for="email">Sub2 邮箱</label>
+    <input id="email" type="email" autocomplete="username" placeholder="请输入 Sub2 登录邮箱" maxlength="254" required autofocus>
+    <label for="password">Sub2 密码</label>
+    <input id="password" type="password" autocomplete="current-password" placeholder="请输入 Sub2 密码" maxlength="128" required>
+    <button id="submit" type="submit">登录并进入画布</button>
+  </form>
+  <div id="message" role="alert" aria-live="polite"></div>
+  <div class="foot"><span>●</span><span><b>独立账号</b> · 个人图片与 API Key 分开保存，Sub2 密码不在 Studio 存储</span></div>
+</main>
+<script>
+const form=document.getElementById('form'),email=document.getElementById('email'),password=document.getElementById('password'),submit=document.getElementById('submit'),message=document.getElementById('message');
+form.addEventListener('submit',async event=>{
+  event.preventDefault();
+  message.textContent='';submit.disabled=true;submit.textContent='正在验证 Sub2 账号…';
+  try{
+    const response=await fetch('/api/auth/sub2-login',{method:'POST',headers:{'Content-Type':'application/json','X-Studio-Request':'1'},credentials:'same-origin',body:JSON.stringify({email:email.value.trim(),password:password.value})});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw Error(data.error||'登录失败，请检查 Sub2 账号和密码');
+    password.value='';
+    location.replace('/');
+  }catch(error){message.textContent=error.message||'登录失败';}
+  finally{submit.disabled=false;submit.textContent='登录并进入画布';}
+});
+fetch('/api/auth/status',{cache:'no-store'}).then(r=>r.json()).then(data=>{if(data.user)location.replace('/');else if(data.sub2Enabled===false){message.textContent='Sub2 服务暂时不可用';submit.disabled=true;}}).catch(()=>{});
+</script>
+</body></html>
