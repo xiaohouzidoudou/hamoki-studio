@@ -18,7 +18,7 @@
       html:not(.hs-preparing) #hamoki-first-frame{opacity:0;visibility:hidden;pointer-events:none;}
       @media(prefers-reduced-motion:reduce){#hamoki-first-frame::before{animation:none;border-color:#77d9a8;}#hamoki-first-frame{transition:none;}}
     </style>
-    <script>window.__hamokiFirstFrameFallback=setTimeout(function(){document.documentElement.classList.remove('hs-preparing');},4500);</script>
+    <script>window.__hamokiFirstFrameFallback=setTimeout(function(){if(document.readyState!=='loading')document.documentElement.classList.remove('hs-preparing');},4500);</script>
     <noscript><style>html.hs-preparing body>.top-bar,html.hs-preparing body>.main-content{visibility:visible!important}#hamoki-first-frame{display:none!important}</style></noscript>
     <link rel="stylesheet" href="flow-entry.css?v=1">
     <link rel="stylesheet" href="studio-v4.css?v=focus-dim-1">
