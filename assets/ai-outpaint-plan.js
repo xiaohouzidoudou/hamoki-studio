@@ -41,8 +41,17 @@
       const minScale=Math.max(512/g.outW,512/g.outH);
       if(maxScale<minScale)throw Error('扩图画布无法满足该模型尺寸限制，请减少扩展幅度');
       const factor=Math.min(maxScale,Math.max(1,minScale));
-      outputWidth=Math.min(4096,Math.max(512,Math.floor(g.outW*factor/16)*16));
-      outputHeight=Math.min(4096,Math.max(512,Math.floor(g.outH*factor/16)*16));
+      // Prefer rounding OUTWARDS: an added right/left margin must not make
+      // the original image a few pixels smaller merely to align to 16px.
+      const upW=Math.ceil(g.outW*factor/16)*16;
+      const upH=Math.ceil(g.outH*factor/16)*16;
+      if(upW<=4096&&upH<=4096&&upW*upH<=MAX_PIXELS&&
+         upW<=upH*3&&upH<=upW*3){
+        outputWidth=upW;outputHeight=upH;
+      }else{
+        outputWidth=Math.min(4096,Math.max(512,Math.floor(g.outW*factor/16)*16));
+        outputHeight=Math.min(4096,Math.max(512,Math.floor(g.outH*factor/16)*16));
+      }
       if(outputWidth*outputHeight>MAX_PIXELS)
         throw Error('扩图像素超出模型限制，请分次扩图');
       if(outputWidth>outputHeight*3||outputHeight>outputWidth*3)
