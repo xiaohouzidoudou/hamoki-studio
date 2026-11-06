@@ -1,0 +1,58 @@
+/* Border Trace — continuous 600ms drawing, no card transforms or hitbox changes. */
+.canvas-node:not(.canvas-note) > .canvas-border-trace {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 5;
+  overflow: visible;
+  border-radius: inherit;
+  pointer-events: none !important;
+  color: #85eab6;
+}
+
+.canvas-node:not(.canvas-note) > .canvas-border-trace > rect {
+  /* SVG geometry follows rectangular and portrait/landscape cards alike. */
+  x: 1px;
+  y: 1px;
+  width: calc(100% - 2px);
+  height: calc(100% - 2px);
+  rx: 11px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8px;
+  stroke-linecap: butt;
+  stroke-linejoin: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  opacity: .94;
+  pointer-events: none;
+  transition: stroke-dashoffset 600ms ease-in-out;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .canvas-viewport:not(.canvas-panning)
+    .canvas-node:not(.canvas-note):hover:not(:active):not(.hm-motion-dragging):not(.hm-motion-resizing)
+    > .canvas-border-trace > rect {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Keyboard users see the same complete outline when navigating the canvas. */
+.canvas-node:not(.canvas-note):focus-visible > .canvas-border-trace > rect {
+  stroke-dashoffset: 0;
+}
+
+/* No re-drawing during a drag or resize, even if the card remains hovered. */
+.canvas-node.hm-motion-dragging > .canvas-border-trace > rect,
+.canvas-node.hm-motion-resizing > .canvas-border-trace > rect,
+.canvas-viewport.canvas-panning .canvas-border-trace > rect {
+  stroke-dashoffset: 100 !important;
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-node:not(.canvas-note) > .canvas-border-trace > rect {
+    transition: none !important;
+  }
+}

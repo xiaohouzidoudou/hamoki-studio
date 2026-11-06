@@ -1,0 +1,269 @@
+/* Hamoki Studio · crisp original-image lightbox over a frosted workspace.
+   The source art and the whole infinite canvas remain untouched. */
+dialog.hm-original-preview {
+  position: fixed !important;
+  inset: 0 !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  max-width: none !important;
+  max-height: none !important;
+  overflow: hidden !important;
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: #ecf3f0 !important;
+}
+dialog.hm-original-preview:not([open]) { display: none !important; }
+dialog.hm-original-preview[open] { display: block !important; }
+dialog.hm-original-preview::backdrop {
+  background: rgba(9, 13, 16, .49);
+  -webkit-backdrop-filter: blur(22px) saturate(72%) brightness(77%);
+  backdrop-filter: blur(22px) saturate(72%) brightness(77%);
+  animation: hm-original-glass-in 240ms ease-out both;
+}
+.hm-original-preview .hm-original-stage {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  padding: 55px 24px 56px;
+  cursor: zoom-out;
+}
+.hm-original-preview .hm-original-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  width: fit-content;
+  max-width: 100%;
+  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+.hm-original-preview .hm-original-figure {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.13);
+  border-radius: 12px;
+  background: rgba(27,30,34,.66);
+  box-shadow: 0 28px 76px rgba(0,0,0,.48),
+              0 0 0 1px rgba(0,0,0,.16);
+  cursor: default;
+  opacity: 0;
+}
+.hm-original-preview .hm-original-figure.ready { opacity: 1; }
+.hm-original-preview .hm-original-image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: min(100%, calc(100vw - 50px));
+  /* Bottom controls float over the backdrop and do not consume image height. */
+  max-height: calc(100dvh - 115px);
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+ .hm-original-preview .hm-original-download {
+  position: absolute;
+  z-index: 2;
+  right: max(18px, env(safe-area-inset-right));
+  bottom: max(17px, env(safe-area-inset-bottom));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-width: 144px;
+  min-height: 42px;
+  padding: 10px 19px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(132,238,191,.42);
+  border-radius: 12px;
+  background: linear-gradient(135deg,rgba(47,132,108,.72),rgba(23,95,86,.72));
+  color: #ecfff6;
+  box-shadow: inset 0 1px 0 rgba(233,255,246,.16),0 10px 28px rgba(0,0,0,.25);
+  backdrop-filter: blur(20px) saturate(150%);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.hm-original-preview .hm-original-download svg {
+  width: 17px;
+  height: 17px;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.hm-original-preview .hm-original-download:hover:not(:disabled) {
+  border-color: rgba(158,250,208,.75);
+  background: linear-gradient(135deg,rgba(51,159,124,.82),rgba(24,117,102,.76));
+}
+.hm-original-preview .hm-original-download:disabled {
+  opacity: .55;
+  cursor: progress;
+}
+.hm-original-preview .hm-original-download:focus-visible {
+  outline: 2px solid #9df5c7;
+  outline-offset: 3px;
+}
+.hm-original-preview .hm-original-close {
+  position: absolute;
+  z-index: 2;
+  top: max(14px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,.20);
+  border-radius: 11px;
+  background: rgba(51,56,61,.52);
+  color: #f4faf7;
+  box-shadow: 0 3px 15px rgba(0,0,0,.16), inset 0 1px rgba(255,255,255,.09);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+  backdrop-filter: blur(18px) saturate(130%);
+  cursor: pointer;
+  transition: background 180ms ease, transform 180ms cubic-bezier(.22,1,.36,1),
+              border-color 180ms ease;
+}
+.hm-original-preview .hm-original-close:hover {
+  background: rgba(87,98,100,.64);
+  border-color: rgba(255,255,255,.33);
+}
+.hm-original-preview .hm-original-close:active { transform: scale(.94); }
+.hm-original-preview .hm-original-close:focus-visible {
+  outline: 2px solid #85e5b4;
+  outline-offset: 3px;
+}
+.hm-original-preview .hm-original-close svg {
+  display: block;
+  width: 17px;
+  height: 17px;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  fill: none;
+  stroke-linecap: round;
+}
+.hm-original-preview .hm-original-info {
+  position: absolute;
+  z-index: 2;
+  left: max(18px, env(safe-area-inset-left));
+  bottom: max(17px, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: 42px;
+  max-width: calc(100vw - 205px);
+  padding: 6px 12px;
+  border: 1px solid rgba(255,255,255,.11);
+  border-radius: 8px;
+  background: rgba(40,45,49,.42);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  color: rgba(231,241,235,.80);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .2px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  pointer-events: none;
+}
+/* The size and download controls belong to the glass backdrop just OUTSIDE the
+   artwork, at its lower-right. Never cover the picture with floating buttons. */
+.hm-original-preview .hm-original-content {
+  position: relative;
+}
+.hm-original-preview .hm-original-tools {
+  position: absolute;
+  z-index: 3;
+  left: calc(100% + 12px);
+  right: auto;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 7px;
+  width: max-content;
+  max-width: min(180px, calc(100vw - 28px));
+  pointer-events: none;
+}
+.hm-original-preview .hm-original-tools[data-placement="below"] {
+  left: auto;
+  right: 0;
+  top: calc(100% + 12px);
+  bottom: auto;
+}
+.hm-original-preview .hm-original-tools > .hm-original-info {
+  position: static;
+  transform: none;
+  left: auto;
+  bottom: auto;
+  min-height: 0;
+  max-width: 100%;
+  padding: 6px 10px;
+  text-align: right;
+  pointer-events: none;
+}
+.hm-original-preview .hm-original-tools > .hm-original-download {
+  position: static;
+  right: auto;
+  bottom: auto;
+  min-width: min(144px, 100%);
+  max-width: 100%;
+  min-height: 40px;
+  pointer-events: auto;
+}
+@media (max-width: 600px) {
+  .hm-original-preview .hm-original-tools {
+    left: calc(100% + 9px);
+    gap: 5px;
+    max-width: min(180px, calc(100vw - 24px));
+  }
+  .hm-original-preview .hm-original-tools[data-placement="below"] {
+    left: auto;
+    right: 0;
+    top: calc(100% + 9px);
+  }
+  .hm-original-preview .hm-original-tools > .hm-original-download {
+    padding: 9px 12px;
+  }
+}
+@keyframes hm-original-glass-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (max-width: 600px) {
+  .hm-original-preview .hm-original-stage { padding: 56px 12px 58px; }
+  .hm-original-preview .hm-original-image {
+    max-width: calc(100vw - 26px);
+    max-height: calc(100dvh - 116px);
+  }
+  .hm-original-preview .hm-original-figure { border-radius: 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog.hm-original-preview::backdrop,
+  .hm-original-preview .hm-original-close,
+  .hm-original-preview .hm-original-download {
+    animation: none !important;
+    transition: none !important;
+  }
+}

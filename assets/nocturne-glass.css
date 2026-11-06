@@ -1,0 +1,387 @@
+/*
+ * HAMOKI STUDIO — NOCTURNE GLASS
+ * Shared global design tokens + structural UI skin.
+ * Visual-only layer. Keep all existing canvas, generation and provider logic intact.
+ * Reference: StyleKit Nocturne Glassmorphism, Hamoki green accent.
+ */
+:root {
+  color-scheme: dark;
+  --ng-night:#060a13;
+  --ng-deep:#0b1322;
+  --ng-lift:#16233a;
+  --ng-text:#f1f6fc;
+  --ng-sub:#bac7d7;
+  --ng-muted:#8c9bae;
+  --ng-accent:#79e2ae;
+  --ng-accent-hover:#a1f5cb;
+  --ng-accent-rgb:121,226,174;
+  --ng-glass:rgba(255,255,255,.075);
+  --ng-glass-light:rgba(255,255,255,.105);
+  --ng-glass-soft:rgba(255,255,255,.045);
+  --ng-glass-dark:rgba(7,14,27,.55);
+  --ng-stroke:rgba(236,244,255,.15);
+  --ng-stroke-hover:rgba(236,244,255,.3);
+  --ng-stroke-dim:rgba(230,242,255,.095);
+  --ng-blur:blur(44px) saturate(180%);
+  --ng-ease:cubic-bezier(.16,1,.3,1);
+  --ng-shadow:0 16px 42px rgba(2,6,16,.35),inset 0 1px 0 rgba(255,255,255,.16),inset 0 -1px 0 rgba(2,6,16,.34);
+  --ng-shadow-raised:0 24px 64px rgba(2,6,16,.5),inset 0 1px 0 rgba(255,255,255,.23),inset 0 -1px 0 rgba(2,6,16,.35);
+  --ng-shadow-small:0 7px 24px rgba(2,6,16,.28),inset 0 1px 0 rgba(255,255,255,.13);
+  --bg-dark:var(--ng-night);
+  --bg-secondary:var(--ng-deep);
+  --bg-tertiary:var(--ng-lift);
+  --bg-elevated:#1d2c42;
+  --border-color:var(--ng-stroke);
+  --border-hover:var(--ng-stroke-hover);
+  --text-primary:var(--ng-text);
+  --text-secondary:var(--ng-sub);
+  --text-muted:var(--ng-muted);
+  --accent-green:var(--ng-accent);
+  --accent-green-hover:var(--ng-accent-hover);
+  --accent-green-dark:#52b985;
+  --accent-blue:#7c9cc4;
+  --gg-deep:var(--ng-night);
+  --gg-canvas:var(--ng-deep);
+  --gg-bar:var(--ng-glass-dark);
+  --gg-panel:var(--ng-glass);
+  --gg-surface:var(--ng-glass-light);
+  --gg-surface-light:rgba(255,255,255,.13);
+  --gg-input:rgba(8,17,30,.34);
+  --gg-border:var(--ng-stroke);
+  --gg-border-soft:var(--ng-stroke-dim);
+  --gg-text:var(--ng-text);
+  --gg-sub:var(--ng-sub);
+  --gg-muted:var(--ng-muted);
+  --gg-green:var(--ng-accent);
+  --gg-green-hover:var(--ng-accent-hover);
+  --gg-green-tint:rgba(var(--ng-accent-rgb),.10);
+  --gg-green-line:rgba(var(--ng-accent-rgb),.5);
+  --gg-shadow:var(--ng-shadow);
+}
+html { background:#060a13; }
+html body {
+  color:var(--ng-text);
+  background:
+    radial-gradient(ellipse 610px 530px at 92% -14%,rgba(124,156,196,.25),transparent 72%),
+    radial-gradient(ellipse 570px 520px at -14% 108%,rgba(51,81,122,.33),transparent 72%),
+    radial-gradient(ellipse 450px 430px at 75% 83%,rgba(44,113,108,.095),transparent 73%),
+    linear-gradient(126deg,#060a13 0%,#0b1322 57%,#080e19 100%) !important;
+  background-attachment:fixed !important;
+}
+body::before {
+  content:"";
+  position:fixed;inset:0;
+  z-index:0;pointer-events:none;
+  opacity:.024;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat:repeat;
+  background-size:160px 160px;
+}
+body > .top-bar, body > .main-content, body > .flow-shell { position:relative; }
+button,input,select,textarea { font-family:inherit; }
+button { -webkit-tap-highlight-color:transparent; }
+:where(button, input, textarea, select, summary, a, [role="button"]):focus-visible {
+  outline:2px solid var(--ng-accent) !important;outline-offset:2px;
+  box-shadow:0 0 0 5px rgba(var(--ng-accent-rgb),.12);
+}
+:where(input, textarea)::placeholder { color:#879bae;opacity:1; }
+:where(button, select, textarea, input) { accent-color:var(--ng-accent); }
+:where(button):disabled {opacity:.55;cursor:not-allowed;}
+::selection {background:rgba(var(--ng-accent-rgb),.31);color:#fff;}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(196,219,240,.2);border-radius:12px}
+::-webkit-scrollbar-thumb:hover{background:rgba(196,219,240,.32)}
+* {scrollbar-color:rgba(196,219,240,.2) transparent}
+
+/* Chrome + navigation: color lives in the background, not the glass. */
+body .top-bar {
+  position:relative;z-index:30;
+  background:rgba(255,255,255,.07) !important;
+  border-bottom:1px solid var(--ng-stroke) !important;
+  box-shadow:0 12px 38px rgba(2,6,16,.25),inset 0 1px 0 rgba(255,255,255,.15) !important;
+  backdrop-filter:var(--ng-blur);-webkit-backdrop-filter:var(--ng-blur);
+}
+body .top-bar::after { display:none !important; }
+body .main-content { background:transparent !important; }
+body .left-section, body .right-section { min-width:0; }
+body .version, body .brand-corner .version {
+  color:#d7e6ef !important;
+  background:rgba(255,255,255,.08) !important;
+  border:1px solid var(--ng-stroke) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.13) !important;
+}
+body .top-tool-btn, body .icon-btn, body .clear-canvas-btn,
+body .zoom-control, body .zoom-btn, body .sidebar-toggle,
+body .canvas-zoom-trigger, body .canvas-zoom-menu {
+  color:var(--ng-sub);
+  border-color:var(--ng-stroke) !important;
+  background:var(--ng-glass-soft) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.1) !important;
+  transition:background .5s var(--ng-ease),border-color .5s var(--ng-ease),
+    color .5s var(--ng-ease),transform .5s var(--ng-ease),box-shadow .5s var(--ng-ease);
+}
+body .top-tool-btn:hover:not(:disabled),body .icon-btn:hover:not(:disabled),
+body .clear-canvas-btn:hover:not(:disabled),body .zoom-btn:hover,
+body .sidebar-toggle:hover,body .canvas-zoom-trigger:hover {
+  background:var(--ng-glass-light) !important;
+  border-color:var(--ng-stroke-hover) !important;color:var(--ng-text) !important;
+  box-shadow:var(--ng-shadow-small) !important;
+  transform:translateY(-1px);
+}
+body .zoom-control {overflow:hidden;}
+body .zoom-text,body .canvas-zoom-current {color:#e3eff8 !important;border-color:var(--ng-stroke-dim) !important;}
+body .canvas-zoom-menu{
+  background:rgba(17,27,43,.84) !important;
+  border:1px solid var(--ng-stroke) !important;
+  backdrop-filter:var(--ng-blur);-webkit-backdrop-filter:var(--ng-blur);
+  box-shadow:var(--ng-shadow-raised) !important;border-radius:16px !important;
+}
+body .canvas-zoom-menu button {color:var(--ng-sub) !important;}
+body .canvas-zoom-menu button:hover {background:var(--ng-glass-light) !important;color:#fff !important;}
+body .sidebar,body .sidebar.expanded,body .sidebar:not(.expanded) {
+  background:rgba(255,255,255,.062) !important;
+  border-right:1px solid var(--ng-stroke) !important;
+  box-shadow:inset -1px 0 rgba(255,255,255,.06),8px 0 24px rgba(0,3,12,.16) !important;
+  backdrop-filter:var(--ng-blur);-webkit-backdrop-filter:var(--ng-blur);
+}
+body .sidebar::after {display:none !important;}
+body .sidebar-toggle {color:var(--ng-muted) !important;}
+body .sidebar-nav {gap:7px;}
+body .sidebar .nav-icon-btn,body .sidebar.expanded .nav-icon-btn {
+  color:var(--ng-sub) !important;
+  background:rgba(255,255,255,.025) !important;
+  border:1px solid rgba(255,255,255,.065) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.035) !important;
+  transition:background .5s var(--ng-ease),border-color .5s var(--ng-ease),
+    box-shadow .5s var(--ng-ease),color .5s var(--ng-ease),transform .5s var(--ng-ease);
+}
+body .sidebar .nav-icon-btn:hover:not(.active) {
+  background:var(--ng-glass-light) !important;
+  border-color:var(--ng-stroke-hover) !important;color:var(--ng-text) !important;
+  transform:translateX(2px);
+}
+body .sidebar .nav-icon-btn.active,body .sidebar.expanded .nav-icon-btn.active {
+  background:rgba(255,255,255,.11) !important;
+  color:#e7fff2 !important;
+  border-color:rgba(var(--ng-accent-rgb),.43) !important;
+  box-shadow:inset 3px 0 0 var(--ng-accent),inset 0 1px rgba(255,255,255,.17),0 5px 22px rgba(0,4,14,.18) !important;
+}
+body .sidebar .nav-icon-btn.active svg {stroke:var(--ng-accent) !important;}
+body .sidebar .nav-icon-btn span {color:inherit;}
+body .sidebar .nav-icon-sub {opacity:.9;}
+
+/* The infinite canvas stays sharp; do NOT blur the picture/content layer. */
+body .canvas-area {background:transparent !important;}
+body .canvas-viewport {
+  background:
+    radial-gradient(circle,rgba(182,204,221,.12) .8px,transparent 1.1px) 0 0 / 27px 27px,
+    radial-gradient(ellipse at 62% 33%,rgba(63,89,126,.065),transparent 62%),
+    rgba(3,8,17,.46) !important;
+  border:1px solid rgba(233,244,255,.095);
+  border-radius:16px;
+  box-shadow:inset 0 0 65px rgba(1,5,12,.27),inset 0 1px 0 rgba(255,255,255,.04);
+}
+body .canvas {background:transparent !important;}
+body .canvas-node {box-shadow:0 12px 32px rgba(0,4,16,.32);}
+body .canvas-node.selected {
+  border-color:var(--ng-accent) !important;
+  box-shadow:0 0 0 2px rgba(var(--ng-accent-rgb),.25),0 18px 45px rgba(0,4,15,.4) !important;
+}
+body .canvas-node-image {filter:none !important;backdrop-filter:none !important;}
+body .canvas-node-foot {
+  background:linear-gradient(180deg,rgba(19,29,43,.72),rgba(8,17,28,.94)) !important;
+  border-color:var(--ng-stroke-dim) !important;
+  color:var(--ng-sub) !important;
+}
+body .canvas-note,body .canvas-welcome {
+  background:rgba(255,255,255,.095) !important;
+  color:var(--ng-text) !important;
+  border:1px solid var(--ng-stroke) !important;
+  backdrop-filter:blur(20px) saturate(150%);-webkit-backdrop-filter:blur(20px) saturate(150%);
+  box-shadow:var(--ng-shadow-small);
+}
+body .canvas-message,body .queue-finish-toast {
+  background:rgba(19,45,38,.88) !important;border:1px solid rgba(var(--ng-accent-rgb),.46) !important;
+  color:#dafbea !important;
+  backdrop-filter:blur(32px) saturate(160%);box-shadow:var(--ng-shadow);
+}
+body .canvas-message.error {background:rgba(60,28,35,.88) !important;color:#ffd2d8 !important;border-color:rgba(255,124,140,.5) !important;}
+
+/* Main generation settings: independent pane of neutral glass. */
+body .params-panel {
+  background:rgba(255,255,255,.068) !important;
+  border:1px solid var(--ng-stroke) !important;
+  border-right:0 !important;
+  box-shadow:-12px 0 35px rgba(2,6,16,.24),inset 1px 0 rgba(255,255,255,.16) !important;
+  backdrop-filter:var(--ng-blur);-webkit-backdrop-filter:var(--ng-blur);
+  color:var(--ng-text);
+}
+body .params-panel .panel-header {
+  background:rgba(255,255,255,.028) !important;
+  border-bottom:1px solid var(--ng-stroke-dim) !important;
+}
+body .params-panel .panel-header h2 {color:var(--ng-text) !important;}
+body .params-panel .param-label {color:#d3deeb !important;}
+body .params-panel .char-count,body .params-panel .reference-dimensions {color:var(--ng-muted) !important;}
+body .params-panel .panel-content {scrollbar-color:rgba(192,214,238,.18) transparent;}
+body .params-panel .model-selector,
+body .params-panel .model-picker-trigger,
+body .params-panel .model-picker-list,
+body .params-panel .model-picker-option,
+body .params-panel .upload-dropzone,
+body .params-panel .prompt-editor .prompt-textarea,
+body .params-panel .prompt-textarea {
+  background:rgba(8,16,29,.39) !important;
+  border:1px solid var(--ng-stroke) !important;
+  color:var(--ng-text) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.09) !important;
+  transition:background .5s var(--ng-ease),border-color .5s var(--ng-ease),
+    box-shadow .5s var(--ng-ease);
+}
+body .params-panel .model-picker-list {
+  background:rgba(17,28,44,.94) !important;
+  backdrop-filter:var(--ng-blur);-webkit-backdrop-filter:var(--ng-blur);
+  box-shadow:var(--ng-shadow-raised) !important;border-radius:15px !important;
+}
+body .params-panel .model-picker-option:hover,
+body .params-panel .model-picker-option.active {
+  background:rgba(255,255,255,.105) !important;
+  border-color:var(--ng-stroke-hover) !important;
+}
+body .params-panel .model-option-text small {color:var(--ng-muted);}
+body .params-panel .model-picker-icon,body .params-panel .model-option-icon {
+  background:rgba(var(--ng-accent-rgb),.11) !important;
+  border:1px solid rgba(var(--ng-accent-rgb),.2) !important;
+  color:var(--ng-accent) !important;
+}
+body .params-panel .model-picker-trigger:hover,
+body .params-panel .upload-dropzone:hover,
+body .params-panel .prompt-textarea:focus {
+  border-color:rgba(var(--ng-accent-rgb),.52) !important;
+  box-shadow:0 0 0 3px rgba(var(--ng-accent-rgb),.095),inset 0 1px 0 rgba(255,255,255,.08) !important;
+}
+body .params-panel .param-button,body .params-panel .ratio-button,
+body .params-panel .mode-tab,body .params-panel .optimize-prompt-btn,
+body .params-panel .reference-clear-button,body .params-panel .model-refresh,
+body .params-panel .reference-quick-btn {
+  background:rgba(255,255,255,.055) !important;
+  border:1px solid var(--ng-stroke) !important;
+  color:#c7d7e4 !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.08) !important;
+  transition:background .5s var(--ng-ease),border-color .5s var(--ng-ease),
+    color .5s var(--ng-ease),transform .5s var(--ng-ease);
+}
+body .params-panel .param-button:hover:not(:disabled),
+body .params-panel .ratio-button:hover:not(:disabled),
+body .params-panel .mode-tab:hover:not(:disabled),
+body .params-panel .optimize-prompt-btn:hover:not(:disabled) {
+  background:rgba(255,255,255,.12) !important;
+  border-color:var(--ng-stroke-hover) !important;
+  color:#f1f9fd !important;transform:translateY(-1px);
+}
+body .params-panel .param-button.active,body .params-panel .ratio-button.active,
+body .params-panel .mode-tab.active {
+  background:rgba(var(--ng-accent-rgb),.13) !important;
+  border-color:rgba(var(--ng-accent-rgb),.6) !important;
+  color:#c8ffe1 !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.17),0 0 0 1px rgba(var(--ng-accent-rgb),.08) !important;
+}
+body .params-panel .generate-button {
+  background:linear-gradient(115deg,#83edb7,#59cb94) !important;
+  border:1px solid #a2f5c8 !important;
+  color:#09251b !important;
+  border-radius:12px !important;
+  box-shadow:0 6px 22px rgba(52,186,125,.23),inset 0 1px 0 rgba(255,255,255,.45) !important;
+  transition:transform .5s var(--ng-ease),box-shadow .5s var(--ng-ease),filter .5s var(--ng-ease);
+}
+body .params-panel .generate-button:hover:not(:disabled) {
+  filter:brightness(1.09);transform:translateY(-2px);
+  box-shadow:0 11px 30px rgba(52,186,125,.3),inset 0 1px 0 rgba(255,255,255,.5) !important;
+}
+body .params-panel .generate-button:active {transform:scale(.985);}
+body .params-panel .upload-dropzone {border-style:dashed !important;}
+body .params-panel .reference-thumb {
+  background:rgba(8,16,29,.42) !important;border-color:var(--ng-stroke) !important;
+  box-shadow:var(--ng-shadow-small) !important;border-radius:11px !important;
+}
+body .params-panel .reference-mode-indicator {
+  color:#b5ebcc !important;background:rgba(var(--ng-accent-rgb),.085) !important;
+  border:1px solid rgba(var(--ng-accent-rgb),.23) !important;
+}
+
+/* Queue is a short floating-looking bottom glass strip, not a white box. */
+body #queue-panel,body .queue-panel {
+  background:rgba(255,255,255,.073) !important;
+  border-top:1px solid var(--ng-stroke) !important;
+  box-shadow:0 -14px 34px rgba(2,6,16,.23),inset 0 1px 0 rgba(255,255,255,.14) !important;
+  backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);
+}
+body .queue-header {
+  background:rgba(255,255,255,.025) !important;
+  border-bottom:1px solid var(--ng-stroke-dim) !important;
+}
+body .queue-title {color:#e9f3fa !important;}
+body .queue-count,body .queue-meta {color:var(--ng-muted) !important;}
+body .queue-tab,body .queue-pause-button,body .queue-action-btn,
+body .queue-select,body .queue-collapse-btn {
+  color:var(--ng-sub) !important;background:rgba(255,255,255,.045) !important;
+  border:1px solid var(--ng-stroke-dim) !important;border-radius:9px !important;
+  transition:background .5s var(--ng-ease),border-color .5s var(--ng-ease),color .5s var(--ng-ease);
+}
+body .queue-tab:hover,body .queue-action-btn:hover,
+body .queue-collapse-btn:hover {background:var(--ng-glass-light) !important;border-color:var(--ng-stroke-hover) !important;color:#fff !important;}
+body .queue-tab.active {background:rgba(var(--ng-accent-rgb),.13) !important;border-color:rgba(var(--ng-accent-rgb),.48) !important;color:#d0ffe5 !important;}
+body .queue-item {
+  background:rgba(255,255,255,.05) !important;
+  border:1px solid var(--ng-stroke-dim) !important;
+  color:var(--ng-text) !important;
+  border-radius:12px !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.075);
+}
+body .queue-item:hover {border-color:var(--ng-stroke-hover) !important;}
+body .queue-status-btn {background:rgba(var(--ng-accent-rgb),.17) !important;color:#ccffe3 !important;border:1px solid rgba(var(--ng-accent-rgb),.35) !important;}
+body .progress-bar {background:rgba(4,9,17,.53) !important;}
+body .progress-fill {background:linear-gradient(90deg,#4ab984,#98f4c5) !important;}
+body .queue-content {scrollbar-color:rgba(201,222,239,.22) transparent;}
+body .queue-panel.collapsed {box-shadow:0 -10px 30px rgba(2,6,16,.2),inset 0 1px rgba(255,255,255,.15) !important;}
+
+/* Global input, popover and non-modal utility surfaces. */
+body select option {background:#152237;color:#eaf3fa;}
+body .work-card,body .library-upload,body .works-search,
+body .work-actions button,body .library-filter {
+  border-color:var(--ng-stroke) !important;
+}
+body .work-card {
+  background:rgba(255,255,255,.07) !important;
+  border:1px solid var(--ng-stroke) !important;
+  box-shadow:var(--ng-shadow-small) !important;
+  backdrop-filter:blur(30px) saturate(170%);
+  border-radius:16px !important;
+  transition:transform .5s var(--ng-ease),box-shadow .5s var(--ng-ease),border-color .5s var(--ng-ease);
+}
+body .work-card:hover {transform:translateY(-3px);border-color:var(--ng-stroke-hover) !important;box-shadow:var(--ng-shadow-raised) !important;}
+body .work-actions button,body .works-search,body .library-upload {
+  background:var(--ng-glass-soft) !important;
+  color:var(--ng-sub) !important;
+  border:1px solid var(--ng-stroke) !important;
+  border-radius:12px !important;
+}
+body .work-actions button:hover,body .library-upload:hover{background:var(--ng-glass-light) !important;color:#fff !important;}
+body .work-description {color:var(--ng-muted) !important;}
+body .work-thumb {background:rgba(7,13,22,.42) !important;}
+@media (max-width:880px) {
+  body .top-bar{backdrop-filter:blur(30px) saturate(160%);}
+  body .sidebar,body .params-panel{backdrop-filter:blur(30px) saturate(160%);}
+  body .canvas-viewport{border-radius:12px;}
+}
+@media (prefers-reduced-motion:reduce) {
+  html body :where(button, input, select, textarea, .nav-icon-btn, .work-card, .hmt-card){
+    transition-duration:.01ms !important;animation-duration:.01ms !important;
+  }
+}
+@supports not (backdrop-filter:blur(20px)) {
+  body .top-bar,body .sidebar,body .params-panel,body #queue-panel{
+    background:rgba(13,22,37,.93) !important;
+  }
+}

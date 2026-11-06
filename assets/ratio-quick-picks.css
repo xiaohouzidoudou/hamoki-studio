@@ -1,0 +1,85 @@
+/* Main image-generation panel: all eight ratio tiles, matching the 4 x 2 design. */
+.params-panel .ratio-heading {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-bottom:6px;
+}
+.params-panel .ratio-heading .param-label { margin:0; }
+
+.params-panel .ratio-group {
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:7px;
+}
+.params-panel .ratio-group .ratio-button {
+  display:flex;
+  flex:none;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  width:100%;
+  min-width:0;
+  height:40px;
+  min-height:40px;
+  padding:0 3px;
+  border:1px solid #3D4854;
+  border-radius:8px;
+  background:#252D37;
+  box-shadow:none;
+  color:#C7D0D9;
+  font-size:12px;
+  font-weight:500;
+  line-height:1;
+  white-space:nowrap;
+  transform:none;
+  transition:background .18s,border-color .18s,color .18s;
+}
+.params-panel .ratio-group .ratio-button::before { display:none; }
+.params-panel .ratio-group .ratio-button:hover:not(.active) {
+  transform:none;
+  background:#323C48;
+  border-color:#62717E;
+  color:#F2F5F8;
+}
+.params-panel .ratio-group .ratio-button.active,
+.params-panel .ratio-group .ratio-button.active:hover {
+  transform:none;
+  background:#303B3D;
+  border-color:#6CAE8E;
+  color:#D7FFE9;
+  box-shadow:inset 0 0 0 1px #74D2A415;
+}
+.params-panel .ratio-group .ratio-button[hidden] { display:none!important; }
+.params-panel .ratio-group .ratio-shape {
+  display:block;
+  box-sizing:border-box;
+  flex:0 0 auto;
+  width:12px;
+  height:12px;
+  border:1.5px solid currentColor;
+  border-radius:2.5px;
+  opacity:.95;
+}
+/* CSS dimensions are deliberate: inline style attributes are blocked by the
+   Studio Content Security Policy, so each ratio must be sized here. */
+.params-panel .ratio-group [data-value="auto"] .ratio-shape { width:18px;height:12px;border-style:dashed; }
+.params-panel .ratio-group [data-value="1:1"] .ratio-shape { width:12px;height:12px; }
+.params-panel .ratio-group [data-value="9:16"] .ratio-shape { width:8px;height:14px; }
+.params-panel .ratio-group [data-value="16:9"] .ratio-shape { width:18px;height:10px; }
+.params-panel .ratio-group [data-value="3:4"] .ratio-shape { width:10px;height:13px; }
+.params-panel .ratio-group [data-value="4:3"] .ratio-shape { width:16px;height:12px; }
+.params-panel .ratio-group [data-value="2:3"] .ratio-shape { width:9px;height:14px; }
+.params-panel .ratio-group [data-value="3:2"] .ratio-shape { width:17px;height:11px; }
+.params-panel .ratio-group .ratio-button:focus-visible {
+  outline:2px solid #79c9a6;
+  outline-offset:2px;
+}
+@media(max-width:390px) {
+  .params-panel .ratio-group { gap:5px; }
+  .params-panel .ratio-group .ratio-button { gap:4px;font-size:11px;padding:0 2px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .params-panel .ratio-group .ratio-button { transition:none; }
+}

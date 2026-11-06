@@ -15,10 +15,3 @@ test('JPEG SOF and WEBP VP8X prototype dimensions are supported',()=>{
  assert.equal(referenceRatio(webp).ratio,'9:16');
  assert.throws(()=>referenceRatio(Buffer.from('not an image')),/原型图片尺寸无法识别/);
 });
-test('real chat flow requests prototype ratio unless user explicitly specifies a ratio',()=>{
- const source=fs.readFileSync(path.join(__dirname,'../assets/creative-workflow-v2.js'),'utf8');
- assert.match(source,/\?\.\[1\]\|\|'reference'/);
- const workspace=fs.readFileSync(path.join(__dirname,'../workspace.js'),'utf8');
- assert.match(workspace,/referenceRatio\(fetchMedia\(proto\.file\)\.bytes\)/);
- assert.match(workspace,/qualityIssues:found\|\|null/);
-});

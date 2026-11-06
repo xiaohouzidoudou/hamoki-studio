@@ -1,0 +1,36 @@
+/* Infinite canvas visual boundaries: overlay is restricted to middle viewport.
+   The selected image keeps top tools above and editor below, without flipping.
+   Outside portions are clipped instead of covering navigation/params/queue. */
+#hamoki-canvas-float-layer {
+  position: fixed;
+  z-index: 1210;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  pointer-events: none;
+  contain: layout style;
+}
+#hamoki-canvas-float-layer > .result-floating-toolbar,
+#hamoki-canvas-float-layer > .result-floating-editor,
+#hamoki-canvas-float-layer > .result-floating-editor.result-composer-compact {
+  position: absolute !important;
+  pointer-events: auto;
+  margin: 0;
+}
+#hamoki-canvas-float-layer > .result-floating-toolbar {
+  max-width: 100%;
+}
+/* In a genuinely free workspace the scrollable surface expands on demand. */
+#canvas-viewport {
+  overflow: auto;
+  overscroll-behavior: contain;
+  overflow-anchor: none;
+}
+#canvas { transform-origin: 0 0; }
+@media(max-width:700px) {
+  #hamoki-canvas-float-layer > .result-floating-toolbar {
+    display:none!important;
+  }
+}

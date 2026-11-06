@@ -1,0 +1,108 @@
+/* Low-profile model selector + left-side prompt-history glass drawer. */
+.params-panel .panel-header {display:flex;align-items:center;gap:10px;overflow:visible!important;}
+.params-panel .panel-header h2 {flex:0 0 auto;white-space:nowrap;min-width:0;}
+.params-panel .panel-header .header-model-group {
+  flex:1 1 0;min-width:0;max-width:176px;margin:0!important;padding:0!important;
+  align-self:center;position:relative;z-index:20;
+}
+.params-panel .panel-header .header-model-group #model-label {
+  position:absolute!important;clip-path:inset(50%);width:1px;height:1px;overflow:hidden;
+  margin:0;padding:0;white-space:nowrap;
+}
+.params-panel .panel-header .model-picker {
+  position:relative;max-width:100%;width:100%;font-weight:400;
+}
+.params-panel .panel-header .model-picker-trigger {
+  height:29px;min-height:29px;width:100%;padding:4px 7px;border-radius:8px;
+  color:#72958e;background:rgba(14,31,35,.52);
+  border:1px solid rgba(139,195,177,.14);
+  box-shadow:none!important;opacity:.8;
+  transition:opacity .21s,border-color .21s,color .21s,background .21s;
+}
+.params-panel .panel-header .model-picker-trigger:hover,
+.params-panel .panel-header .model-picker-trigger[aria-expanded=true]{
+  opacity:1;color:#c1e3d6;background:rgba(19,50,45,.83);
+  border-color:rgba(107,203,162,.37);
+}
+.params-panel .panel-header .model-picker-icon {display:none!important;}
+.params-panel .panel-header .model-picker-name {
+  color:inherit;font-size:10px;font-weight:500;letter-spacing:-.02em;
+}
+.params-panel .panel-header .model-picker-trigger > svg{width:12px;height:12px;opacity:.75;}
+.params-panel .panel-header .model-picker-list {
+  position:absolute;left:auto;right:0;top:calc(100% + 8px);
+  width:min(335px,78vw);max-height:min(400px,55vh);
+  z-index:300;background:rgba(14,34,36,.97);border:1px solid rgba(166,226,202,.26);
+  border-radius:13px;box-shadow:0 21px 60px rgba(0,0,0,.49);
+  backdrop-filter:blur(25px) saturate(140%);
+}
+.params-panel .panel-header .refresh-btn{flex:0 0 auto;}
+.params-panel .prompt-label-row {display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px;}
+.params-panel .prompt-label-row .param-label {margin:0!important;}
+.params-panel .prompt-history-trigger {
+  appearance:none;border:1px solid rgba(118,187,165,.2);
+  border-radius:8px;background:rgba(46,74,66,.26);color:#8db1a4;
+  display:inline-flex;gap:5px;align-items:center;padding:5px 8px;
+  font:inherit;font-size:11px;line-height:1.2;cursor:pointer;
+  transition:color .22s,border-color .22s,background .22s;
+}
+.params-panel .prompt-history-trigger:hover,.params-panel .prompt-history-trigger[aria-expanded=true]{
+  color:#a2efcc;background:rgba(73,151,112,.2);border-color:rgba(119,233,181,.42);
+}
+.params-panel .prompt-history-trigger svg {width:14px;height:14px}
+.params-panel .prompt-editor .prompt-textarea {padding-bottom:13px!important;}
+.hm-prompt-history {
+  position:fixed;z-index:2147482510;box-sizing:border-box;
+  display:flex;flex-direction:column;overflow:hidden;
+  background:linear-gradient(153deg,rgba(35,70,65,.96),rgba(11,29,36,.985) 48%,rgba(18,42,43,.98));
+  border:1px solid rgba(179,237,217,.2);border-radius:17px;
+  box-shadow:0 25px 78px rgba(0,0,0,.57),inset 0 1px 0 rgba(255,255,255,.12);
+  backdrop-filter:blur(28px) saturate(150%);
+  -webkit-backdrop-filter:blur(28px) saturate(150%);
+  color:#d1e7dc;
+  opacity:0;transform:translate3d(17px,0,0) scale(.982);
+  pointer-events:none;transition:opacity .28s cubic-bezier(.22,1,.36,1),
+    transform .34s cubic-bezier(.22,1,.36,1);
+  font-family:Inter,ui-sans-serif,system-ui,'Microsoft YaHei',sans-serif;
+}
+.hm-prompt-history.open{opacity:1;transform:translate3d(0,0,0) scale(1);pointer-events:auto;}
+.hm-history-head {
+  display:flex;align-items:center;justify-content:space-between;
+  min-height:46px;box-sizing:border-box;padding:12px 12px 10px 17px;
+  border-bottom:1px solid rgba(196,249,226,.11);
+}
+.hm-history-head strong{font-size:13px;letter-spacing:.01em;color:#d5f4e7;font-weight:650}
+.hm-history-close{width:28px;height:28px;display:grid;place-items:center;
+  border-radius:8px;border:0;background:rgba(255,255,255,.05);color:#a7c0b6;cursor:pointer}
+.hm-history-close:hover{background:rgba(152,232,188,.15);color:#e2faec}
+.hm-history-close svg,.hm-history-copy-button svg{width:16px;height:16px;}
+.hm-prompt-history-list {flex:1;min-height:0;overflow:auto;padding:9px;overscroll-behavior:contain;}
+.hm-history-item{position:relative;padding:11px 40px 12px 12px;margin-bottom:7px;
+  border-radius:11px;background:rgba(255,255,255,.035);
+  border:1px solid rgba(168,220,196,.11);
+  transition:border-color .19s,background .19s,transform .19s;
+}
+.hm-history-item:hover{background:rgba(111,185,141,.085);border-color:rgba(134,217,164,.32)}
+.hm-history-meta{display:flex;align-items:center;gap:8px;justify-content:space-between;
+  color:#729a8c;font-size:10px;margin-bottom:7px;min-height:14px;}
+.hm-history-source{color:#94cbb3;}
+.hm-history-copy-text{font-size:12px;line-height:1.62;color:#c2d9d0;
+  display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;
+  overflow:hidden;overflow-wrap:anywhere;white-space:pre-wrap;margin:0;}
+.hm-history-copy-button {position:absolute;right:8px;bottom:10px;width:29px;height:29px;
+  display:grid;place-items:center;cursor:pointer;border-radius:8px;
+  background:rgba(98,211,157,.12);border:1px solid rgba(104,206,162,.18);
+  color:#86d5ab;transition:background .19s,color .19s,transform .19s;
+}
+.hm-history-copy-button:hover{background:rgba(93,224,164,.25);color:#c4ffe0;transform:scale(1.045)}
+.hm-history-loading,.hm-history-empty{font-size:12px;line-height:1.8;color:#86a79b;padding:16px;margin:0;}
+@media(max-width:920px){
+ .hm-prompt-history{left:10px!important;top:70px!important;
+   height:min(64vh,540px)!important;width:min(310px,calc(100vw - 30px))!important;}
+ .params-panel .panel-header {gap:6px}
+ .params-panel .panel-header .header-model-group {max-width:120px}
+ .params-panel .panel-header .model-picker-name{font-size:9px}
+}
+@media(prefers-reduced-motion:reduce){
+ .hm-prompt-history,.hm-history-item,.hm-history-copy-button,.params-panel .model-picker-trigger{transition:none!important}
+}

@@ -1,0 +1,43 @@
+/* 2026-11-05 icon language: two-tone line icons (thin line + green accent fill),
+   matching the 049_ collection style. Loaded LAST so it overrides the mixed
+   1.65–2.5 stroke values baked into legacy theme files. Only outline icons
+   (fill="none") are touched, so artwork, logos and connector lines keep their look. */
+
+:root{
+  --icon-stroke:2.1;
+  --icon-accent:#74D2A4;
+}
+
+/* Single weight + rounded terminals everywhere. */
+svg[fill="none"]{
+  stroke-width:var(--icon-stroke)!important;
+  stroke-linecap:round!important;
+  stroke-linejoin:round!important;
+}
+
+/* Green accent layer shared by inline icons and JS-rendered ones. */
+.ico-a{fill:var(--icon-accent);stroke:none}
+/* On the solid green download button the accent must invert to stay visible. */
+.result-floating-toolbar .result-download .ico-a{fill:#0c2b1b}
+
+/* Floating result toolbar: 15px hairlines -> 16px at the new weight. */
+.result-floating-toolbar .generated-result-action svg,
+.result-floating-toolbar .result-toolbar-more svg,
+.result-floating-editor button svg,
+.result-floating-toolbar .result-download svg{
+  width:16px!important;height:16px!important;flex:0 0 16px!important;
+}
+
+/* Canvas node corner controls (@ reference + download + remove). */
+body .canvas-node .canvas-node-download svg,
+body .canvas-node .canvas-node-at svg,
+body .canvas-node .canvas-node-delete svg{
+  width:18px!important;height:18px!important;
+}
+
+/* Right-hand generator panel: model chip icons. */
+.params-panel .model-picker-icon svg,
+.params-panel .model-option-icon svg,
+.params-panel .optimize-prompt-btn svg{
+  width:17px!important;height:17px!important;
+}

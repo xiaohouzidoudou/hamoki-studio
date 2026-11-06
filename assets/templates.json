@@ -1,0 +1,1771 @@
+[
+  {
+    "id": "action-figure-box",
+    "name": "盒装可动人偶",
+    "prompt": "把参考图中的人物做成一个装在吸塑包装里的可动人偶：人偶站在卡板包装中间的透明塑料泡壳里，右侧小格子里放着配件——一台笔记本电脑、一杯咖啡、一副耳机和一个双肩包；包装顶部印着大字名字「ALEX」，下方一行小字「PRODUCT DESIGNER」；人偶是光滑的塑料质感、关节清晰，保留本人的脸、眼镜、发型和衣服；包装挂在货架挂钩上，棚拍柔光，真实玩具产品照。",
+    "category": "手办·3D",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-action-figure-box.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#action-figure-box"
+  },
+  {
+    "id": "pet-action-figure",
+    "name": "宠物盒装玩偶",
+    "prompt": "把参考图中的宠物做成一个盒装收藏玩偶：玩偶是哑光搪胶质感，保留毛色、花纹和吐舌头的神情；装在印有草地和骨头图案的卡板包装里，透明泡壳旁边的小格子放着一个飞盘、一根骨头和一个迷你狗碗；包装上印着「PARK HERO」；白色背景，棚拍柔光，产品摄影。",
+    "category": "手办·3D",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-pet-action-figure.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana 2",
+      "GPT Image 2"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#pet-action-figure"
+  },
+  {
+    "id": "bobblehead",
+    "name": "摇头公仔",
+    "prompt": "把参考图中的人物做成一个树脂摇头公仔：超大的头、小小的身体，站在圆形底座上，底座正面刻着「BEST FRIEND」；手绘上色的质感，保留发型、牛仔外套和微笑；公仔放在木质书架上，旁边有一盆小绿植，暖色室内光，浅景深。",
+    "category": "手办·3D",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-bobblehead.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#bobblehead"
+  },
+  {
+    "id": "halloween-costume",
+    "name": "万圣节变装照",
+    "prompt": "给参考图中的人物换上万圣节女巫装扮：黑色尖顶宽檐帽、深紫色丝绒斗篷，手里提着一盏发光的南瓜灯；背景是夜晚挂满小灯串的旧木门廊，地上摆着雕刻好的南瓜，薄雾和暖橙色烛光；人像摄影质感，保留本人的脸、发型和神态，节日但不恐怖。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-halloween-costume.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#halloween-costume"
+  },
+  {
+    "id": "halloween-pet",
+    "name": "宠物万圣节装扮",
+    "prompt": "给参考图中的宠物穿上南瓜造型的万圣节服装：橙色南瓜外套、绿色小叶子帽子；它坐在铺着落叶的门前台阶上，旁边是几个小南瓜和一个装满糖果的篮子；傍晚暖光，背景虚化的小灯串，保留品种、毛色和花纹，可爱的节日照片。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-halloween-pet.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana 2",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#halloween-pet"
+  },
+  {
+    "id": "halloween-gothic-portrait",
+    "name": "哥特吸血鬼油画肖像",
+    "prompt": "把参考图中的人物画成一幅维多利亚时代的吸血鬼伯爵油画肖像：黑色高领斗篷配暗红色内衬、蕾丝领巾、金色胸针，站在点着蜡烛的古堡书房里，背后是彩绘玻璃窗和满月；伦勃朗式明暗光，古典油画笔触和画布纹理，保留眼镜和五官，神秘优雅。",
+    "category": "头像·证件照",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-halloween-gothic-portrait.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "Seedream 5.0 Pro"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#halloween-gothic-portrait"
+  },
+  {
+    "id": "halloween-poster",
+    "name": "万圣节派对海报",
+    "prompt": "一张万圣节派对海报：画面中央是一座剪影城堡和一轮巨大的橙色满月，蝙蝠飞过，前景一排咧嘴笑的南瓜灯；大标题「万圣夜派对」，副标题「10 月 31 日 · 晚 8 点 · 老仓库」，底部一行小字「变装入场 · 最佳造型有奖」；深紫和橙色配色，复古丝网印刷质感，文字清晰。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-halloween-poster.webp",
+    "referenceRequired": false,
+    "models": [
+      "GPT Image 2",
+      "Nano Banana Pro"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#halloween-poster"
+  },
+  {
+    "id": "halloween-pumpkins",
+    "name": "南瓜灯门廊",
+    "prompt": "夜晚的老房子门廊，台阶上摆着五个雕刻精美的南瓜灯：一个经典笑脸、一只猫、一只蝙蝠、一轮月亮和一座鬼屋，烛光从刻痕里透出来；周围是干草垛、玉米秆和落叶，门上挂着秋叶花环；暖橙色烛光与冷蓝色夜色对比，真实摄影，细节丰富。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "4/3",
+    "image": "assets/tpl-halloween-pumpkins.webp",
+    "referenceRequired": false,
+    "models": [
+      "Seedream 5.0 Flash",
+      "Nano Banana 2"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#halloween-pumpkins"
+  },
+  {
+    "id": "christmas-portrait",
+    "name": "圣诞节写真",
+    "prompt": "把参考图中的人物拍成圣诞节居家写真：穿红白相间的麻花针织毛衣，坐在壁炉旁的扶手椅上，手捧一杯热可可；身后是挂满暖黄小灯和金色彩球的圣诞树，壁炉上挂着袜子；温暖的烛光和灯串光，浅景深，保留本人五官、眼镜和发型，温馨自然。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-christmas-portrait.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#christmas-portrait"
+  },
+  {
+    "id": "christmas-card",
+    "name": "圣诞贺卡",
+    "prompt": "一张圣诞贺卡：雪夜里的小木屋，窗户透出暖光，屋前一棵挂满彩灯的松树，一只小狐狸戴着红围巾站在雪地里；上方手写体大字「圣诞快乐」，下方一行小字「愿你新年平安喜乐 —— 小周一家」；水彩与金箔烫印质感，米白卡纸，文字清晰。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-christmas-card.webp",
+    "referenceRequired": false,
+    "models": [
+      "GPT Image 2",
+      "Nano Banana Pro"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#christmas-card"
+  },
+  {
+    "id": "christmas-pet",
+    "name": "宠物圣诞照",
+    "prompt": "给参考图中的宠物拍一张圣诞照：戴着红色圣诞帽和绿色格子领巾，趴在圣诞树下的一堆礼物盒旁边，嘴边叼着一根拐杖糖；背景是虚化的暖黄灯串，保留品种、毛色和花纹，温馨可爱的节日照片。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-christmas-pet.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#christmas-pet"
+  },
+  {
+    "id": "polaroid-photo",
+    "name": "拍立得复古照",
+    "prompt": "把参考图中的人物做成一张拍立得照片：白色相纸边框，画面是她在游乐园摩天轮前比耶，直闪拍摄，轻微过曝和暗角，颜色偏暖、略带颗粒；照片放在木桌上，旁边有几张散落的拍立得和一支记号笔，相纸下边框手写「summer '26」；保留本人五官和发型。",
+    "category": "风格化",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-polaroid-photo.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#polaroid-photo"
+  },
+  {
+    "id": "caricature",
+    "name": "职业漫画夸张像",
+    "prompt": "把参考图中的人物画成一幅漫画夸张像：大头小身，五官适度夸张但一眼能认出来，戴着同款眼镜；他坐在堆满显示器、咖啡杯和便利贴的工位上，一只手拿着数位笔，另一只手端着咖啡，身边有一只打瞌睡的橘猫；明亮的手绘水彩加马克笔风格，白色背景，幽默友好。",
+    "category": "风格化",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-caricature.webp",
+    "referenceRequired": true,
+    "models": [
+      "GPT Image 2",
+      "Nano Banana Pro"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#caricature"
+  },
+  {
+    "id": "wedding-portrait",
+    "name": "婚纱照",
+    "prompt": "把参考图中的人物拍成一张户外婚纱照：简约缎面一字肩婚纱、长头纱被风轻轻吹起，手捧白色和浅粉色的花束；站在黄昏的海边悬崖草地上，逆光金色光晕，远处是海面；婚纱摄影的柔和色调，浅景深，保留本人五官、发型和笑容。",
+    "category": "头像·证件照",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-wedding-portrait.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "Seedream 5.0 Pro"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#wedding-portrait"
+  },
+  {
+    "id": "anime-portrait",
+    "name": "照片转动漫",
+    "prompt": "把参考图转成日系动漫插画：干净的线稿、赛璐璐上色，大而有神的眼睛，保留短发、牛仔外套和白 T 恤，以及靠窗而坐的姿势；窗外是夏日午后的街道和蓝天白云，光线通透；构图和人物神态与原图一致。",
+    "category": "风格化",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-anime-portrait.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana 2",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#anime-portrait"
+  },
+  {
+    "id": "sticker-sheet",
+    "name": "照片做贴纸",
+    "prompt": "把参考图中的人物做成一整张 Q 版贴纸：共 6 个贴纸，分别是挥手打招呼、比心、喝咖啡、戴耳机听歌、困到趴桌、开心跳起来；每个贴纸都有粗白边的模切轮廓和轻微投影，保留发型、牛仔外套和五官特征；浅灰色背景，排列整齐，扁平卡通风格，高清。",
+    "category": "插画·表情",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-sticker-sheet.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana 2",
+      "GPT Image 2"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#sticker-sheet"
+  },
+  {
+    "id": "tattoo-flash",
+    "name": "纹身图稿",
+    "prompt": "一张美式传统纹身图稿（flash sheet）：九个独立图案整齐排列——玫瑰与匕首、燕子、船锚、老虎头、心形横幅、蛇缠骷髅、月亮与星星、帆船、灯塔；粗黑轮廓线，红、绿、黄、黑的经典配色，平涂上色，米黄色旧纸背景，适合直接拿给纹身师参考。",
+    "category": "插画·表情",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-tattoo-flash.webp",
+    "referenceRequired": false,
+    "models": [
+      "Seedream 5.0 Flash",
+      "GPT Image 2",
+      "Nano Banana 2"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#tattoo-flash"
+  },
+  {
+    "id": "logo-design",
+    "name": "Logo 设计",
+    "prompt": "为一家叫「月豆咖啡」的精品咖啡店设计 logo：一颗咖啡豆的中缝化成一弯新月，简洁的几何线条；下方是店名「月豆咖啡」和一行小字「SINCE 2026」；深墨绿配暖金色，扁平矢量风格，白色背景居中，另在右下角展示一个印在牛皮纸杯上的效果。",
+    "category": "插画·表情",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-logo-design.webp",
+    "referenceRequired": false,
+    "models": [
+      "GPT Image 2",
+      "Nano Banana Pro"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#logo-design"
+  },
+  {
+    "id": "phone-wallpaper",
+    "name": "手机壁纸",
+    "prompt": "一张竖版手机壁纸：黎明时分的雪山湖泊，湖面如镜倒映着粉紫色的天空和山峰，湖边一棵孤零零的松树，薄雾贴着水面；画面上方三分之一留出干净的天空给时间和通知，下方主体清晰；色彩柔和、细节锐利，超高清风光摄影。",
+    "category": "插画·表情",
+    "categorySource": "heuristic",
+    "aspectRatio": "9/16",
+    "image": "assets/tpl-phone-wallpaper.webp",
+    "referenceRequired": false,
+    "models": [
+      "Seedream 5.0 Pro",
+      "Nano Banana Pro"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#phone-wallpaper"
+  },
+  {
+    "id": "product-splash",
+    "name": "动感广告大片",
+    "prompt": "把参考图中的运动鞋做成一张动感广告大片：鞋子悬浮在画面中央、略微倾斜，周围迸溅起薄荷绿的水花和细小水珠，背景是从浅灰到白的干净渐变；高速快门冻结水花，棚拍轮廓光勾出鞋型，保留鞋子的配色、材质和鞋底细节，商业广告质感。",
+    "category": "电商",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-product-splash.webp",
+    "referenceRequired": true,
+    "models": [
+      "Seedream 5.0 Pro",
+      "Nano Banana Pro",
+      "GPT Image 2"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#product-splash"
+  },
+  {
+    "id": "figure",
+    "name": "照片变手办",
+    "prompt": "把参考图中的人物做成 1/7 比例的商业手办：PVC 材质，细节精致，放在透明亚克力圆形底座上，摆在电脑桌上；背后的显示器正在显示这个手办的 3D 建模过程，旁边立着印有人物插画的包装盒。柔和室内光，浅景深，真实产品摄影质感，保留人物的发型、服装和神态。",
+    "category": "手办·3D",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-figure.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#figure"
+  },
+  {
+    "id": "chibi-3d",
+    "name": "Q 版 3D 形象",
+    "prompt": "把参考图中的人物变成 Q 版 3D 卡通形象：大头小身比例，圆润可爱，皮克斯风格渲染，柔和的次表面散射材质，保留发型、眼镜和衣服颜色；纯色浅蓝背景，柔和棚拍光，居中全身。",
+    "category": "手办·3D",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-chibi-3d.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana 2",
+      "GPT Image 2"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#chibi-3d"
+  },
+  {
+    "id": "blind-box",
+    "name": "盲盒潮玩三件套",
+    "prompt": "一组 3 个盲盒潮玩公仔并排摆放，主题是「太空咖啡师」：一个拿拉花杯，一个抱着咖啡豆袋，一个坐在迷你火箭上；哑光搪胶质感，马卡龙配色，圆润造型；每个公仔前有小号透明底座，背景是浅米色无缝背景纸，柔和棚拍光，产品摄影。",
+    "category": "手办·3D",
+    "categorySource": "heuristic",
+    "aspectRatio": "4/3",
+    "image": "assets/tpl-blind-box.webp",
+    "referenceRequired": false,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#blind-box"
+  },
+  {
+    "id": "brick-figure",
+    "name": "积木小人",
+    "prompt": "把参考图中的人物做成塑料积木小人：圆柱形头部、简化的五官印刷、C 形手、可动的腿，衣服图案和发型颜色与原图一致；小人站在一块绿色积木底板上，旁边有两三块散落的彩色积木；微距摄影，浅景深，明亮自然光。",
+    "category": "手办·3D",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-brick-figure.webp",
+    "referenceRequired": true,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#brick-figure"
+  },
+  {
+    "id": "plush-pet",
+    "name": "宠物变毛绒公仔",
+    "prompt": "把参考图中的宠物做成一只柔软的毛绒公仔：短绒面料、可见的缝线、刺绣眼睛和鼻子，保留毛色和花纹；公仔坐在铺着针织毯的床上，旁边有一个挂着吊牌的礼品袋；温暖的午后窗光，生活感产品照。",
+    "category": "手办·3D",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-plush-pet.webp",
+    "referenceRequired": true,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#plush-pet"
+  },
+  {
+    "id": "id-photo",
+    "name": "证件照",
+    "prompt": "用参考图中的人物生成一张标准证件照：正脸、双肩平齐、表情自然，换上深色西装和白衬衫，头发整理整齐；纯蓝色背景（#438EDB），均匀无阴影的正面柔光，头顶留少量空白，高清，保持本人五官和脸型不变。",
+    "category": "头像·证件照",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-id-photo.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana 2",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#id-photo"
+  },
+  {
+    "id": "avatar-pro",
+    "name": "职业形象照",
+    "prompt": "把参考图中的人物拍成职场形象照：穿米色西装外套，胸部以上构图，身体微侧、面向镜头微笑；背景是虚化的现代办公室，左侧柔和主光加轮廓光，85mm 镜头质感，肤色自然，保留本人五官。适合 LinkedIn 和简历。",
+    "category": "头像·证件照",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-avatar-pro.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash",
+      "Nano Banana 2",
+      "Nano Banana 2.1"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#avatar-pro"
+  },
+  {
+    "id": "younger-self",
+    "name": "和小时候的自己合影",
+    "prompt": "生成一张合影：参考图中的人物（现在的样子）坐在公园长椅上，身边坐着他大约 8 岁时的样子，两人长相明显是同一个人，一起看着镜头笑，大人搭着孩子的肩；温暖的傍晚逆光，胶片色调，真实摄影。",
+    "category": "头像·证件照",
+    "categorySource": "heuristic",
+    "aspectRatio": "4/3",
+    "image": "assets/tpl-younger-self.webp",
+    "referenceRequired": true,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#younger-self"
+  },
+  {
+    "id": "hairstyle-grid",
+    "name": "发型试戴九宫格",
+    "prompt": "用参考图中的人物生成 3×3 九宫格，每格是同一个人换一种发型：齐肩短发、法式刘海、大波浪长卷发、高马尾、丸子头、锁骨发、羊毛卷、黑长直、精灵短发；脸、妆容和衣服保持不变，统一浅灰背景和正面光，每格下方用小字标注发型名称。",
+    "category": "头像·证件照",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-hairstyle-grid.webp",
+    "referenceRequired": true,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#hairstyle-grid"
+  },
+  {
+    "id": "yearbook-90s",
+    "name": "90 年代毕业照",
+    "prompt": "把参考图中的人物拍成 1990 年代的学校毕业纪念照：蓝灰色斑驳影楼背景布，略带柔焦，衣服和发型换成 90 年代风格，胸像构图、微笑；画面带轻微胶片颗粒和褪色，像扫描出来的老照片，保留本人五官。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-yearbook-90s.webp",
+    "referenceRequired": true,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#yearbook-90s"
+  },
+  {
+    "id": "portrait-film",
+    "name": "胶片感人像",
+    "prompt": "一位穿米白色针织衫的年轻女性站在秋天的梧桐街道，回头看向镜头，发丝被风吹起；午后逆光，暖色调，Kodak Portra 400 胶片质感，细腻颗粒，浅景深，自然肤色，半身构图。",
+    "category": "头像·证件照",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-portrait-film.webp",
+    "referenceRequired": false,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#portrait-film"
+  },
+  {
+    "id": "product-white",
+    "name": "白底主图",
+    "prompt": "把参考图中的商品抠出来，做成电商白底主图：纯白背景（#FFFFFF），商品居中，占画面约 80%，正面略俯视角度，底部有自然柔和的投影；修正透视和白平衡，去掉杂物和反光瑕疵，保持商品形状、颜色和印花不变，高清锐利。",
+    "category": "电商",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-product-white.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana 2",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#product-white"
+  },
+  {
+    "id": "product-scene",
+    "name": "场景氛围图",
+    "prompt": "把参考图中的商品放进一个清晨的北欧风厨房场景：木质台面，旁边有一本摊开的书、一小盆绿植和几颗咖啡豆，杯中冒着热气；窗外柔和的晨光从左侧照进来，暖色调，浅景深，商品保持原样且是画面焦点，商业广告摄影质感。",
+    "category": "电商",
+    "categorySource": "heuristic",
+    "aspectRatio": "4/3",
+    "image": "assets/tpl-product-scene.webp",
+    "referenceRequired": true,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#product-scene"
+  },
+  {
+    "id": "model-wear",
+    "name": "模特上脚图",
+    "prompt": "让一位穿浅色阔腿牛仔裤的模特穿上参考图中的运动鞋，走在城市街头的斑马线上，镜头低角度对准鞋子，膝盖以下构图；鞋子的款式、配色和 logo 位置与原图完全一致；阴天柔光，街拍质感，背景轻微虚化。",
+    "category": "电商",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-model-wear.webp",
+    "referenceRequired": true,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#model-wear"
+  },
+  {
+    "id": "product-exploded",
+    "name": "产品卖点拆解图",
+    "prompt": "一副白色头戴式降噪耳机的爆炸拆解图：耳罩、驱动单元、降噪麦克风、电池和头梁依次悬浮分开排列，每个部件用细线引出中文标注：「40mm 动圈单元」「双馈降噪麦克风」「60 小时续航」「记忆海绵耳罩」；浅灰渐变背景，干净的科技产品渲染风格。",
+    "category": "电商",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-product-exploded.webp",
+    "referenceRequired": false,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#product-exploded"
+  },
+  {
+    "id": "flat-lay",
+    "name": "平铺摆拍",
+    "prompt": "一组护肤品的俯拍平铺摆拍：玻璃精华瓶、面霜罐、滴管瓶和化妆刷，搭配干花、丝带和几片绿叶，摆放疏密有致；奶油色亚麻布背景，自然窗光带柔和阴影，低饱和莫兰迪色调，小红书风格产品图。",
+    "category": "电商",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-flat-lay.webp",
+    "referenceRequired": false,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#flat-lay"
+  },
+  {
+    "id": "selling-points",
+    "name": "详情页卖点图",
+    "prompt": "一张保温杯的电商详情页卖点图：上方大标题「12 小时保温 · 24 小时保冷」，中间是一只雾面墨绿色保温杯的特写，杯身旁有冰块和热气两种效果对比；下方三个带图标的卖点：「316 不锈钢内胆」「一键弹盖」「500ml 大容量」；配色干净，排版整齐，文字清晰无错字。",
+    "category": "电商",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-selling-points.webp",
+    "referenceRequired": false,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#selling-points"
+  },
+  {
+    "id": "poster-event",
+    "name": "活动海报",
+    "prompt": "一张城市爵士音乐节海报：主视觉是一把金色萨克斯风，周围是流动的霓虹线条和音符；大标题「城市爵士夜」，副标题「10.18 — 10.20 · 滨江草坪」，底部一行小字「购票请扫码」；深藏青底色配金色和珊瑚红，复古装饰艺术风格，排版有层次，文字清晰。",
+    "category": "海报·封面",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-poster-event.webp",
+    "referenceRequired": false,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#poster-event"
+  },
+  {
+    "id": "poster-movie",
+    "name": "电影感海报",
+    "prompt": "一张科幻电影海报：一名穿宇航服的人独自站在红色沙丘上，仰望天空中一颗巨大的蓝色行星，远处有坠毁的飞船残骸；电影级调色，青橙对比，强烈的空气透视；顶部片名「回声星球」，底部演职员表小字和上映日期「2027 年春」。",
+    "category": "海报·封面",
+    "categorySource": "heuristic",
+    "aspectRatio": "2/3",
+    "image": "assets/tpl-poster-movie.webp",
+    "referenceRequired": false,
+    "models": [
+      "Nano Banana Pro",
+      "Seedream 5.0 Pro"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#poster-movie"
+  },
+  {
+    "id": "video-thumbnail",
+    "name": "视频封面缩略图",
+    "prompt": "一张 B 站 / YouTube 视频封面：左侧是一个表情惊讶的年轻男生指向右边，右侧是一台拆开的旧笔记本电脑和发光的内存条；大号粗体标题「50 元让旧电脑起飞」，黄色描边高对比，亮色背景，构图简单一眼能看清，适合小尺寸显示。",
+    "category": "海报·封面",
+    "categorySource": "heuristic",
+    "aspectRatio": "16/9",
+    "image": "assets/tpl-video-thumbnail.webp",
+    "referenceRequired": false,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#video-thumbnail"
+  },
+  {
+    "id": "social-cover",
+    "name": "小红书封面",
+    "prompt": "一张小红书笔记封面：奶油黄背景，中间是手写感大标题「一个人的周末 citywalk 路线」，周围贴着咖啡杯、地铁票、小地图和相机的拼贴贴纸，带手绘箭头和星星装饰；清新可爱的手账风格，标题醒目，文字清晰。",
+    "category": "海报·封面",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-social-cover.webp",
+    "referenceRequired": false,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#social-cover"
+  },
+  {
+    "id": "menu-board",
+    "name": "咖啡店菜单",
+    "prompt": "一块咖啡店黑板菜单：标题「今日咖啡」，下面列出 5 款饮品和价格：美式 18、拿铁 22、燕麦拿铁 25、桂花冷萃 26、手冲耶加雪菲 32；粉笔手写字体，角落画着咖啡豆和杯子涂鸦，挂在砖墙上，暖色吊灯照明，文字清晰对齐。",
+    "category": "电商",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-menu-board.webp",
+    "referenceRequired": false,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#menu-board"
+  },
+  {
+    "id": "infographic-steps",
+    "name": "流程步骤图",
+    "prompt": "一张「手冲咖啡 5 步」竖版信息图：标题在顶部，下面 5 个带编号的步骤卡片，每步配一个扁平插画图标和一句说明：1 研磨 15g 咖啡豆（中细）；2 92℃ 热水润湿滤纸；3 注水 30g 闷蒸 30 秒；4 分三段注水至 240g；5 2 分 30 秒内完成萃取。暖棕配色，版式整洁，文字准确清晰。",
+    "category": "信息图",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-infographic-steps.webp",
+    "referenceRequired": false,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#infographic-steps"
+  },
+  {
+    "id": "knowledge-card",
+    "name": "科普知识卡片",
+    "prompt": "一张讲解「光合作用」的科普知识卡片：中间是一片叶子的剖面插画，箭头标出阳光、二氧化碳、水进入，氧气和葡萄糖产出；顶部标题「植物是怎么吃饭的？」，底部一句总结；清新绿色系，儿童科普绘本风格，标注文字清晰准确。",
+    "category": "信息图",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-knowledge-card.webp",
+    "referenceRequired": false,
+    "models": [
+      "Nano Banana Pro",
+      "Nano Banana 2",
+      "Nano Banana 2.1"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#knowledge-card"
+  },
+  {
+    "id": "isometric-city",
+    "name": "等距微缩城市",
+    "prompt": "一个 45° 等距视角的微缩城市街区：中间是一座带钟楼的老火车站，周围有咖啡馆、书店、小公园和有轨电车，街上有行人和自行车；精致的 3D 渲染，柔和的傍晚光，暖色路灯刚亮起，纯色浅背景，像精致的桌面模型。",
+    "category": "信息图",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-isometric-city.webp",
+    "referenceRequired": false,
+    "models": [
+      "Nano Banana Pro",
+      "Nano Banana 2",
+      "Nano Banana 2.1"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#isometric-city"
+  },
+  {
+    "id": "recipe-card",
+    "name": "图解食谱",
+    "prompt": "一张「番茄炒蛋」图解食谱：上方是成品的水彩插画，左侧列出食材：番茄 2 个、鸡蛋 3 个、葱 1 根、盐和糖少许；右侧 4 个步骤配小插图：打散鸡蛋、炒蛋盛出、炒番茄出汁、合炒调味；手绘水彩风格，米白纸张质感，文字清晰。",
+    "category": "信息图",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-recipe-card.webp",
+    "referenceRequired": false,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#recipe-card"
+  },
+  {
+    "id": "image-to-layers",
+    "name": "拆成 PSD 图层",
+    "prompt": "把标题文字、主体和装饰元素分别拆成独立的透明图层，背景补全。",
+    "category": "改图·修复",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-image-to-layers.webp",
+    "referenceRequired": true,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#image-to-layers"
+  },
+  {
+    "id": "restore-old-photo",
+    "name": "老照片修复上色",
+    "prompt": "修复这张老照片：去掉划痕、折痕、霉点和噪点，补全缺损的部分，提升清晰度，然后自然上色（肤色、衣服和背景用符合年代的真实颜色）；保持人物五官、表情、姿势和构图完全不变，不要美颜，看起来像当年用彩色胶片拍的。",
+    "category": "改图·修复",
+    "categorySource": "heuristic",
+    "aspectRatio": "4/3",
+    "image": "assets/tpl-restore-old-photo.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash",
+      "Nano Banana 2",
+      "Nano Banana 2.1"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#restore-old-photo"
+  },
+  {
+    "id": "remove-bg",
+    "name": "一键换纯色背景",
+    "prompt": "保留参考图中的主体（运动鞋），把背景换成纯浅灰色（#F2F2F2）无缝背景，去掉地面杂物和影子，只在鞋底保留一小片自然接触阴影；边缘干净，主体的颜色、纹理和细节保持不变。",
+    "category": "改图·修复",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-remove-bg.webp",
+    "referenceRequired": true,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#remove-bg"
+  },
+  {
+    "id": "change-background",
+    "name": "人像换场景",
+    "prompt": "把参考图中的人物放到京都清水寺附近的石板坡道上，秋天红叶，傍晚暖光；调整人物的光线方向和色温与新场景一致，加上自然的地面阴影；人物的五官、发型、衣服和姿势保持不变，看起来像真实旅拍。",
+    "category": "改图·修复",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-change-background.webp",
+    "referenceRequired": true,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#change-background"
+  },
+  {
+    "id": "outfit-swap",
+    "name": "一键换装",
+    "prompt": "保持参考图中人物的脸、发型、姿势和背景不变，只把衣服换成：深灰色羊毛大衣、白色高领毛衣、深色西裤；衣服的褶皱、光影和身材贴合要自然真实。",
+    "category": "改图·修复",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-outfit-swap.webp",
+    "referenceRequired": true,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#outfit-swap"
+  },
+  {
+    "id": "declutter-room",
+    "name": "一键收拾房间",
+    "prompt": "把参考图中的房间收拾干净：去掉地上的衣服、纸箱、杂物和桌面上的零碎东西，沙发靠垫摆整齐，其余家具、墙面、地板、窗户和光线保持原样，看起来像同一间房刚打扫完。",
+    "category": "改图·修复",
+    "categorySource": "heuristic",
+    "aspectRatio": "4/3",
+    "image": "assets/tpl-declutter-room.webp",
+    "referenceRequired": true,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#declutter-room"
+  },
+  {
+    "id": "room-redesign",
+    "name": "装修效果图",
+    "prompt": "保持参考图房间的结构、门窗位置和视角不变，改造成日式原木风：浅橡木地板、米白色墙面、低矮布艺沙发、藤编灯罩、几盆绿植和亚麻窗帘；自然光，温馨干净，像室内设计效果图。",
+    "category": "改图·修复",
+    "categorySource": "heuristic",
+    "aspectRatio": "4/3",
+    "image": "assets/tpl-room-redesign.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#room-redesign"
+  },
+  {
+    "id": "sketch-to-render",
+    "name": "线稿变效果图",
+    "prompt": "把参考图的铅笔线稿渲染成真实的建筑效果图：严格保持线稿的造型、比例和视角；白色外墙、深色木饰面、大面积落地玻璃，周围是草坪和几棵树，傍晚天空，室内暖光透出，写实建筑摄影风格。",
+    "category": "改图·修复",
+    "categorySource": "heuristic",
+    "aspectRatio": "4/3",
+    "image": "assets/tpl-sketch-to-render.webp",
+    "referenceRequired": true,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#sketch-to-render"
+  },
+  {
+    "id": "ghibli",
+    "name": "宫崎骏动画风",
+    "prompt": "把参考图重绘成日本手绘动画电影风格：柔和的水彩背景、干净的线条、温暖明亮的色彩，天空有大朵积云，草地被风吹动；保留原图的主体、构图和动作。",
+    "category": "风格化",
+    "categorySource": "heuristic",
+    "aspectRatio": "4/3",
+    "image": "assets/tpl-ghibli.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana 2",
+      "GPT Image 2"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#ghibli"
+  },
+  {
+    "id": "style-transfer",
+    "name": "印象派油画",
+    "prompt": "把参考图画成印象派油画：明显的厚涂笔触、斑驳的光点、莫奈式的柔和色彩，背景换成开满睡莲的池塘边；人物的姿势、构图和五官特征保持可辨认，画布纹理可见。",
+    "category": "风格化",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-style-transfer.webp",
+    "referenceRequired": true,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#style-transfer"
+  },
+  {
+    "id": "pixel-art",
+    "name": "像素游戏风",
+    "prompt": "把参考图中的宠物做成 16-bit 复古游戏像素风角色：清晰的像素点，有限的调色板，站在草地平台上，头顶有一颗像素爱心；背景是简单的蓝天和像素云，像一张游戏截图。",
+    "category": "风格化",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-pixel-art.webp",
+    "referenceRequired": true,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#pixel-art"
+  },
+  {
+    "id": "watercolor-journal",
+    "name": "水彩旅行手账",
+    "prompt": "一页水彩旅行手账：画的是希腊圣托里尼的白房子和蓝顶教堂，旁边贴着手绘邮票、登机牌和一片压花，留白处有钢笔小字和手绘箭头；水彩晕染，纸张纹理明显，清新明亮的地中海蓝白配色。",
+    "category": "风格化",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-watercolor-journal.webp",
+    "referenceRequired": false,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#watercolor-journal"
+  },
+  {
+    "id": "coloring-page",
+    "name": "儿童涂色线稿",
+    "prompt": "一张给儿童的涂色线稿：一只小恐龙在森林里放风筝，旁边有蘑菇、花朵和小溪；只有干净的黑色粗线条，封闭的色块区域，纯白背景，没有灰度和阴影，适合打印出来涂色。",
+    "category": "风格化",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-coloring-page.webp",
+    "referenceRequired": false,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#coloring-page"
+  },
+  {
+    "id": "sticker",
+    "name": "可爱贴纸",
+    "prompt": "一只圆滚滚的橘猫贴纸，戴着黄色小皇冠，双爪比心；粗黑色描边，赛璐璐平涂上色，白色描边外框，纯白背景，居中构图，高清。",
+    "category": "插画·表情",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-sticker.webp",
+    "referenceRequired": false,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#sticker"
+  },
+  {
+    "id": "emoji-pack",
+    "name": "宠物表情包",
+    "prompt": "用参考图中的宠物做一套 3×3 表情包，Q 版卡通风格，保留毛色和花纹，每格一个表情和一句短文字：「早安」「收到」「好耶」「委屈」「在忙」「晚安」「谢谢」「？？？」「爱你」；白色背景，粗描边，文字清晰。",
+    "category": "插画·表情",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-emoji-pack.webp",
+    "referenceRequired": true,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#emoji-pack"
+  },
+  {
+    "id": "comic",
+    "name": "四格漫画",
+    "prompt": "一则四格漫画，主角是一只戴眼镜的小猫程序员：第 1 格「代码终于跑通了！」开心举手；第 2 格「顺手优化一下……」认真敲键盘；第 3 格屏幕满是红色报错，小猫石化；第 4 格「……回滚。」默默按下撤销。日系简笔画风格，对话气泡文字清晰。",
+    "category": "风格化",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-comic.webp",
+    "referenceRequired": false,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#comic"
+  },
+  {
+    "id": "picture-book",
+    "name": "儿童绘本插画",
+    "prompt": "一幅儿童绘本插画：一个穿黄色雨衣的小女孩和一只小狐狸在雨后的森林里分享一把蘑菇伞，地上有水洼倒影，萤火虫开始亮起；彩铅加水彩质感，温柔的暖色调，画面安静治愈。",
+    "category": "插画·表情",
+    "categorySource": "heuristic",
+    "aspectRatio": "4/3",
+    "image": "assets/tpl-picture-book.webp",
+    "referenceRequired": false,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#picture-book"
+  },
+  {
+    "id": "landscape",
+    "name": "壮丽风光",
+    "prompt": "冰岛黑沙滩日出，远处海蚀柱被金色阳光勾边，海浪在长曝光下变成丝绸般的雾气，前景是湿润发亮的黑色鹅卵石；超广角，低机位，HDR，国家地理风光摄影质感。",
+    "category": "摄影",
+    "categorySource": "heuristic",
+    "aspectRatio": "16/9",
+    "image": "assets/tpl-landscape.webp",
+    "referenceRequired": false,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#landscape"
+  },
+  {
+    "id": "food",
+    "name": "美食特写",
+    "prompt": "一碗热气腾腾的红烧牛肉面，汤色红亮，牛肉块纹理清晰，撒着葱花和香菜，旁边放着筷子和一小碟辣椒油；深色木桌，侧逆光突出热气，浅景深，美食杂志摄影风格。",
+    "category": "摄影",
+    "categorySource": "heuristic",
+    "aspectRatio": "4/3",
+    "image": "assets/tpl-food.webp",
+    "referenceRequired": false,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#food"
+  },
+  {
+    "id": "pet-portrait",
+    "name": "宠物艺术写真",
+    "prompt": "给参考图中的宠物拍一张影棚艺术写真：戴一个小小的红色格子领结，端坐在深墨绿色丝绒背景前，伦勃朗式侧光，眼神光清晰，毛发细节锐利；保留宠物的品种、毛色和花纹，像高端宠物摄影工作室作品。",
+    "category": "头像·证件照",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-pet-portrait.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana 2",
+      "GPT Image 2"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#pet-portrait"
+  },
+  {
+    "id": "cinematic-street",
+    "name": "电影感街景",
+    "prompt": "雨夜的香港街头，霓虹招牌倒映在湿漉漉的路面上，一个撑透明雨伞的行人穿过马路，远处双层巴士亮着车灯；电影宽画幅，青色与品红的霓虹调色，轻微雾气，35mm 胶片颗粒，王家卫式氛围。",
+    "category": "海报·封面",
+    "categorySource": "heuristic",
+    "aspectRatio": "16/9",
+    "image": "assets/tpl-cinematic-street.webp",
+    "referenceRequired": false,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#cinematic-street"
+  },
+  {
+    "id": "product-macro",
+    "name": "微距静物",
+    "prompt": "一枚机械腕表的微距特写：蓝色表盘上的日内瓦波纹、抛光指针和宝石轴承清晰可见，表盘上有几颗细小水珠；深色背景，一束硬光从侧面打出高光，极浅景深，奢侈品广告摄影质感。",
+    "category": "电商",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-product-macro.webp",
+    "referenceRequired": false,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#product-macro"
+  },
+  {
+    "id": "aerial-view",
+    "name": "航拍大片",
+    "prompt": "秋天的梯田航拍俯视图，层层叠叠的弧形田埂呈现金黄、橙红和墨绿的色块，一条小路和几户白墙黑瓦的农舍点缀其间，清晨薄雾在山谷中流动；无人机垂直俯拍，高饱和但自然，细节丰富。",
+    "category": "摄影",
+    "categorySource": "heuristic",
+    "aspectRatio": "16/9",
+    "image": "assets/tpl-aerial-view.webp",
+    "referenceRequired": false,
+    "models": [],
+    "sourceUrl": "https://yingtu.ai/zh/templates#aerial-view"
+  },
+  {
+    "id": "retro-80s-photo",
+    "name": "80 年代复古影棚照",
+    "prompt": "把参考图中的人物拍成一张 1980 年代影楼写真：蓬松的大卷发、垫肩亮色西装外套、大圆耳环，背景是渐变的粉紫色激光纹影棚布，柔光镜带来的朦胧光晕，胶片颗粒和轻微偏色，像 1986 年的商场影楼照片；保留本人的脸和神态。",
+    "category": "风格化",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-retro-80s-photo.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#retro-80s-photo"
+  },
+  {
+    "id": "horror-90s-selfie",
+    "name": "90 年代恐怖片剧照",
+    "prompt": "把参考图中的人物放进一张 90 年代青春恐怖片的剧照：深夜的郊区老房子客厅，他拿着老式无绳电话一脸惊恐地回头，身后走廊尽头的门口站着一个穿黑色兜帽长袍的高大身影，兜帽下完全是一片黑暗、看不到脸，也没有戴任何面具；冷蓝月光加一盏暖色台灯，35mm 胶片颗粒，轻微运动模糊，像 1996 年的电影截图；保留本人的脸、发型和眼镜。",
+    "category": "摄影",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-horror-90s-selfie.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#horror-90s-selfie"
+  },
+  {
+    "id": "catrina-dia-de-muertos",
+    "name": "亡灵节 Catrina 妆容",
+    "prompt": "把参考图中的人物画成墨西哥亡灵节的 Catrina 妆容：白色底妆上精致的黑色和彩色花纹骷髅彩绘，头戴橙黄色万寿菊和红玫瑰花冠，黑色蕾丝高领裙；背景是烛光摇曳的祭坛，摆着万寿菊花瓣、彩色剪纸旗和糖骷髅；温暖、庄重、美丽，人像摄影质感，保留本人的五官和神态。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-catrina-dia-de-muertos.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#catrina-dia-de-muertos"
+  },
+  {
+    "id": "pet-ofrenda",
+    "name": "宠物亡灵节纪念祭坛",
+    "prompt": "为参考图中的宠物布置一个温馨的墨西哥亡灵节纪念祭坛（ofrenda）：中间是它端坐微笑的木框照片，周围摆满橙色万寿菊、点燃的蜡烛、彩色剪纸旗、一碗狗粮、小骨头玩具和一个画着爪印的糖骷髅；暖黄烛光，温柔怀念而不悲伤；照片里的宠物保留品种、毛色和花纹。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "4/3",
+    "image": "assets/tpl-pet-ofrenda.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#pet-ofrenda"
+  },
+  {
+    "id": "fall-photoshoot",
+    "name": "秋日南瓜田写真",
+    "prompt": "把参考图中的人物拍成一组秋日南瓜田写真：她穿着燕麦色粗针织毛衣和格子围巾，坐在干草堆上抱着一个小白南瓜，周围是成片的橙色南瓜和金黄的枫树；傍晚逆光，温暖的金色光晕，浅景深，像生活方式杂志的秋季大片；保留本人的脸和发型。",
+    "category": "头像·证件照",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-fall-photoshoot.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana 2",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#fall-photoshoot"
+  },
+  {
+    "id": "christmas-family-photo",
+    "name": "圣诞全家福",
+    "prompt": "把参考图中的一家人拍成圣诞全家福：全家穿着同款红白北欧花纹毛衣，坐在壁炉前的地毯上，旁边是挂满暖黄小灯和金色彩球的圣诞树，壁炉上挂着写有每个人名字首字母的圣诞袜；温暖的室内光，大家自然地笑着看镜头，像专业家庭摄影；保留每个人的脸、发型和年龄。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "4/3",
+    "image": "assets/tpl-christmas-family-photo.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#christmas-family-photo"
+  },
+  {
+    "id": "candy-cane-christmas",
+    "name": "拐杖糖圣诞写真",
+    "prompt": "把参考图中的人物拍成一张甜美的圣诞写真：她穿着红色丝绒连衣裙，双手拿着两根巨大的红白条纹拐杖糖，背景是奶油色墙面前堆满包装好的礼物和一棵挂着红白装饰的小圣诞树，头顶飘着细小的雪花；明亮的影棚光，糖果色调，俏皮可爱；保留本人的脸和发型。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-candy-cane-christmas.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#candy-cane-christmas"
+  },
+  {
+    "id": "snow-globe-me",
+    "name": "把自己装进水晶球",
+    "prompt": "把参考图中的人物做成一个圣诞水晶球里的小人偶：他穿着红色毛衣和围巾站在积雪的小木屋前，旁边有一棵小松树；水晶球放在铺着格子桌布的木桌上，球里雪花飘落，底座是烫金木雕，写着“Merry Christmas”；背景是虚化的圣诞灯光，微距产品摄影；人偶保留本人的脸、发型和眼镜。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-snow-globe-me.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#snow-globe-me"
+  },
+  {
+    "id": "ugly-sweater",
+    "name": "圣诞丑毛衣图案",
+    "prompt": "设计一件“圣诞丑毛衣”，平铺在木地板上俯拍：红色针织底，绿色和白色的像素风针织图案，正中间是一只戴墨镜的驯鹿骑着滑板，周围一圈雪花、姜饼人和小圣诞树，下摆一行针织字母“HO HO HO”；针织纹理真实，线头和毛球清晰，搞笑又节日。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-ugly-sweater.webp",
+    "referenceRequired": false,
+    "models": [
+      "GPT Image 2",
+      "Nano Banana Pro",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#ugly-sweater"
+  },
+  {
+    "id": "nengajo-2027",
+    "name": "2027 羊年日式贺年卡",
+    "prompt": "设计一张日本新年贺卡（年贺状），竖版明信片：2027 年是羊年，画面中间是一只圆滚滚的白色小绵羊，戴着红白绳结的新年装饰，旁边有松枝、梅花和金色祥云；上方用毛笔字写“謹賀新年”，下方小字“2027”；和纸质感背景，朱红、金、白配色，简洁可爱。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "2/3",
+    "image": "assets/tpl-nengajo-2027.webp",
+    "referenceRequired": false,
+    "models": [
+      "GPT Image 2",
+      "Nano Banana Pro",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#nengajo-2027"
+  },
+  {
+    "id": "lunar-new-year-portrait",
+    "name": "新春红金写真",
+    "prompt": "把参考图中的人物拍成一张新春写真：她穿着红色丝绒改良旗袍，手里拿着一只金色的福字红包，身后是挂满红灯笼的庭院回廊和盛开的梅花，飘着少量金色纸屑；暖红金色调，喜庆但高级，像时尚杂志的新年特辑；保留本人的脸和发型。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-lunar-new-year-portrait.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#lunar-new-year-portrait"
+  },
+  {
+    "id": "seollal-hanbok",
+    "name": "韩服新年写真",
+    "prompt": "把参考图中的人物拍成一张韩国新年（설날）韩服写真：她穿着淡粉色上衣和深红色长裙的传统韩服，发间一支小发簪，站在韩屋的木门廊下，旁边摆着福袋和传统纸灯；柔和的冬日自然光，干净典雅；保留本人的脸和神态。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-seollal-hanbok.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#seollal-hanbok"
+  },
+  {
+    "id": "new-year-eve-poster",
+    "name": "跨年派对海报",
+    "prompt": "设计一张跨年派对海报：深海军蓝背景，金色烟花在上方绽放，中间是大号金属质感的数字“2027”，下面是两只相碰的香槟杯和飘落的金色亮片；标题“跨年倒数派对”，下方小字“12 月 31 日 · 22:00 · 天台酒廊”；装饰艺术风格细线边框，高级、闪亮、干净。",
+    "category": "海报·封面",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-new-year-eve-poster.webp",
+    "referenceRequired": false,
+    "models": [
+      "GPT Image 2",
+      "Nano Banana Pro",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#new-year-eve-poster"
+  },
+  {
+    "id": "red-envelope-design",
+    "name": "羊年红包封面",
+    "prompt": "设计一个 2027 羊年红包封面，正面平铺展示：大红底色，烫金线条画的一只可爱小羊站在祥云上，头顶一个金色的“福”字，四角有简洁的金色回纹；纸张有细腻的压纹和烫金反光，产品摄影质感，喜庆而精致。",
+    "category": "海报·封面",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-red-envelope-design.webp",
+    "referenceRequired": false,
+    "models": [
+      "GPT Image 2",
+      "Nano Banana Pro",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#red-envelope-design"
+  },
+  {
+    "id": "pet-bathroom-portrait",
+    "name": "宠物浴缸贵族照",
+    "prompt": "给参考图中的宠物拍一张复古浴室写真：它端坐在一个白色爪足浴缸里，浴缸里堆满泡泡，头上顶着一条卷起来的小毛巾，旁边是黄铜水龙头、墨绿色瓷砖墙和一小盆蕨类植物；柔和的窗光，表情一本正经，好笑又高级；保留宠物的品种、毛色和花纹。",
+    "category": "头像·证件照",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-pet-bathroom-portrait.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#pet-bathroom-portrait"
+  },
+  {
+    "id": "pet-to-human",
+    "name": "如果我家宠物是人",
+    "prompt": "想象参考图中的宠物变成了一个人，拍一张真实的人像：保留它的性格和毛色特征——发色对应毛色，穿着也用同样的配色，表情和神态像它一样开朗；在同一个公园草坪上，明亮日光，自然的街拍质感；在人物旁边的草地上，原来的宠物坐着看镜头。",
+    "category": "头像·证件照",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-pet-to-human.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#pet-to-human"
+  },
+  {
+    "id": "royal-pet-portrait",
+    "name": "宠物文艺复兴油画",
+    "prompt": "把参考图中的宠物画成一幅文艺复兴时期的皇室肖像油画：它穿着带白色貂皮领的深红天鹅绒披风，胸前挂着金色勋章，端坐在金色雕花椅上，背景是深色帷幔和柔和的伦勃朗光；古典油画笔触，细腻的裂纹，装在华丽的金色画框里；保留品种、毛色和花纹。",
+    "category": "风格化",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-royal-pet-portrait.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#royal-pet-portrait"
+  },
+  {
+    "id": "bw-couple-portrait",
+    "name": "黑白情侣大片",
+    "prompt": "把参考图中的情侣拍成一张黑白时尚大片：两人穿着简洁的黑色高领毛衣和白衬衫，额头轻轻相抵、闭着眼微笑，纯色深灰影棚背景，单侧柔光勾出轮廓，高反差黑白，细腻的胶片颗粒，像时装杂志的情侣专题；保留两个人的脸和发型。",
+    "category": "风格化",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-bw-couple-portrait.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#bw-couple-portrait"
+  },
+  {
+    "id": "birthday-photoshoot",
+    "name": "生日写真",
+    "prompt": "把参考图中的人物拍成一组生日写真：她戴着一顶小小的金色派对帽，捧着插满蜡烛的奶油蛋糕微笑，身后是奶油粉和香槟金的气球墙，数字气球“25”，飘着彩带；明亮柔和的影棚光，梦幻甜美；保留本人的脸和发型。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-birthday-photoshoot.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#birthday-photoshoot"
+  },
+  {
+    "id": "magazine-cover",
+    "name": "我上了杂志封面",
+    "prompt": "把参考图中的人物做成一本时尚杂志的封面：他穿着剪裁利落的驼色大衣，影棚纯色背景，自信地看镜头；顶部大号衬线刊名“MODERN”，左侧几行封面标题：“The Creative Issue”“32 Ideas for 2027”“Inside the Studio”，右下角条形码和期号；专业杂志排版，锐利清晰；保留本人的脸、发型和眼镜。",
+    "category": "海报·封面",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-magazine-cover.webp",
+    "referenceRequired": true,
+    "models": [
+      "GPT Image 2",
+      "Nano Banana Pro",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#magazine-cover"
+  },
+  {
+    "id": "superhero-me",
+    "name": "我变成超级英雄",
+    "prompt": "把参考图中的人物变成一位原创超级英雄的电影海报剧照：深蓝与银色的科技战衣，胸口一个发光的六边形标志，斗篷在风中飘动，站在夜晚城市楼顶，身后是闪电与霓虹；电影级光影，低角度仰拍，史诗感；保留本人的脸、发型和眼镜（眼镜可以是战术护目镜款）。",
+    "category": "头像·证件照",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-superhero-me.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#superhero-me"
+  },
+  {
+    "id": "pencil-sketch",
+    "name": "照片转铅笔素描",
+    "prompt": "把参考图画成一幅铅笔素描肖像：白色素描纸上，石墨铅笔的排线和明暗层次，头发用流畅的长线条，脸部细腻的过渡，边缘留出没画完的松散线条；纸张有轻微纹理，旁边放着一支削好的铅笔和橡皮，俯拍；保留本人的五官和神态。",
+    "category": "风格化",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-pencil-sketch.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana 2",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#pencil-sketch"
+  },
+  {
+    "id": "trading-card",
+    "name": "我的专属球星卡",
+    "prompt": "把参考图中的人物做成一张收藏级篮球球星卡：他穿着 23 号蓝白球衣，腾空扣篮的动作，背景是闪亮的镭射折射纹；卡片顶部名字“ALEX CHEN”，底部队名“CITY HAWKS”和“ROOKIE 2027”标识，右上角烫金“1 of 99”编号；卡片放在透明卡砖里，桌面微距拍摄；保留本人的脸、发型和眼镜。",
+    "category": "插画·表情",
+    "categorySource": "heuristic",
+    "aspectRatio": "2/3",
+    "image": "assets/tpl-trading-card.webp",
+    "referenceRequired": true,
+    "models": [
+      "GPT Image 2",
+      "Nano Banana Pro",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#trading-card"
+  },
+  {
+    "id": "vinyl-figure",
+    "name": "大头搪胶公仔",
+    "prompt": "把参考图中的人物做成一个大头搪胶收藏公仔：方圆的大头、黑色圆点眼睛、小小的身体，穿着同款牛仔外套和白 T 恤；公仔站在一个开窗的彩色纸盒前，盒子上印着她的名字“MIA”和编号“#27”；桌面产品摄影，柔和阴影；保留发型、发色和衣服配色。",
+    "category": "手办·3D",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-vinyl-figure.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#vinyl-figure"
+  },
+  {
+    "id": "diwali-portrait",
+    "name": "排灯节纱丽写真",
+    "prompt": "把参考图中的人物拍成一张排灯节（Diwali）写真：身穿金色滚边的玫红色丝绸纱丽，戴金色吊坠耳环和几只玻璃手镯，坐在庭院台阶上，双手捧着一盏点亮的小陶土油灯；身边摆着一排排发光的油灯，地上是彩色花瓣拼成的兰戈利图案，门边挂着万寿菊花环；暖金色的傍晚光线混合烛光，柔和的背景光斑。人像摄影，保留本人的脸、发型和笑容。",
+    "category": "头像·证件照",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-diwali-portrait.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#diwali-portrait"
+  },
+  {
+    "id": "christmas-room-decor",
+    "name": "客厅圣诞布置",
+    "prompt": "把参考图中的客厅布置成圣诞节的样子：保留同一个房间、沙发、窗户和布局，把地上和桌上的杂物收拾干净；在角落放一棵约 1.8 米高、挂着暖白灯串和红金色彩球的圣诞树，树下堆几个包好的礼物，窗边挂一圈带灯的松枝花环，沙发上换成红绿格纹抱枕和一条针织毯，墙上挂一个花环；傍晚温馨的灯光，真实的室内摄影。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "4/3",
+    "image": "assets/tpl-christmas-room-decor.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana 2",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#christmas-room-decor"
+  },
+  {
+    "id": "santa-caught-on-camera",
+    "name": "监控拍到圣诞老人",
+    "prompt": "把参考图中的客厅变成一张平安夜的家庭监控截图：同一个房间、同样的家具，深夜里只有窗边一棵圣诞树的彩灯亮着；穿红色衣服、留白胡子的圣诞老人跪在树旁，正把一个包好的礼物放到树下，回头瞥了一眼镜头；墙角高处俯拍的视角，广角畸变，昏暗画面里有明显噪点，左上角一行白色小字时间戳「12-24-2026 23:47」。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "4/3",
+    "image": "assets/tpl-santa-caught-on-camera.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#santa-caught-on-camera"
+  },
+  {
+    "id": "pet-christmas-ornament",
+    "name": "宠物圣诞挂饰",
+    "prompt": "把参考图中的宠物做成一个定制圣诞挂饰：圆形玻璃球挂饰，正面是手绘的宠物肖像，保留品种、毛色和花纹，肖像外面一圈金色冬青叶细边，下方用白色小字写着「BISCUIT」和「2026」，顶部系着红色丝绒蝴蝶结；挂饰挂在装饰好的圣诞树枝上，背景是虚化的暖黄灯串；产品摄影，浅景深。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-pet-christmas-ornament.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana 2",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#pet-christmas-ornament"
+  },
+  {
+    "id": "new-year-balloons-2027",
+    "name": "2027 跨年气球写真",
+    "prompt": "把参考图中的人物拍成一张跨年夜写真：穿黑色丝绒西装外套、打领结，手拿一杯香槟，站在一组巨大的金色铝膜数字气球「2027」旁边；金色彩纸屑从空中落下，深色背景里有暖色灯串光斑和几条彩带；派对闪光灯摄影，光泽感的杂志大片质感；保留本人的脸、眼镜和发型。",
+    "category": "头像·证件照",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-new-year-balloons-2027.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#new-year-balloons-2027"
+  },
+  {
+    "id": "vintage-new-year-postcard",
+    "name": "复古新年明信片",
+    "prompt": "一张 1970 年代风格的复古新年明信片：星空下落满雪的冷杉林，一根挂着玻璃彩球的冷杉枝上吊着一只圆钟，指针差几分钟到午夜；一只红胸灰雀停在积雪的树枝上，远处一辆马拉雪橇挂着铃铛驶过。红色复古美术字大标题「新年快乐！」，下方金色的「2027」；水粉插画，略旧的米白卡纸，印刷明信片的质感，文字清晰。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-vintage-new-year-postcard.webp",
+    "referenceRequired": false,
+    "models": [
+      "GPT Image 2",
+      "Nano Banana Pro",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#vintage-new-year-postcard"
+  },
+  {
+    "id": "christmas-product-photo",
+    "name": "圣诞节商品图",
+    "prompt": "把参考图中的商品拍成圣诞节商品图：同一只马克杯，完全保留杯子的形状、颜色和叶子图案，杯里装着热可可和迷你棉花糖，放在铺着白雪的台面上，周围点缀松枝、红色浆果、一根肉桂棒和一个包好的小礼盒；背景是暖黄色灯串光斑，柔和的窗光，干净的节日电商风格，商品上方留出放文字的空间。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-christmas-product-photo.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana 2",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#christmas-product-photo"
+  },
+  {
+    "id": "black-friday-banner",
+    "name": "黑五大促横幅",
+    "prompt": "用参考图中的商品做一张黑五大促横幅：同一只运动鞋，完全保留鞋子的形状和配色，微微倾斜地悬浮在画面右侧，黑色背景上有几道醒目的金色斜向光带；左侧是白色粗体大标题「黑五大促」，下面一行金色字「全场低至 5 折」，再下面一个白色小按钮「立即抢购」；干净、高对比的电商网页横幅，文字清晰。",
+    "category": "电商",
+    "categorySource": "heuristic",
+    "aspectRatio": "16/9",
+    "image": "assets/tpl-black-friday-banner.webp",
+    "referenceRequired": true,
+    "models": [
+      "GPT Image 2",
+      "Nano Banana Pro",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#black-friday-banner"
+  },
+  {
+    "id": "listing-infographic",
+    "name": "商品卖点标注图",
+    "prompt": "用参考图中的商品做一张电商卖点标注图：同一只马克杯，完全保留形状、颜色和叶子图案，放在干净的浅灰色背景正中；四条细引线从杯子引出，分别指向带简洁线性图标的短标签「350ml 大容量」「可放洗碗机」「可微波加热」「哑光釉面」；顶部标题「日常陶瓷马克杯」。简洁现代的平台商品图，文字清晰，不杂乱。",
+    "category": "电商",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-listing-infographic.webp",
+    "referenceRequired": true,
+    "models": [
+      "GPT Image 2",
+      "Nano Banana Pro"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#listing-infographic"
+  },
+  {
+    "id": "ugc-product-photo",
+    "name": "真实感买家秀",
+    "prompt": "用参考图中的商品拍一张买家秀风格的社交媒体照片：随手用手机拍的感觉，一只穿着宽松针织长袖的手握着同一只马克杯，完全保留杯子的形状、颜色和叶子图案；下面是有点凌乱但温馨的床铺，上面有一本书、一台没有任何标志的笔记本电脑和一条针织毯；柔和的清晨窗光，构图略微随意，颜色自然，像真实顾客发的 Instagram 快拍，画面里不要文字和标志。",
+    "category": "电商",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-ugc-product-photo.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana 2",
+      "GPT Image 2"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#ugc-product-photo"
+  },
+  {
+    "id": "album-cover",
+    "name": "专辑封面",
+    "prompt": "用参考图中的人物做一张音乐专辑封面：夜里隔着挂满雨痕的车窗拍的氛围感特写，只有一红一蓝两道霓虹光打在脸上，胶片颗粒；左上角白色小字歌手名「顾南」，底部是被略微拉宽的镀铬大字专辑名「夜行」；方形构图，电影感，保留本人的脸和眼镜。",
+    "category": "海报·封面",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-album-cover.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#album-cover"
+  },
+  {
+    "id": "book-cover",
+    "name": "小说书封",
+    "prompt": "一本长篇小说的封面：黄昏时分，一座孤零零的灯塔立在礁石悬崖上，光束穿过海面上的浓雾，一个提着灯的小小身影正沿着小路往上走。顶部是大号优雅衬线字书名「最后的灯塔」，下面一行小字「长篇小说」，底部是作者名「林雾」；绘画质感，氛围浓郁，低饱和的青绿与琥珀色，文字清晰，只要平面的封面正面。",
+    "category": "插画·表情",
+    "categorySource": "heuristic",
+    "aspectRatio": "2/3",
+    "image": "assets/tpl-book-cover.webp",
+    "referenceRequired": false,
+    "models": [
+      "GPT Image 2",
+      "Nano Banana Pro",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#book-cover"
+  },
+  {
+    "id": "wedding-invitation",
+    "name": "婚礼请柬",
+    "prompt": "一张优雅的婚礼请柬：水彩尤加利叶和浅粉玫瑰装饰在上方两角，米白色纹理卡纸，细细的金色边框。文字居中排列：「诚邀您参加我们的婚礼」，大号书法字新人名字「林晓 & 陈默」，「2027 年 6 月 12 日 星期六」，「杭州 · 西湖玫瑰园」，「敬备喜宴 恭候光临」；正面平视，留白舒展，文字清晰。",
+    "category": "插画·表情",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-wedding-invitation.webp",
+    "referenceRequired": false,
+    "models": [
+      "GPT Image 2",
+      "Nano Banana Pro"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#wedding-invitation"
+  },
+  {
+    "id": "calendar-2027",
+    "name": "2027 年挂历月页",
+    "prompt": "一页可打印的 2027 年 1 月挂历：上半部分是一幅水彩插画，雪中的小村庄和结冰的池塘上有人在滑冰；下方是标题「2027 年 1 月」和整齐的月历表格，表头「一 二 三 四 五 六 日」（周一开始）；1 月 1 日是星期五，所以第一行从星期五的 1 开始、到星期日的 3，一共五行，最后一行是 25 日（周一）到 31 日（周日）。简洁现代的字体，米白纸张，文字和数字清晰。",
+    "category": "信息图",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-calendar-2027.webp",
+    "referenceRequired": false,
+    "models": [
+      "GPT Image 2",
+      "Nano Banana Pro"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#calendar-2027"
+  },
+  {
+    "id": "photo-booth-strip",
+    "name": "照相亭四格照",
+    "prompt": "把参考图中的情侣做成一张经典黑白照相亭相纸：一张 4×6 英寸相纸上并排两条一模一样的四格照片条，每条四格都是两人在同一个照相亭里——对着镜头微笑、一起做鬼脸、她亲他的脸颊、两人大笑；素色帘子背景，直打闪光灯，银盐颗粒感，白色边框。保留两个人的脸、发型和胡子。",
+    "category": "头像·证件照",
+    "categorySource": "heuristic",
+    "aspectRatio": "2/3",
+    "image": "assets/tpl-photo-booth-strip.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#photo-booth-strip"
+  },
+  {
+    "id": "korean-profile-photo",
+    "name": "韩式照相馆形象照",
+    "prompt": "把参考图中的人物拍成一张韩式照相馆形象照：柔和均匀的美颜布光，干净的浅粉蓝色背景，头发打理得整齐有光泽，淡雅自然的妆容和水光肌，穿一件简单的象牙白衬衫，肩膀微微侧转，抿嘴温柔地微笑；胸像构图，高级修图但保留真实的皮肤纹理；保留脸型和五官。",
+    "category": "头像·证件照",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-korean-profile-photo.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#korean-profile-photo"
+  },
+  {
+    "id": "aging-future-self",
+    "name": "75 岁的我",
+    "prompt": "展示参考图中的人物 75 岁左右的样子：同一张脸、同一副眼镜和同样的神情，自然地变老——银灰色头发，眼角和额头更深的皱纹，一些老年斑，脸颊略微消瘦；穿一件灰色针织开衫，以同样的姿势站在同一面素色墙前，柔和日光。真实照片，不要夸张或漫画化。",
+    "category": "头像·证件照",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-aging-future-self.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#aging-future-self"
+  },
+  {
+    "id": "future-baby",
+    "name": "我们的宝宝长什么样",
+    "prompt": "想象参考图中这对情侣未来的宝宝：一个大约 10 个月大、笑得很开心的宝宝，自然地融合了两个人的特征——她的眼型和他的笑容，柔软的深棕色头发；宝宝坐在明亮婴儿房里的米白色针织毯上，穿一件简单的燕麦色连体衣；柔和窗光，真实的婴儿摄影，眼神清晰，温暖自然；画面里只有宝宝。",
+    "category": "头像·证件照",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-future-baby.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#future-baby"
+  },
+  {
+    "id": "crochet-doll",
+    "name": "钩针毛线玩偶",
+    "prompt": "把参考图中的人物做成一个手工钩针毛线玩偶：清晰可见的毛线针脚，圆圆的头，黑色小珠子眼睛和粉色绣线腮红，毛线头发保持同样的长度和颜色，穿着钩织的小牛仔外套和白色上衣；玩偶坐在木桌上，旁边放着一团毛线和一根钩针；柔和自然光，手工艺品特写摄影，浅景深。",
+    "category": "手办·3D",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-crochet-doll.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana 2",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#crochet-doll"
+  },
+  {
+    "id": "claymation-family",
+    "name": "黏土定格动画全家福",
+    "prompt": "把参考图中的一家人做成定格动画里的黏土场景：四个人都是手工捏的橡皮泥小人，带着可见的指纹和工具痕迹，黏土表面微微有光泽，五官圆润简化；保留每个人的发型、发色和衣服颜色，比如妈妈的黑色短发和女孩的双马尾；他们坐在一个迷你客厅布景里的黏土小沙发上，温暖的实景灯光，浅景深，像定格动画电影里的一帧。",
+    "category": "风格化",
+    "categorySource": "heuristic",
+    "aspectRatio": "4/3",
+    "image": "assets/tpl-claymation-family.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana 2",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#claymation-family"
+  },
+  {
+    "id": "photo-to-coloring-page",
+    "name": "照片变涂色线稿",
+    "prompt": "把参考图变成一张可打印的涂色线稿：纯白背景上只有干净的黑色轮廓线，不要阴影、不要灰色填充、不要任何颜色；保留四个人的姿势、脸、发型和沙发，让人一眼认得出，简化成平滑、闭合、方便涂色的线条形状，线条中等粗细，适合孩子涂色。",
+    "category": "摄影",
+    "categorySource": "heuristic",
+    "aspectRatio": "4/3",
+    "image": "assets/tpl-photo-to-coloring-page.webp",
+    "referenceRequired": true,
+    "models": [
+      "GPT Image 2",
+      "Nano Banana 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#photo-to-coloring-page"
+  },
+  {
+    "id": "tarot-card",
+    "name": "我的专属塔罗牌",
+    "prompt": "把参考图中的人物画成一张新艺术风格的塔罗牌「星星」：她赤脚站在夜空下安静的水池边，天上一颗大大的八角星和七颗小星，她手持两只陶罐向水中倒水，身穿飘逸的午夜蓝长袍；华丽的金色边框，顶部罗马数字「XVII」，底部「THE STAR」；平面插画，精细的线条，低饱和的宝石色调；保留她的脸和发型。",
+    "category": "插画·表情",
+    "categorySource": "heuristic",
+    "aspectRatio": "2/3",
+    "image": "assets/tpl-tarot-card.webp",
+    "referenceRequired": true,
+    "models": [
+      "GPT Image 2",
+      "Nano Banana Pro",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#tarot-card"
+  },
+  {
+    "id": "winter-couple-photoshoot",
+    "name": "冬日雪景情侣照",
+    "prompt": "把参考图中的情侣拍成一组冬日写真：两人穿着厚针织毛衣和羊毛长大衣，她戴米白色贝雷帽，他围灰色围巾，傍晚在落雪的林荫街道上挽着手边走边笑；雪花飘落，身后是暖色橱窗灯光和光斑；抓拍感的生活方式摄影，85mm 镜头，柔和的电影色调；保留两个人的脸、发型和胡子。",
+    "category": "头像·证件照",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-winter-couple-photoshoot.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana Pro",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#winter-couple-photoshoot"
+  },
+  {
+    "id": "thanksgiving-family-dinner",
+    "name": "感恩节家庭晚餐合照",
+    "prompt": "把参考图中的一家四口放进感恩节晚餐桌前：桌子中央是一只金黄的烤火鸡，旁边有土豆泥、四季豆、蔓越莓酱和一块南瓜派，长蜡烛和铺满秋叶、小葫芦的桌旗；每个人穿着秋季针织毛衣，看着镜头微笑，爸爸手里拿着切火鸡的刀；傍晚窗边暖光，身后有柔和的小灯串，像一张自然的家庭合照。保留每个人的脸、发型和年龄。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "4/3",
+    "image": "assets/tpl-thanksgiving-family-dinner.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana 2.1",
+      "GPT Image 2",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#thanksgiving-family-dinner"
+  },
+  {
+    "id": "thanksgiving-pet",
+    "name": "宠物感恩节餐桌照",
+    "prompt": "让参考图中的宠物坐上感恩节餐桌：它穿着带树叶花纹的橙色小针织毛衣，头戴一顶小小的火鸡造型毛毡帽，坐在椅子上把前爪搭在桌边，盯着一块南瓜派和一只小烤火鸡；桌上有秋叶、蜡烛和小葫芦，温暖的居家灯光，浅景深。保留品种、毛色和花纹，可爱的节日照片。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "1/1",
+    "image": "assets/tpl-thanksgiving-pet.webp",
+    "referenceRequired": true,
+    "models": [
+      "Nano Banana 2",
+      "Nano Banana 2.1",
+      "Seedream 5.0 Flash"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#thanksgiving-pet"
+  },
+  {
+    "id": "friendsgiving-photo",
+    "name": "Friendsgiving 聚餐主人照",
+    "prompt": "把参考图中的情侣拍成一场 Friendsgiving（朋友感恩节聚餐）的主人：傍晚的后院长桌前，两人站在桌首举起苹果酒干杯，两侧坐着的朋友稍微虚化；头顶挂着小灯串，桌上有火鸡、烤蔬菜和派，高低不一的蜡烛和秋季花束；抓拍感的生活方式摄影，暖色黄金时刻色调。保留两个人的脸、发型和胡子。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-friendsgiving-photo.webp",
+    "referenceRequired": true,
+    "models": [
+      "Seedream 5.0 Flash",
+      "Nano Banana 2.1",
+      "GPT Image 2"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#friendsgiving-photo"
+  },
+  {
+    "id": "thanksgiving-card",
+    "name": "感恩节贺卡",
+    "prompt": "一张感恩节贺卡：古朴的木桌上摆着一个丰饶角，里面倒出南瓜、苹果、麦穗和秋叶，暖金色光线；上方手写体大字「感恩节快乐」，下方一行小字「感谢有你 —— 小林一家」；水彩加水粉插画，铜箔烫印点缀，奶油色卡纸，文字清晰。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-thanksgiving-card.webp",
+    "referenceRequired": false,
+    "models": [
+      "GPT Image 2",
+      "Nano Banana 2.1",
+      "Nano Banana Pro"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#thanksgiving-card"
+  },
+  {
+    "id": "thanksgiving-menu",
+    "name": "感恩节晚宴菜单",
+    "prompt": "一张家庭感恩节晚餐的菜单卡：上方是一圈秋叶和麦穗的小水彩花环，标题「感恩节晚宴」，下面一行「11 月 26 日 星期四」，再分三栏写这些菜名——「前菜：南瓜浓汤」「主菜：烤火鸡 · 玉米面包馅料 · 四季豆焗菜」「甜点：南瓜派 · 苹果酥」；深棕色衬线字体，奶油色纸张，金色分隔线，文字清晰。",
+    "category": "节日",
+    "categorySource": "heuristic",
+    "aspectRatio": "3/4",
+    "image": "assets/tpl-thanksgiving-menu.webp",
+    "referenceRequired": false,
+    "models": [
+      "Nano Banana 2.1",
+      "GPT Image 2"
+    ],
+    "sourceUrl": "https://yingtu.ai/zh/templates#thanksgiving-menu"
+  }
+]

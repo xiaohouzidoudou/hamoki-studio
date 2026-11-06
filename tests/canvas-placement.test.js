@@ -3,7 +3,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
-const {nextGeneratedPosition,intersects,STEP,COLUMNS}=require('../lib/canvas-placement');
+const {nextGeneratedPosition,intersects,STEP,COLUMNS,TILE,fitImageBox}=require('../lib/canvas-placement');
 
 test('new results use left-to-right four-column rows without overlaps',()=>{
  const p={nodes:[]};
@@ -38,6 +38,19 @@ test('manual movement into a future slot does not create overlap',()=>{
  assert.deepEqual({x:pos.x,y:pos.y},{x:180,y:170});
  pos=nextGeneratedPosition(p);
  assert.deepEqual({x:pos.x,y:pos.y},{x:180+STEP*2,y:170});
+});
+test('generated node boxes follow the real image aspect ratio',()=>{
+ // Landscape: long edge fills the tile, short edge keeps 16:9.
+ assert.deepEqual(fitImageBox(1024,576),{w:TILE,h:Math.round(TILE*576/1024)});
+ // Portrait: height fills the tile, width keeps 9:16.
+ assert.deepEqual(fitImageBox(576,1024),{w:Math.round(TILE*576/1024),h:TILE});
+ // Square stays a square tile.
+ assert.deepEqual(fitImageBox(128,128),{w:TILE,h:TILE});
+ // Extreme ratios keep the canvas minimum edge at 90 instead of distorting further.
+ assert.deepEqual(fitImageBox(3000,750),{w:TILE,h:90});
+ // Unreadable dimensions fall back to the classic square tile.
+ assert.deepEqual(fitImageBox(),{w:TILE,h:TILE});
+ assert.deepEqual(fitImageBox(0,-5),{w:TILE,h:TILE});
 });
 test('new result retrieval control exists in the desktop canvas',()=>{
  const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');

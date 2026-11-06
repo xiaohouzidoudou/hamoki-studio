@@ -1,0 +1,56 @@
+/* Hamoki Studio | Global Border Trace
+   One non-interactive SVG overlay for all pages; no layout or button mutations. */
+.hm-global-trace {
+  position: fixed;
+  display: block;
+  overflow: visible;
+  box-sizing: border-box;
+  z-index: 2147483000;
+  pointer-events: none !important;
+  user-select: none;
+  contain: none;
+}
+.hm-global-trace[data-host="layer"] { position: absolute; }
+.hm-global-trace > rect {
+  fill: none;
+  stroke: var(--glass-green, #86e8b6);
+  stroke-width: 1.55px;
+  stroke-opacity: .85;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  transition: stroke-dashoffset 600ms ease-in-out;
+  pointer-events: none !important;
+  vector-effect: non-scaling-stroke;
+}
+.hm-global-trace.is-active > rect { stroke-dashoffset: 0; }
+.hm-global-trace.is-resetting > rect {
+  stroke-dashoffset: 100 !important;
+  transition: none !important;
+}
+.hm-global-trace[data-tone="danger"] > rect {
+  stroke: #f2a1a9;
+  stroke-opacity: .8;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hm-global-trace > rect { transition: none !important; }
+}
+@media (forced-colors: active) {
+  .hm-global-trace > rect { stroke: Highlight; stroke-opacity: 1; }
+}
+
+/* Modal layers must win immediately over an unfinished hover/focus trace. */
+body.haop-open .hm-global-trace,
+body:has(dialog[open]) .hm-global-trace,
+body:has(.modal-back:not(.hidden) [role="dialog"][aria-modal="true"]) .hm-global-trace,
+body:has(.rie-backdrop [role="dialog"][aria-modal="true"]) .hm-global-trace {
+  display: none !important;
+}
+body.haop-open .canvas-border-trace > rect,
+body:has(dialog[open]) .canvas-border-trace > rect,
+body:has(.modal-back:not(.hidden) [role="dialog"][aria-modal="true"]) .canvas-border-trace > rect,
+body:has(.rie-backdrop [role="dialog"][aria-modal="true"]) .canvas-border-trace > rect {
+  stroke-dashoffset: 100 !important;
+  transition: none !important;
+}

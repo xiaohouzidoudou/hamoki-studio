@@ -1,0 +1,152 @@
+/* Canvas generation frames — the Figma-style caption above each artwork plus the
+   loading placeholder that occupies the exact slot the finished image will use.
+   Only queued / running jobs get a frame; failures are reported in the bottom
+   queue panel instead of on the canvas.
+   Loaded after the theme files on index.html so it owns these two components. */
+
+/* ── Caption (name + pixel size) above a finished artwork ─────────────── */
+.canvas-node.generated-result-node{overflow:visible;background:#101b18;border-color:#3c5a4b}
+.canvas-node.generated-result-node:hover{background:#101b18}
+.canvas-node-caption,
+.generation-frame-caption{
+  position:absolute;
+  left:0;right:0;
+  bottom:calc(100% + 7px);
+  display:flex;
+  align-items:center;
+  gap:6px;
+  height:18px;
+  color:#aebbc8;
+  font-size:11px;
+  line-height:18px;
+  letter-spacing:.1px;
+  pointer-events:none;
+  white-space:nowrap;
+}
+.canvas-node-caption svg,
+.generation-frame-caption svg{
+  width:13px;height:13px;
+  flex:0 0 auto;
+  opacity:.72;
+}
+.canvas-node-caption .canvas-node-name,
+.generation-frame-caption .generation-frame-name{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  color:#cdd9e4;
+  font-size:11.5px;
+  font-weight:600;
+  letter-spacing:.15px;
+}
+.canvas-node-caption .canvas-node-size,
+.generation-frame-caption .generation-frame-size{
+  margin-left:auto;
+  padding-left:10px;
+  color:#7f8fa0;
+  font-size:10.5px;
+  font-variant-numeric:tabular-nums;
+  font-feature-settings:"tnum";
+  letter-spacing:.1px;
+}
+/* The floating result toolbar sits in this gap; hide the caption while selected. */
+.canvas-node.generated-result-node.selected > .canvas-node-caption{opacity:0}
+.canvas-node.generated-result-node > .canvas-node-caption{opacity:1;transition:opacity .16s ease}
+
+/* Finished artwork metadata should recede into the dark canvas. */
+.canvas-node-caption{
+  color:#58636e;
+  height:9px;
+  line-height:9px;
+  font-size:5.5px;
+  letter-spacing:.05px;
+  gap:3px;
+  bottom:calc(100% + 3.5px);
+}
+.canvas-node-caption svg{width:6.5px;height:6.5px;opacity:.43}
+.canvas-node-caption .canvas-node-name{
+  color:#66727d;font-weight:500;font-size:5.75px;letter-spacing:.075px;
+}
+.canvas-node-caption .canvas-node-size{
+  color:#515e69;font-size:5.25px;padding-left:5px;letter-spacing:.05px;
+}
+
+/* ── Loading placeholder pinned to the reserved canvas slot ───────────── */
+.generation-frame{
+  position:absolute;
+  box-sizing:border-box;
+  z-index:4;
+  pointer-events:none;
+  contain:layout style;
+}
+.generation-frame-body{
+  position:relative;
+  box-sizing:border-box;
+  width:100%;height:100%;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:9px;
+  overflow:hidden;
+  border:1px solid #35424f;
+  border-radius:12px;
+  background:
+    radial-gradient(130% 120% at 50% -10%,#1d2935 0%,#161f2a 48%,#111821 100%);
+  box-shadow:0 12px 30px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.035);
+}
+.generation-frame-body:before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background-image:linear-gradient(rgba(126,158,180,.05) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(126,158,180,.05) 1px,transparent 1px);
+  background-size:26px 26px;
+  mask-image:radial-gradient(120% 100% at 50% 40%,#000 20%,transparent 74%);
+  -webkit-mask-image:radial-gradient(120% 100% at 50% 40%,#000 20%,transparent 74%);
+  pointer-events:none;
+}
+/* Transparent 6-second looping mascot progress bar, no duplicate spinner. */
+.generation-frame-monkey{
+  position:relative;
+  z-index:1;
+  display:block;
+  width:min(94%,310px);
+  flex:0 0 auto;
+  max-height:44%;
+  line-height:0;
+}
+.generation-frame-monkey-img{
+  display:block;
+  width:100%;
+  height:auto;
+  max-height:100%;
+  object-fit:contain;
+  filter:drop-shadow(0 3px 6px rgba(0,0,0,.2));
+}
+.generation-frame-label{
+  position:relative;
+  z-index:1;
+  font-size:12px;
+  font-weight:600;
+  line-height:1;
+  letter-spacing:.55px;
+  color:#9df0b0;
+  text-shadow:0 0 14px rgba(123,239,148,.28);
+}
+.generation-frame.status-queued .generation-frame-monkey{
+  opacity:.58;
+  filter:saturate(.6);
+}
+.generation-frame.status-queued .generation-frame-label{color:#9fb0bd;text-shadow:none}
+.generation-frame.generation-frame-new .generation-frame-body{
+  animation:gf-in .3s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes gf-in{
+  from{opacity:0;transform:scale(.96)}
+  to{opacity:1;transform:scale(1)}
+}
+@media(prefers-reduced-motion:reduce){
+  /* The <picture> source picks a static monkey frame automatically. */
+  .generation-frame.generation-frame-new .generation-frame-body{animation:none}
+}

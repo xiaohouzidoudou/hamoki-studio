@@ -1,0 +1,854 @@
+/* Hamoki Studio | Glass Landing component fidelity | 2026-11-05
+   Secondary controls only. No geometry, image transforms, canvas pointer behavior,
+   modal visibility, queue flow or generation logic is changed here. */
+html.glass-landing {
+  --glass-mini-bg:linear-gradient(153deg,rgba(43,79,74,.92),rgba(12,32,38,.94) 64%,rgba(18,44,45,.92));
+  --glass-mini-top:linear-gradient(160deg,rgba(255,255,255,.09),rgba(255,255,255,.025));
+  --glass-mini-quiet:linear-gradient(165deg,rgba(255,255,255,.075),rgba(255,255,255,.018));
+  --glass-mini-edge:rgba(219,255,250,.18);
+  --glass-mini-hover:linear-gradient(155deg,rgba(125,227,224,.19),rgba(118,228,179,.06));
+  --glass-mini-selected:linear-gradient(135deg,rgba(125,227,224,.23),rgba(110,232,177,.075));
+  --glass-mini-text:#e4f3f0;
+  --glass-mini-muted:#aac8c3;
+  --glass-mini-shadow:0 19px 55px -19px rgba(0,0,0,.82),inset 0 1px 0 rgba(255,255,255,.17);
+}
+
+/* The user-visible More/Crop submenus were still the old solid blue-gray. */
+html.glass-landing body :is(.result-toolbar-menu,.result-submenu,.result-model-popover) {
+  background:var(--glass-mini-bg) !important;
+  background-image:var(--glass-mini-bg) !important;
+  border:1px solid rgba(224,255,250,.24) !important;
+  border-radius:12px !important;
+  box-shadow:var(--glass-mini-shadow) !important;
+  color:var(--glass-mini-text) !important;
+  backdrop-filter:blur(28px) saturate(150%) !important;
+  -webkit-backdrop-filter:blur(28px) saturate(150%) !important;
+}
+html.glass-landing body .result-toolbar-more>summary {
+  background:var(--glass-mini-quiet) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  color:var(--glass-mini-text) !important;
+  border-radius:9px !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.09) !important;
+}
+html.glass-landing body .result-toolbar-more>summary:hover,
+html.glass-landing body .result-toolbar-more[open]>summary {
+  background:var(--glass-mini-selected) !important;
+  border-color:rgba(125,227,224,.45) !important;
+  color:#f3fffc !important;
+}
+html.glass-landing body .result-toolbar-menu :is(.result-menu-action,.result-menu-parent),
+html.glass-landing body .result-submenu .result-submenu-action {
+  background:transparent !important;
+  background-image:none !important;
+  color:#cde7e0 !important;
+  border:1px solid transparent !important;
+  border-radius:8px !important;
+  box-shadow:none !important;
+}
+html.glass-landing body .result-toolbar-menu :is(.result-menu-action,.result-menu-parent):hover,
+html.glass-landing body .result-toolbar-menu :is(.result-menu-action,.result-menu-parent):focus-visible,
+html.glass-landing body .result-submenu .result-submenu-action:hover,
+html.glass-landing body .result-submenu .result-submenu-action:focus-visible {
+  background:var(--glass-mini-hover) !important;
+  color:#f3fffa !important;
+  border-color:rgba(125,227,224,.21) !important;
+}
+html.glass-landing body .result-toolbar-menu .result-menu-action:last-child {
+  color:#ffb6b9 !important;
+}
+html.glass-landing body .result-toolbar-menu .result-menu-action:last-child:hover {
+  background:rgba(232,108,115,.13) !important;
+  border-color:rgba(244,155,163,.20) !important;
+}
+html.glass-landing body :is(.result-menu-sep,.result-toolbar-download) {
+  border-color:var(--glass-mini-edge) !important;
+}
+html.glass-landing body .result-menu-caret {color:#91c4ba !important;}
+
+/* Inline result editor: fields, headings, tiny utility actions and dropdowns. */
+html.glass-landing body .result-floating-editor .generated-result-editor-head {
+  background:linear-gradient(115deg,rgba(36,79,69,.85),rgba(14,41,45,.91)) !important;
+  border-bottom:1px solid var(--glass-mini-edge) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.09) !important;
+}
+html.glass-landing body .result-floating-editor :is(
+  .result-select,.result-custom-model,.generated-result-prompt,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  select,textarea
+) {
+  background:var(--glass-mini-quiet) !important;
+  background-image:var(--glass-mini-quiet) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  border-radius:9px !important;
+  color:var(--glass-mini-text) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.07) !important;
+  color-scheme:dark;
+}
+html.glass-landing body .result-floating-editor :is(
+ .result-select,.result-custom-model,.generated-result-prompt,input,select,textarea
+):focus-visible {
+  border-color:rgba(125,227,224,.57) !important;
+  box-shadow:0 0 0 3px rgba(125,227,224,.12),inset 0 1px rgba(255,255,255,.1) !important;
+}
+html.glass-landing body .result-floating-editor :is(
+  .generated-result-dismiss,.result-reverse-prompt,.result-reference-mode,
+  .result-fetch-models,button:not(.generated-result-primary):not(.result-download)
+) {
+  color:var(--glass-mini-muted) !important;
+}
+html.glass-landing body .result-floating-editor :is(
+  .generated-result-dismiss,.result-reverse-prompt,.result-reference-mode
+) {
+  background:var(--glass-mini-quiet) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  border-radius:9px !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.08) !important;
+}
+html.glass-landing body .result-floating-editor :is(
+  .generated-result-dismiss,.result-reverse-prompt,.result-reference-mode
+):hover {
+  background:var(--glass-mini-hover) !important;
+  border-color:rgba(125,227,224,.4) !important;
+  color:#f3fffa !important;
+}
+html.glass-landing body .result-floating-editor :is(.result-field-label,.result-editor-title strong) {
+  color:#d9efea !important;
+}
+html.glass-landing body .result-floating-editor :is(.result-editor-title small,.result-model-subtitle) {
+  color:var(--glass-mini-muted) !important;
+}
+
+/* Canvas zoom menu: remove the leftover olive/lime selected state. */
+html.glass-landing body .canvas-area .canvas-zoom-menu button,
+html.glass-landing body .canvas-zoom-menu button {
+  color:var(--glass-mini-text) !important;
+  border-radius:8px !important;
+}
+html.glass-landing body .canvas-area .canvas-zoom-menu button.active,
+html.glass-landing body .canvas-zoom-menu button.active,
+html.glass-landing body .canvas-zoom-menu button[aria-selected="true"] {
+  background:var(--glass-mini-selected) !important;
+  background-image:var(--glass-mini-selected) !important;
+  color:#c8fff3 !important;
+  border-color:rgba(125,227,224,.42) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.1) !important;
+}
+html.glass-landing body .canvas-area .canvas-zoom-menu button:hover,
+html.glass-landing body .canvas-zoom-menu button:hover {
+  background:var(--glass-mini-hover) !important;
+  color:#f3fffa !important;
+}
+html.glass-landing body :is(.hamoki-richnote-toolbar,.hamoki-richnote-float-layer .hamoki-richnote-toolbar) {
+  background:var(--glass-mini-bg) !important;
+  border:1px solid rgba(224,255,250,.24) !important;
+  border-radius:12px !important;
+  box-shadow:var(--glass-mini-shadow) !important;
+  backdrop-filter:blur(26px) saturate(145%) !important;
+  -webkit-backdrop-filter:blur(26px) saturate(145%) !important;
+}
+html.glass-landing body .hamoki-richnote-toolbar :is(button,select,input) {
+  border-color:var(--glass-mini-edge) !important;
+  background:var(--glass-mini-quiet) !important;
+  color:var(--glass-mini-text) !important;
+}
+html.glass-landing body .hamoki-richnote-toolbar button:hover {
+  background:var(--glass-mini-hover) !important;
+  color:#fff !important;
+}
+
+/* Settings: secondary actions inherited old opaque #2b3540. */
+html.glass-landing body .hs-dialog button:not(.hs-primary):not(.hs-danger) {
+  background:var(--glass-mini-quiet) !important;
+  background-image:var(--glass-mini-quiet) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  border-radius:9px !important;
+  color:var(--glass-mini-text) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.08) !important;
+}
+html.glass-landing body .hs-dialog button:not(.hs-primary):not(.hs-danger):hover {
+  background:var(--glass-mini-hover) !important;
+  border-color:rgba(125,227,224,.41) !important;
+  color:#f4fffb !important;
+}
+html.glass-landing body .hs-dialog button:is([aria-selected="true"],.active) {
+  background:var(--glass-mini-selected) !important;
+  border-color:rgba(125,227,224,.48) !important;
+  color:#c8fff3 !important;
+}
+html.glass-landing body .hs-dialog .hs-danger {
+  background:linear-gradient(150deg,rgba(228,93,105,.13),rgba(255,255,255,.025)) !important;
+  border-color:rgba(244,148,159,.30) !important;
+  color:#ffb9c1 !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.06) !important;
+}
+html.glass-landing body .hs-dialog .hs-danger:hover {
+  background:rgba(228,93,105,.22) !important;
+  border-color:rgba(244,148,159,.52) !important;
+  color:#ffe5e8 !important;
+}
+html.glass-landing body .hs-dialog .hs-provider :is(.hs-provider-actions,.hs-model-result,.hs-model-row) {
+  border-color:var(--glass-mini-edge) !important;
+}
+html.glass-landing body .hs-dialog :is(.hs-footnote,.hs-muted,.hs-empty) {
+  color:var(--glass-mini-muted) !important;
+}
+html.glass-landing body .hs-dialog :is(input:not([type="checkbox"]),select,textarea) {
+  color-scheme:dark;
+}
+html.glass-landing body .hs-dialog :is(select,option),
+html.glass-landing body #hmtReferenceFilter,
+html.glass-landing body #hgType {
+  color-scheme:dark;
+}
+html.glass-landing body :is(.hs-dialog,.hmt-dialog,.hg-editor,.result-floating-editor) select option {
+  background:#173138 !important;
+  color:#e5f6f1 !important;
+}
+
+/* Template gallery and its native top-layer detail dialog. */
+html.glass-landing body .hmt-dialog :is(
+  #hmtDialogClose,.hmt-copy-prompt,.hmt-secondary,
+  button:not(.hmt-primary):not(.hmt-use)
+) {
+  background:var(--glass-mini-quiet) !important;
+  background-image:var(--glass-mini-quiet) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  border-radius:9px !important;
+  color:var(--glass-mini-text) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.085) !important;
+}
+html.glass-landing body .hmt-dialog :is(#hmtDialogClose,.hmt-copy-prompt,button:not(.hmt-primary)):hover {
+  background:var(--glass-mini-hover) !important;
+  border-color:rgba(125,227,224,.42) !important;
+  color:#f5fffb !important;
+}
+html.glass-landing body :is(.hmt-detail-tags span,.hmt-card-models span,.hmt-card-ratio,.hmt-picture-chip,.hmt-img2img) {
+  background:linear-gradient(140deg,rgba(125,227,224,.11),rgba(255,255,255,.026)) !important;
+  border:1px solid rgba(125,227,224,.24) !important;
+  color:#b7eee0 !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.06) !important;
+}
+html.glass-landing body .hmt-dialog-media {
+  background:linear-gradient(160deg,rgba(13,38,41,.97),rgba(8,24,29,.97)) !important;
+}
+html.glass-landing body .hmt-empty,
+html.glass-landing body .params-panel .hmt-applied-note {
+  background:var(--glass-mini-quiet) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.09) !important;
+}
+html.glass-landing body .params-panel :is(.hmt-return,.hmt-remove) {
+  background:var(--glass-mini-quiet) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  color:#cceee4 !important;
+}
+html.glass-landing body .params-panel :is(.hmt-return,.hmt-remove):hover {
+  background:var(--glass-mini-hover) !important;
+  border-color:rgba(125,227,224,.4) !important;
+}
+html.glass-landing body :is(.hmt-toast,.hg-stage2-toast,.flow-toast) {
+  background:var(--glass-mini-bg) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  color:var(--glass-mini-text) !important;
+  box-shadow:var(--glass-mini-shadow) !important;
+  backdrop-filter:blur(24px) saturate(145%) !important;
+}
+
+/* Game UI tool plaza: previously blue-gray header, search and configuration rail. */
+html.glass-landing body .hg-plaza :is(.hg-head,.hg-editor) {
+  background:linear-gradient(155deg,rgba(31,66,62,.84),rgba(11,31,38,.86) 65%,rgba(20,45,46,.84)) !important;
+  background-image:linear-gradient(155deg,rgba(31,66,62,.84),rgba(11,31,38,.86) 65%,rgba(20,45,46,.84)) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.11),0 16px 38px -30px #000 !important;
+  backdrop-filter:blur(20px) saturate(140%) !important;
+  -webkit-backdrop-filter:blur(20px) saturate(140%) !important;
+}
+html.glass-landing body .hg-plaza :is(.hg-search,.hg-stage2-upload,.hg-stage2-drop,.hg-stage2-prompt-preview,.hg-stage2-prompt-preview textarea),
+html.glass-landing body .hg-editor :is(select,textarea,input:not([type="checkbox"]):not([type="radio"]):not([type="file"])) {
+  background:var(--glass-mini-quiet) !important;
+  background-image:var(--glass-mini-quiet) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  border-radius:10px !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.09) !important;
+  color:var(--glass-mini-text) !important;
+  color-scheme:dark;
+}
+html.glass-landing body .hg-editor :is(select,textarea,input):focus-visible,
+html.glass-landing body .hg-plaza .hg-search:focus-within {
+  border-color:rgba(125,227,224,.48) !important;
+  box-shadow:0 0 0 3px rgba(125,227,224,.10) !important;
+}
+html.glass-landing body .hg-plaza :is(.hg-open,.hg-editor details,.hg-editor summary) {
+  background:var(--glass-mini-quiet) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  color:var(--glass-mini-text) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.07) !important;
+}
+html.glass-landing body .hg-plaza :is(.hg-open,.hg-editor summary):hover {
+  background:var(--glass-mini-hover) !important;
+  border-color:rgba(125,227,224,.4) !important;
+  color:#f5fffb !important;
+}
+html.glass-landing body .hg-editor .hg-submit {
+  background:linear-gradient(110deg,#7de3e0,#8ceab5) !important;
+  border:1px solid #b5f7e2 !important;
+  color:#07302c !important;
+  box-shadow:0 10px 28px -10px rgba(125,227,224,.36) !important;
+}
+html.glass-landing body .hg-plaza :is(.hg-stage2-feature,.hg-stage2-card-preview) {
+  background-color:#10272b !important;
+}
+html.glass-landing body .hg-plaza :is(.hg-stage2-preview-badge,.hg-stage2-feature-caption,.hg-category-label) {
+  background:linear-gradient(145deg,rgba(19,63,57,.83),rgba(14,37,43,.86)) !important;
+  border-color:rgba(125,227,224,.25) !important;
+  color:#c5f5e8 !important;
+  backdrop-filter:blur(10px) !important;
+}
+html.glass-landing body .hg-plaza :is(.hg-editor-summary,.hg-tip,.hg-stage2-count,.hg-stage2-limit) {
+  color:var(--glass-mini-muted) !important;
+}
+
+/* Workflow: interior inspector actions were still solid green/blue, mobile toggle gray. */
+html.glass-landing body.ng-flow-page :is(
+  .inspector .action,.inspector-mobile-toggle,.queue-popover button,
+  .flow-dialog button:not(.primary-button),.dialog-body button:not(.primary-button)
+) {
+  background:var(--glass-mini-quiet) !important;
+  background-image:var(--glass-mini-quiet) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  color:var(--glass-mini-text) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.08) !important;
+}
+html.glass-landing body.ng-flow-page :is(
+  .inspector .action,.inspector-mobile-toggle,.queue-popover button,
+  .flow-dialog button:not(.primary-button),.dialog-body button:not(.primary-button)
+):hover {
+  background:var(--glass-mini-hover) !important;
+  border-color:rgba(125,227,224,.42) !important;
+  color:#f5fffb !important;
+}
+html.glass-landing body.ng-flow-page :is(.inspector,.library,.dialog-body,.queue-popover) :is(
+ input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+ textarea,select
+) {
+  background:var(--glass-mini-quiet) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  border-radius:9px !important;
+  color:var(--glass-mini-text) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.07) !important;
+  color-scheme:dark;
+}
+html.glass-landing body.ng-flow-page :is(.inspector,.library,.dialog-body,.queue-popover) :is(input,textarea,select):focus-visible {
+  border-color:rgba(125,227,224,.5) !important;
+  outline:2px solid rgba(125,227,224,.36) !important;
+  outline-offset:1px !important;
+}
+html.glass-landing body.ng-flow-page :is(.dialog-toolbar,.queue-popover header,.queue-popover footer) {
+  background:rgba(255,255,255,.04) !important;
+  border-color:var(--glass-mini-edge) !important;
+}
+html.glass-landing body.ng-flow-page :is(.queue-popover,.flow-dialog) select option {
+  background:#163039 !important;
+  color:var(--glass-mini-text) !important;
+}
+
+/* Second-pass audit: the queue strip, rich-note paper and Game UI canvas
+   were the last large opaque neutral-gray surfaces outside the editor. */
+html.glass-landing body :is(#queue-panel,#queue-panel.expanded,.queue-panel.collapsed) {
+  background:linear-gradient(160deg,rgba(26,58,56,.90),rgba(8,27,34,.92) 65%,rgba(19,46,47,.90)) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.11),0 -7px 21px rgba(0,0,0,.18) !important;
+  backdrop-filter:blur(18px) saturate(140%) !important;
+  -webkit-backdrop-filter:blur(18px) saturate(140%) !important;
+}
+html.glass-landing body #queue-panel .queue-header {
+  background:linear-gradient(100deg,rgba(32,70,65,.62),rgba(12,33,40,.55)) !important;
+  border-color:var(--glass-mini-edge) !important;
+}
+html.glass-landing body #queue-panel .queue-tab.active {
+  background:var(--glass-mini-selected) !important;
+  border:1px solid rgba(125,227,224,.42) !important;
+  color:#d4fff3 !important;
+}
+html.glass-landing body #queue-panel .queue-item {
+  background:var(--glass-mini-quiet) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.055) !important;
+}
+html.glass-landing body :is(.queue-finish-toast,.canvas-message) {
+  background:var(--glass-mini-bg) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  box-shadow:var(--glass-mini-shadow) !important;
+  color:#d5fff1 !important;
+  backdrop-filter:blur(21px) !important;
+}
+html.glass-landing body .canvas-node.canvas-note.canvas-rich-node {
+  background:linear-gradient(160deg,rgba(30,58,56,.96),rgba(13,31,38,.96)) !important;
+  border:1px solid rgba(222,255,246,.18) !important;
+  color:var(--glass-mini-text) !important;
+  box-shadow:0 12px 36px -20px #000,inset 0 1px rgba(255,255,255,.10) !important;
+  backdrop-filter:blur(13px) saturate(132%) !important;
+  -webkit-backdrop-filter:blur(13px) saturate(132%) !important;
+}
+html.glass-landing body .canvas-node.canvas-note.canvas-rich-node.selected {
+  border-color:rgba(125,227,224,.64) !important;
+  box-shadow:0 0 0 1px rgba(125,227,224,.43),0 10px 30px -19px rgba(0,0,0,.75) !important;
+}
+html.glass-landing body .canvas-rich-node .hamoki-richnote-editor {
+  caret-color:var(--glass-accent) !important;
+  color:var(--glass-mini-text) !important;
+}
+html.glass-landing body .hg-plaza {
+  background:radial-gradient(ellipse at 12% 7%,rgba(21,120,103,.11),transparent 57%),
+    radial-gradient(ellipse at 85% 72%,rgba(24,140,145,.09),transparent 61%),
+    #08171a !important;
+}
+
+/* Third visual pass: the crop/scale dialog interior previously retained the
+   slate-blue header/footer/sidebar. Keep the artwork stage opaque and crisp. */
+html.glass-landing body .rie-backdrop {
+  background:rgba(3,12,17,.61) !important;
+  backdrop-filter:blur(10px) saturate(94%) !important;
+  -webkit-backdrop-filter:blur(10px) saturate(94%) !important;
+}
+html.glass-landing body .rie-head {
+  background:linear-gradient(125deg,rgba(34,76,70,.73),rgba(12,39,43,.72)) !important;
+  border-bottom:1px solid var(--glass-mini-edge) !important;
+}
+html.glass-landing body .rie-controls {
+  background:linear-gradient(165deg,rgba(23,57,53,.60),rgba(9,30,35,.68)) !important;
+  border-left:1px solid var(--glass-mini-edge) !important;
+  scrollbar-color:rgba(125,227,224,.35) transparent !important;
+}
+html.glass-landing body .rie-foot {
+  background:linear-gradient(110deg,rgba(26,62,58,.67),rgba(11,34,39,.75)) !important;
+  border-top:1px solid var(--glass-mini-edge) !important;
+}
+html.glass-landing body .rie-stage {
+  background-color:#0c2026 !important;
+  background-image:radial-gradient(rgba(127,184,178,.12) 1px,transparent 1px) !important;
+}
+html.glass-landing body .rie-loading {
+  background:rgba(10,30,35,.90) !important;
+  color:var(--glass-mini-muted) !important;
+}
+html.glass-landing body .rie-head :is(.rie-kicker,.rie-title),
+html.glass-landing body .rie-section-title {
+  color:#c4f1e4 !important;
+}
+html.glass-landing body .rie-head .rie-subtitle,
+html.glass-landing body :is(.rie-tip,.rie-hint,.rie-field>span,.rie-check) {
+  color:var(--glass-mini-muted) !important;
+}
+html.glass-landing body .rie-close,
+html.glass-landing body :is(.rie-chip,.rie-cancel) {
+  background:var(--glass-mini-quiet) !important;
+  background-image:var(--glass-mini-quiet) !important;
+  color:var(--glass-mini-text) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  border-radius:9px !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.075) !important;
+}
+html.glass-landing body .rie-close:hover,
+html.glass-landing body :is(.rie-chip,.rie-cancel):hover {
+  background:var(--glass-mini-hover) !important;
+  border-color:rgba(125,227,224,.41) !important;
+  color:#f4fffb !important;
+}
+html.glass-landing body .rie-chip.active {
+  background:var(--glass-mini-selected) !important;
+  background-image:var(--glass-mini-selected) !important;
+  border-color:rgba(125,227,224,.53) !important;
+  color:#c9fff2 !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.08) !important;
+}
+html.glass-landing body .rie-input {
+  background:var(--glass-mini-quiet) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  border-radius:9px !important;
+  color:var(--glass-mini-text) !important;
+  color-scheme:dark;
+}
+html.glass-landing body .rie-input:focus-visible {
+  border-color:rgba(125,227,224,.65) !important;
+  outline:2px solid rgba(125,227,224,.24) !important;
+  outline-offset:1px !important;
+}
+@media (max-width:760px) {
+  html.glass-landing body .rie-controls {
+    border-left:0 !important;
+    border-top:1px solid var(--glass-mini-edge) !important;
+  }
+}
+
+/* Compact image composer controls and its upward settings flyout. */
+html.glass-landing body :is(.result-floating-settings,.result-model-popover) {
+  background:var(--glass-mini-bg) !important;
+  background-image:var(--glass-mini-bg) !important;
+  border:1px solid rgba(224,255,250,.25) !important;
+  box-shadow:var(--glass-mini-shadow) !important;
+  border-radius:13px !important;
+  color:var(--glass-mini-text) !important;
+  backdrop-filter:blur(27px) saturate(151%) !important;
+  -webkit-backdrop-filter:blur(27px) saturate(151%) !important;
+}
+html.glass-landing body .result-composer-compact :is(
+ .result-compact-tools button,.result-settings-trigger,.result-model-trigger,
+ .result-compact-footer button:not(.result-submit-icon)
+) {
+  background:var(--glass-mini-quiet) !important;
+  background-image:var(--glass-mini-quiet) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  color:var(--glass-mini-text) !important;
+  border-radius:9px !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.075) !important;
+}
+html.glass-landing body .result-composer-compact :is(
+ .result-compact-tools button,.result-settings-trigger,.result-model-trigger,
+ .result-compact-footer button:not(.result-submit-icon)
+):hover {
+  background:var(--glass-mini-hover) !important;
+  border-color:rgba(125,227,224,.41) !important;
+  color:#f3fffa !important;
+}
+html.glass-landing body .result-composer-compact .result-compact-footer .result-submit-icon {
+  background:linear-gradient(110deg,#7de3e0,#8ceab5) !important;
+  background-image:linear-gradient(110deg,#7de3e0,#8ceab5) !important;
+  border:1px solid rgba(198,255,240,.7) !important;
+  color:#07302c !important;
+  box-shadow:0 7px 20px rgba(102,226,185,.19),inset 0 1px rgba(255,255,255,.23) !important;
+}
+html.glass-landing body .result-composer-compact .result-compact-footer .result-submit-icon:hover {
+  filter:brightness(1.11) !important;
+}
+html.glass-landing body .result-floating-settings :is(
+ .result-choice,.result-settings-modes button
+),html.glass-landing body .result-model-popover .result-model-option {
+  background:var(--glass-mini-quiet) !important;
+  background-image:var(--glass-mini-quiet) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  color:var(--glass-mini-muted) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.04) !important;
+  border-radius:9px !important;
+}
+html.glass-landing body .result-floating-settings :is(
+ .result-choice,.result-settings-modes button
+):hover,
+html.glass-landing body .result-model-popover .result-model-option:hover {
+  background:var(--glass-mini-hover) !important;
+  border-color:rgba(125,227,224,.39) !important;
+  color:#f5fffb !important;
+}
+html.glass-landing body .result-floating-settings :is(
+ .result-choice.active,.result-settings-modes button.active
+),
+html.glass-landing body .result-model-popover .result-model-option.active {
+  background:var(--glass-mini-selected) !important;
+  background-image:var(--glass-mini-selected) !important;
+  border-color:rgba(125,227,224,.52) !important;
+  color:#c5fff0 !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.1) !important;
+}
+html.glass-landing body .result-model-popover .model-option-icon {
+  background:var(--glass-mini-quiet) !important;
+  border-color:var(--glass-mini-edge) !important;
+  color:#a4e9d4 !important;
+}
+html.glass-landing body .result-floating-settings :is(.result-settings-caption,.result-field-label,.result-option-hint),
+html.glass-landing body .result-compact-status {
+  color:var(--glass-mini-muted) !important;
+}
+html.glass-landing body .result-transparency input:not(:checked) {
+  background:rgba(145,182,175,.23) !important;
+  box-shadow:inset 0 0 0 1px rgba(224,255,250,.18) !important;
+}
+html.glass-landing body .result-transparency input:checked {
+  background:linear-gradient(110deg,#64dcb6,#87e5bd) !important;
+  box-shadow:inset 0 0 0 1px rgba(224,255,250,.25) !important;
+}
+
+/* Original-image view: frost behind the artwork, never blur its pixels. */
+html.glass-landing body .hm-original-preview .hm-original-figure {
+  background:rgba(13,35,39,.71) !important;
+  border:1px solid rgba(224,255,250,.21) !important;
+  box-shadow:0 26px 72px rgba(0,0,0,.48),inset 0 1px rgba(255,255,255,.11) !important;
+}
+html.glass-landing body .hm-original-preview :is(.hm-original-close,.hm-original-info) {
+  background:linear-gradient(155deg,rgba(45,82,76,.75),rgba(14,37,44,.79)) !important;
+  border:1px solid rgba(224,255,250,.26) !important;
+  color:var(--glass-mini-text) !important;
+  box-shadow:var(--glass-mini-shadow) !important;
+  backdrop-filter:blur(21px) saturate(140%) !important;
+  -webkit-backdrop-filter:blur(21px) saturate(140%) !important;
+}
+html.glass-landing body .hm-original-preview .hm-original-close:hover {
+  background:var(--glass-mini-hover) !important;
+  border-color:rgba(125,227,224,.49) !important;
+}
+
+/* Tiny custom-dimension disclosure and pixel fields on the generator rail. */
+html.glass-landing body .params-panel .custom-size-toggle {
+  background:var(--glass-mini-quiet) !important;
+  background-image:var(--glass-mini-quiet) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  border-radius:9px !important;
+  color:var(--glass-mini-text) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.07) !important;
+}
+html.glass-landing body .params-panel .custom-size-toggle:hover {
+  background:var(--glass-mini-hover) !important;
+  border-color:rgba(125,227,224,.4) !important;
+  color:#f3fffa !important;
+}
+html.glass-landing body .params-panel .custom-size-toggle.active {
+  background:var(--glass-mini-selected) !important;
+  background-image:var(--glass-mini-selected) !important;
+  border-color:rgba(125,227,224,.5) !important;
+  color:#c9fff0 !important;
+}
+html.glass-landing body .params-panel .custom-size-fields input {
+  background:var(--glass-mini-quiet) !important;
+  background-image:var(--glass-mini-quiet) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  color:var(--glass-mini-text) !important;
+  border-radius:9px !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.07) !important;
+  color-scheme:dark;
+}
+html.glass-landing body .params-panel .custom-size-fields input:focus {
+  border-color:rgba(125,227,224,.53) !important;
+  box-shadow:0 0 0 3px rgba(125,227,224,.1) !important;
+}
+html.glass-landing body .params-panel :is(
+ .custom-size-hint,.custom-size-unit,.custom-size-times,.custom-size-fields label
+) {color:var(--glass-mini-muted) !important;}
+
+/* Gallery views: 'My Works' and 'Asset Library' reused opaque legacy work
+   cards and a navy search field; keep the artwork thumbnails untouched. */
+html.glass-landing body .works-panel .works-search {
+  background:var(--glass-mini-quiet) !important;
+  background-image:var(--glass-mini-quiet) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  color:var(--glass-mini-text) !important;
+  border-radius:10px !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.075) !important;
+}
+html.glass-landing body .works-panel .works-search:focus {
+  border-color:rgba(125,227,224,.52) !important;
+  box-shadow:0 0 0 3px rgba(125,227,224,.11) !important;
+}
+html.glass-landing body .works-panel .work-card {
+  background:linear-gradient(158deg,rgba(255,255,255,.072),rgba(255,255,255,.014)) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  border-radius:13px !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.10),0 8px 20px -17px rgba(0,0,0,.56) !important;
+  backdrop-filter:blur(14px) saturate(136%) !important;
+  -webkit-backdrop-filter:blur(14px) saturate(136%) !important;
+}
+html.glass-landing body .works-panel .work-card:hover {
+  border-color:rgba(125,227,224,.37) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.13),0 11px 28px -17px rgba(0,0,0,.7) !important;
+}
+html.glass-landing body .works-panel .work-card .work-thumb {
+  background:#10282b !important;
+  border:1px solid rgba(224,255,250,.13) !important;
+  border-radius:9px !important;
+}
+html.glass-landing body .works-panel .work-card .work-description {
+  color:var(--glass-mini-text) !important;
+}
+html.glass-landing body .works-panel .work-card .work-description small {
+  color:var(--glass-mini-muted) !important;
+}
+html.glass-landing body .works-panel :is(.work-actions a,.work-card button) {
+  background:var(--glass-mini-quiet) !important;
+  background-image:var(--glass-mini-quiet) !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  color:#d4efe7 !important;
+  border-radius:9px !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.08) !important;
+}
+html.glass-landing body .works-panel :is(.work-actions a,.work-card button):hover {
+  background:var(--glass-mini-hover) !important;
+  border-color:rgba(125,227,224,.41) !important;
+  color:#f6fffb !important;
+}
+html.glass-landing body .works-panel .library-upload {
+  background:linear-gradient(110deg,#7de3e0,#8ceab5) !important;
+  border:1px solid rgba(198,255,240,.70) !important;
+  color:#07302c !important;
+  box-shadow:0 9px 25px -14px rgba(125,227,224,.44) !important;
+}
+
+/* Native Windows option menus cannot have CSS backdrop blur. Keep each native
+   <select> as the actual form control and use an accessible glass listbox above
+   it; glass-selects.js forwards input/change to the original element. */
+html.glass-landing body .hm-glass-select-host {
+  display:inline-block;
+  position:relative;
+  vertical-align:middle;
+  box-sizing:border-box;
+  min-width:0;
+  line-height:normal;
+}
+html.glass-landing body .hm-glass-select-host > select[data-hm-glass-enhanced] {
+  opacity:0 !important;
+  pointer-events:none !important;
+}
+html.glass-landing body .hm-glass-select-trigger {
+  position:absolute !important;
+  inset:0 !important;
+  z-index:1;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  gap:8px;
+  width:100% !important;
+  height:100% !important;
+  min-height:0 !important;
+  padding:0 10px !important;
+  text-align:left;
+  border-radius:10px !important;
+  border:1px solid var(--glass-mini-edge) !important;
+  background:var(--glass-mini-quiet) !important;
+  background-image:var(--glass-mini-quiet) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.085) !important;
+  color:var(--glass-mini-text) !important;
+  font:inherit !important;
+  line-height:1.3 !important;
+  letter-spacing:normal;
+  text-transform:none;
+  cursor:pointer;
+  white-space:nowrap;
+}
+html.glass-landing body .hm-glass-select-trigger:hover,
+html.glass-landing body .hm-glass-select-trigger[aria-expanded="true"] {
+  background:var(--glass-mini-hover) !important;
+  background-image:var(--glass-mini-hover) !important;
+  border-color:rgba(125,227,224,.4) !important;
+  color:#f3fffb !important;
+}
+html.glass-landing body .hm-glass-select-trigger:focus-visible {
+  outline:2px solid var(--glass-accent) !important;
+  outline-offset:2px !important;
+}
+html.glass-landing body .hm-glass-select-trigger:disabled {
+  opacity:.56;
+  cursor:not-allowed;
+}
+html.glass-landing body .hm-glass-select-label {
+  flex:1;
+  min-width:0;
+  display:block;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+  color:inherit;
+}
+html.glass-landing body .hm-glass-select-chevron {
+  flex:0 0 15px;
+  width:15px;
+  height:15px;
+  display:grid;
+  place-items:center;
+  color:#a7cfc7;
+  transition:transform .2s var(--glass-ease);
+}
+html.glass-landing body .hm-glass-select-chevron svg {
+  width:15px;
+  height:15px;
+}
+html.glass-landing body .hm-glass-select-trigger[aria-expanded="true"] .hm-glass-select-chevron {
+  transform:rotate(180deg);
+}
+html.glass-landing body .hm-glass-select-popover {
+  position:fixed !important;
+  z-index:2147482500 !important;
+  display:flex !important;
+  flex-direction:column;
+  gap:3px;
+  min-width:0;
+  min-height:0;
+  max-width:calc(100vw - 18px);
+  max-height:min(316px,calc(100dvh - 24px));
+  padding:6px;
+  overflow-y:auto;
+  overflow-x:hidden;
+  overscroll-behavior:contain;
+  background:var(--glass-mini-bg) !important;
+  background-image:var(--glass-mini-bg) !important;
+  border:1px solid rgba(224,255,250,.26) !important;
+  border-radius:12px;
+  box-shadow:var(--glass-mini-shadow) !important;
+  backdrop-filter:blur(30px) saturate(155%);
+  -webkit-backdrop-filter:blur(30px) saturate(155%);
+  scrollbar-width:thin;
+  scrollbar-color:rgba(125,227,224,.36) transparent;
+}
+html.glass-landing body .hm-glass-select-option {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  flex:0 0 auto;
+  min-height:34px;
+  padding:8px 10px;
+  width:100%;
+  color:#d1ebe4 !important;
+  border:1px solid transparent !important;
+  border-radius:8px !important;
+  background:transparent !important;
+  background-image:none !important;
+  box-shadow:none !important;
+  text-align:left;
+  font:inherit;
+  font-size:12px;
+  line-height:1.35;
+  cursor:pointer;
+}
+html.glass-landing body .hm-glass-select-option:hover,
+html.glass-landing body .hm-glass-select-option:focus-visible {
+  background:var(--glass-mini-hover) !important;
+  border-color:rgba(125,227,224,.22) !important;
+  color:#f4fffb !important;
+}
+html.glass-landing body .hm-glass-select-option.is-selected {
+  background:var(--glass-mini-selected) !important;
+  border-color:rgba(125,227,224,.28) !important;
+  color:#d8fff3 !important;
+}
+html.glass-landing body .hm-glass-select-option:disabled {
+  opacity:.46;
+  cursor:not-allowed;
+}
+html.glass-landing body .hm-glass-select-option .hm-glass-select-check {
+  color:var(--glass-accent);
+  font-size:14px;
+  font-weight:700;
+  visibility:hidden;
+}
+html.glass-landing body .hm-glass-select-option.is-selected .hm-glass-select-check {
+  visibility:visible;
+}
+html.glass-landing body .hm-glass-select-empty {
+  margin:0;
+  padding:12px 10px;
+  color:var(--glass-mini-muted);
+  font-size:12px;
+}
+
+/* Explicit hover, keyboard and motion feedback for compact controls. */
+html.glass-landing body :is(
+ .hs-dialog button,.hmt-dialog button,.result-toolbar-menu button,.result-submenu button,
+ .hg-editor button,.hg-open,.canvas-zoom-menu button
+):focus-visible {
+  outline:2px solid var(--glass-accent) !important;
+  outline-offset:2px !important;
+}
+@media (prefers-reduced-motion:reduce) {
+  html.glass-landing body :is(
+   .hs-dialog button,.hmt-dialog button,.result-toolbar-menu button,.result-submenu button,
+   .hg-editor button,.hg-open,.canvas-zoom-menu button
+  ) {transition:none !important;transform:none !important;}
+}

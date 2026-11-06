@@ -1,0 +1,85 @@
+/* 2026-11-05 typography layer: crisper, larger UI text.
+   Reference comparison: a 13–14px, high-contrast, normal-weight UI reads sharp,
+   while 9–12px muted CJK at synthetic weights reads blurry on Windows.
+   Loaded LAST so it wins over the per-component sizes. */
+
+:root{
+  --ui-font:"Segoe UI Variable Text","Segoe UI","Microsoft YaHei UI","Microsoft YaHei",
+    "PingFang SC","Hiragino Sans GB",system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
+  --txt:#eef4f1;
+  --txt-dim:#c9d8d2;
+  --txt-quiet:#a3b8b0;
+}
+
+html,body{
+  font-family:var(--ui-font);
+  text-rendering:optimizeLegibility;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+body{font-size:14px;line-height:1.5}
+
+/* ── Top bar & sidebar ─────────────────────────────────────────────── */
+.top-tool-btn{font-size:13px;font-weight:600}
+.top-tool-btn svg{width:19px;height:19px}
+.sidebar .nav-icon-btn span{font-size:13px;font-weight:650;letter-spacing:.1px}
+.sidebar-toggle-label{font-size:12.5px;font-weight:600;color:var(--txt-dim)}
+.zoom-text{font-size:12px;font-weight:650}
+.clear-canvas-btn{font-size:12.5px;font-weight:600}
+
+/* ── Right panel (generator params) ────────────────────────────────── */
+.params-panel .param-label{font-size:13px;font-weight:650;color:var(--txt-dim)}
+.params-panel .model-picker-name{font-size:13px;font-weight:650}
+.params-panel .model-option-text strong{font-size:12.5px;font-weight:650}
+.params-panel .model-option-text small{font-size:11px;color:var(--txt-quiet)}
+.params-panel .prompt-textarea{font-size:13px;line-height:1.7}
+.params-panel .optimize-prompt-btn{font-size:12px;font-weight:650}
+.params-panel .char-count{font-size:11px;color:var(--txt-quiet)}
+.params-panel .param-button,.params-panel .ratio-button{font-size:12px;font-weight:650}
+.params-panel .generate-button{font-size:15px;font-weight:700}
+.params-panel .reference-mode-indicator{font-size:11px}
+.params-panel .reference-dimensions{font-size:11px;color:var(--txt-quiet);line-height:1.6}
+.params-panel .reference-count{font-size:11px}
+.params-panel .reference-thumb-name{font-size:11px}
+.params-panel .upload-dropzone{font-size:12.5px}
+
+/* ── Floating result composer ──────────────────────────────────────── */
+.result-floating-toolbar .generated-result-action{font-size:13px;font-weight:600}
+.result-floating-toolbar .result-toolbar-more>summary{font-size:13px}
+.result-menu-action{font-size:13px}
+.result-field-label,.result-floating-settings .result-field-label{font-size:12px;font-weight:650}
+.result-rich-prompt,.result-floating-composer .hamoki-rich-prompt{font-size:13px;line-height:1.7}
+.result-compact-tools button{font-size:13px}
+.result-compact-footer button{font-size:13px}
+.result-compact-footer .result-transparency{font-size:12.5px}
+.result-settings-trigger{font-size:12px}
+.result-settings-caption{font-size:12.5px}
+.result-floating-settings .result-choice{font-size:12.5px}
+.result-floating-settings .result-option-hint{font-size:11px;line-height:1.4}
+.result-compose-status,.result-submit-hint,.result-char-count,.result-ref-tip,.result-option-hint{
+  font-size:11px;color:var(--txt-quiet);
+}
+.result-editor-title small,.result-model-subtitle{font-size:11px;color:var(--txt-quiet)}
+.result-ref-count,.result-reference-mode{font-size:11px}
+
+/* ── Queue & misc chrome ───────────────────────────────────────────── */
+#queue-panel .queue-count{font-size:12px}
+.queue-title{font-size:12.5px;font-weight:650}
+
+/* ── Template library ──────────────────────────────────────────────── */
+.hmt-hero p,.hmt-section-title span{font-size:12.5px;color:var(--txt-dim)}
+.hmt-kicker{font-size:11px;letter-spacing:1px}
+.hmt-search-wrap input,.hmt-cat,.hmt-use{font-size:13px}
+.hmt-card-excerpt,.hmt-footnote,.hmt-reference-tip,.hmt-detail-tags span{font-size:12px;line-height:1.7}
+.hmt-cat small,.hmt-card-ratio,.hmt-card-models span,.hmt-img2img{font-size:11px}
+.hmt-card-line h3{font-size:13px;font-weight:650}
+
+/* ── Game-UI tool plaza ────────────────────────────────────────────── */
+.hg-head p,.hg-import-note,.hg-tip,.hg-editor-summary{font-size:12.5px;line-height:1.75}
+.hg-card-info strong,.hg-open,.hg-field label,.hg-section-label{font-size:13px}
+.hg-card-meta,.hg-cat small,.hg-editor-meta span,.hg-foot,.hg-kicker{font-size:11px}
+.hg-field select,.hg-field textarea,.hg-field input{font-size:13px}
+.hg-search input{font-size:13px}
+
+/* Smallest helper text never drops below 11px. */
+.micro{font-size:12px!important}

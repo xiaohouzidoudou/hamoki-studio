@@ -1,0 +1,464 @@
+/*
+ * Hamoki Studio · Nocturne Glass / optical rework (2026-11-05).
+ * True glass is only visible when light exists BEHIND the surfaces.
+ * Scene = ink night + moonlight wells. Glass = colorless white 5%-12%,
+ * strong background blur/saturation, lit upper rim, shaded lower rim.
+ * Dedicated visual-only layer; no DOM, layout, canvas or request changes.
+ */
+
+:root {
+  --ng-blur:blur(60px) saturate(180%);
+  --ng-optic:linear-gradient(158deg,
+    rgba(255,255,255,.125) 0%,
+    rgba(255,255,255,.072) 15%,
+    rgba(255,255,255,.046) 47%,
+    rgba(255,255,255,.036) 75%,
+    rgba(255,255,255,.084) 100%);
+  --ng-optic-raised:linear-gradient(151deg,
+    rgba(255,255,255,.145) 0%,
+    rgba(255,255,255,.084) 19%,
+    rgba(255,255,255,.051) 60%,
+    rgba(255,255,255,.078) 100%);
+  --ng-surface-optic:linear-gradient(147deg,
+    rgba(255,255,255,.104),rgba(255,255,255,.045) 40%,rgba(255,255,255,.058) 100%);
+  --ng-rim:rgba(231,244,255,.235);
+  --ng-light-rim:rgba(241,250,255,.4);
+  --ng-shadow:0 20px 52px rgba(0,3,13,.48),
+    0 3px 10px rgba(1,7,17,.18),
+    inset 0 1px 0 rgba(255,255,255,.32),
+    inset 1px 0 0 rgba(255,255,255,.115),
+    inset 0 -1px 0 rgba(1,5,15,.45);
+  --ng-shadow-raised:0 34px 86px rgba(0,2,10,.6),
+    0 3px 16px rgba(1,6,18,.26),
+    inset 0 1px 0 rgba(255,255,255,.39),
+    inset 1px 0 0 rgba(255,255,255,.16),
+    inset 0 -1px 0 rgba(1,5,15,.54);
+  --ng-shadow-small:0 12px 26px rgba(1,5,16,.38),
+    inset 0 1px 0 rgba(255,255,255,.26),
+    inset 0 -1px 0 rgba(1,5,15,.33);
+}
+
+/* 01 · A real scene to look through. Richer where the glass panels stand,
+   darker where artwork needs visual priority. No purple/pink gradient. */
+html {background:#060a13 !important;}
+html body {
+  background:
+    radial-gradient(ellipse 420px 580px at 0% 25%,rgba(97,146,202,.53),rgba(57,91,139,.26) 46%,transparent 84%),
+    radial-gradient(ellipse 500px 650px at 100% 35%,rgba(125,167,207,.48),rgba(51,86,143,.27) 45%,transparent 83%),
+    radial-gradient(ellipse 750px 340px at 49% 102%,rgba(46,102,134,.24),transparent 81%),
+    radial-gradient(ellipse 510px 420px at 76% -20%,rgba(115,155,201,.26),transparent 78%),
+    linear-gradient(119deg,#070c16 0%,#0b1424 42%,#07101d 100%) !important;
+  background-attachment:fixed !important;
+}
+/* These emit light underneath the UI, not on the glass itself. */
+body .main-content {
+  position:relative !important;
+  isolation:isolate;
+  background:transparent !important;
+}
+body .main-content::before {
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:0;
+  pointer-events:none;
+  background:
+    radial-gradient(ellipse 340px 540px at 0% 23%,rgba(145,195,236,.33) 0%,rgba(70,114,176,.21) 42%,transparent 88%),
+    radial-gradient(ellipse 350px 620px at 100% 41%,rgba(143,186,230,.38) 0%,rgba(60,107,169,.22) 44%,transparent 87%),
+    radial-gradient(ellipse 780px 260px at 49% 5%,rgba(110,157,215,.18),transparent 83%),
+    radial-gradient(ellipse 680px 290px at 58% 108%,rgba(37,107,119,.19),transparent 83%),
+    linear-gradient(125deg,rgba(7,13,26,.12),transparent 52%,rgba(13,28,48,.06));
+}
+body .main-content > .sidebar,
+body .main-content > .canvas-area,
+body .main-content > .params-panel,
+body .main-content > .hmt-screen,
+body .main-content > #flow-host {
+  position:relative;
+  z-index:1;
+}
+
+/* 02 · Structural glass: neutral opacity + etched edges + real frosted light. */
+body .top-bar {
+  background:var(--ng-optic) !important;
+  border-bottom:1px solid var(--ng-rim) !important;
+  box-shadow:var(--ng-shadow) !important;
+  backdrop-filter:var(--ng-blur) !important;
+  -webkit-backdrop-filter:var(--ng-blur) !important;
+}
+body .top-bar::after {
+  content:"";
+  display:block !important;
+  position:absolute;top:0;left:5%;right:auto;width:56%;height:1px;
+  pointer-events:none;z-index:1;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.59) 20%,
+    rgba(255,255,255,.16) 75%,transparent);
+  box-shadow:0 1px 9px rgba(196,218,255,.24);
+  opacity:.9;
+}
+body .sidebar,
+body .sidebar.expanded,
+body .sidebar:not(.expanded),
+body .params-panel {
+  background:var(--ng-optic) !important;
+  border:1px solid var(--ng-rim) !important;
+  backdrop-filter:var(--ng-blur) !important;
+  -webkit-backdrop-filter:var(--ng-blur) !important;
+  box-shadow:var(--ng-shadow) !important;
+}
+body .sidebar,
+body .sidebar.expanded,
+body .sidebar:not(.expanded) {
+  border-top:0 !important;
+  border-left:0 !important;
+  border-bottom:0 !important;
+  border-right:1px solid var(--ng-rim) !important;
+}
+body .params-panel {border-top:0 !important;border-bottom:0 !important;border-right:0 !important;}
+/* Vertical reflected edge strips mimic a light grazing the sheet. */
+body .sidebar::after {
+  display:block !important;
+  content:"";
+  position:absolute;
+  top:5%;right:0;
+  width:1px;height:72%;
+  background:linear-gradient(to bottom,rgba(255,255,255,.59),rgba(255,255,255,.21) 35%,transparent 94%);
+  box-shadow:-1px 0 16px rgba(197,225,255,.24);
+  z-index:4;pointer-events:none;
+}
+body .params-panel::after {
+  content:"";
+  position:absolute;top:4%;left:0;width:1px;height:75%;
+  background:linear-gradient(to bottom,rgba(255,255,255,.7),rgba(255,255,255,.24) 35%,transparent 95%);
+  box-shadow:1px 0 16px rgba(197,225,255,.28);
+  pointer-events:none;z-index:4;
+}
+body .sidebar-nav .nav-icon-btn,
+body .sidebar.expanded .nav-icon-btn,
+body .top-tool-btn,
+body .clear-canvas-btn,
+body .zoom-control {
+  background:var(--ng-surface-optic) !important;
+  border-color:rgba(237,246,255,.2) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.19),inset 0 -1px 0 rgba(1,5,15,.3) !important;
+}
+body .sidebar-nav .nav-icon-btn:hover:not(.active),
+body .top-tool-btn:hover:not(:disabled),
+body .clear-canvas-btn:hover:not(:disabled) {
+  background:var(--ng-optic-raised) !important;
+  border-color:rgba(237,246,255,.4) !important;
+  box-shadow:var(--ng-shadow-small) !important;
+}
+body .sidebar-nav .nav-icon-btn.active {
+  background:linear-gradient(120deg,rgba(255,255,255,.145),rgba(255,255,255,.058)) !important;
+  border-color:rgba(121,226,174,.57) !important;
+  border-left:1px solid rgba(121,226,174,.57) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.37),
+    0 6px 24px rgba(1,8,22,.3) !important;
+}
+body .params-panel .panel-header {
+  background:linear-gradient(180deg,rgba(255,255,255,.11),rgba(255,255,255,.017)) !important;
+  border-bottom:1px solid rgba(235,246,255,.16) !important;
+}
+body .params-panel .panel-content {
+  background:transparent !important;
+}
+body .params-panel .model-picker-trigger,
+body .params-panel .prompt-editor .prompt-textarea,
+body .params-panel .upload-dropzone,
+body .params-panel .param-button,
+body .params-panel .ratio-button,
+body .params-panel .optimize-prompt-btn {
+  background:var(--ng-surface-optic) !important;
+  border-color:rgba(241,247,255,.22) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(2,7,20,.26) !important;
+  backdrop-filter:blur(25px) saturate(170%);
+  -webkit-backdrop-filter:blur(25px) saturate(170%);
+}
+body .params-panel .model-picker-trigger:hover,
+body .params-panel .upload-dropzone:hover {
+  border-color:rgba(var(--ng-accent-rgb),.59) !important;
+}
+body .params-panel .prompt-editor .prompt-textarea:focus {
+  border-color:rgba(var(--ng-accent-rgb),.62) !important;
+  box-shadow:0 0 0 3px rgba(var(--ng-accent-rgb),.1),inset 0 1px 0 rgba(255,255,255,.16) !important;
+}
+/* Recess the text well within the lit sheet so prompt/placeholder stays legible. */
+body .params-panel .prompt-editor .prompt-textarea,
+body .params-panel .prompt-textarea {
+  background:linear-gradient(155deg,rgba(6,13,27,.52),rgba(7,16,29,.34)) !important;
+  color:#eff6fa !important;
+}
+body .params-panel .prompt-textarea::placeholder {
+  color:#aebed0 !important;
+  opacity:1;
+}
+body #queue-panel,body .queue-panel {
+  background:var(--ng-optic) !important;
+  border-top:1px solid var(--ng-rim) !important;
+  box-shadow:0 -20px 52px rgba(0,3,13,.36),inset 0 1px rgba(255,255,255,.32) !important;
+  backdrop-filter:var(--ng-blur) !important;
+  -webkit-backdrop-filter:var(--ng-blur) !important;
+}
+body .queue-header {
+  background:linear-gradient(180deg,rgba(255,255,255,.09),rgba(255,255,255,.016)) !important;
+  border-bottom:1px solid rgba(235,246,255,.13) !important;
+}
+body .queue-item,body .queue-tab,body .queue-select,body .queue-action-btn {
+  background:var(--ng-surface-optic) !important;
+  border-color:rgba(236,244,255,.21) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.17) !important;
+}
+body .canvas-area {
+  background:transparent !important;
+}
+/* The canvas is the photo workspace; dark and crisp, not frosted. */
+body .canvas-viewport {
+  background:
+    radial-gradient(circle,rgba(175,211,234,.10) .8px,transparent 1.1px) 0 0/27px 27px,
+    linear-gradient(130deg,rgba(3,8,17,.83),rgba(4,12,23,.65)) !important;
+  border:1px solid rgba(223,242,255,.18) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),inset 0 0 80px rgba(0,3,9,.34) !important;
+}
+body .canvas-node-image,body .canvas img {filter:none !important;backdrop-filter:none !important;}
+
+/* 03 · Template gallery: big hero with obvious moonlit reflections,
+   transparent raised cards, photographed contents never blurred. */
+body .hmt-screen {background:transparent !important;}
+body .hmt-hero {
+  position:relative;
+  background:var(--ng-optic-raised) !important;
+  border:1px solid var(--ng-rim) !important;
+  box-shadow:var(--ng-shadow-raised) !important;
+  backdrop-filter:blur(60px) saturate(180%) !important;
+  -webkit-backdrop-filter:blur(60px) saturate(180%) !important;
+}
+body .hmt-hero::before {
+  content:"";
+  position:absolute;
+  pointer-events:none;z-index:0;
+  top:0;left:8%;width:60%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(247,252,255,.8) 25%,rgba(245,252,255,.23) 80%,transparent);
+  box-shadow:0 0 21px rgba(193,224,255,.32);
+}
+body .hmt-card {
+  position:relative;
+  background:var(--ng-optic) !important;
+  border:1px solid rgba(238,246,255,.24) !important;
+  box-shadow:var(--ng-shadow-small) !important;
+  backdrop-filter:blur(45px) saturate(180%) !important;
+  -webkit-backdrop-filter:blur(45px) saturate(180%) !important;
+}
+body .hmt-card::after {
+  content:"";
+  position:absolute;z-index:3;pointer-events:none;
+  top:0;left:7%;width:78%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.7) 36%,rgba(255,255,255,.18) 88%,transparent);
+  opacity:.7;transition:opacity .5s var(--ng-ease);
+}
+body .hmt-card:hover {
+  border-color:rgba(243,251,255,.43) !important;
+  box-shadow:var(--ng-shadow-raised) !important;
+}
+body .hmt-card:hover::after {opacity:1;}
+body .hmt-card-content {
+  background:linear-gradient(158deg,rgba(255,255,255,.105),rgba(255,255,255,.035) 75%) !important;
+  border-top:1px solid rgba(255,255,255,.16);
+}
+body .hmt-cat,body .hmt-search-wrap,body #hmtReferenceFilter,
+body .hmt-secondary,body .hmt-icon-button {
+  background:var(--ng-surface-optic) !important;
+  border-color:rgba(237,247,255,.22) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(3,8,19,.2) !important;
+  backdrop-filter:blur(32px) saturate(180%);
+}
+body .hmt-cat:hover,body .hmt-secondary:hover {
+  background:var(--ng-optic-raised) !important;
+  border-color:var(--ng-light-rim) !important;
+}
+/* "Look through the glass" modal: no opaque midnight-blue sheet. */
+body .hmt-dialog {
+  background:var(--ng-optic-raised) !important;
+  border:1px solid var(--ng-light-rim) !important;
+  box-shadow:var(--ng-shadow-raised) !important;
+  backdrop-filter:blur(65px) saturate(180%) !important;
+  -webkit-backdrop-filter:blur(65px) saturate(180%) !important;
+}
+body .hmt-dialog::backdrop {
+  background:rgba(1,5,14,.50) !important;
+  backdrop-filter:blur(6px) !important;
+  -webkit-backdrop-filter:blur(6px) !important;
+}
+body .hmt-dialog-body {
+  background:linear-gradient(155deg,rgba(255,255,255,.095),rgba(255,255,255,.027)) !important;
+}
+body .hmt-dialog-media {
+  background:rgba(6,12,22,.2) !important;
+}
+body #hmtDetailPrompt {
+  background:rgba(5,11,20,.24) !important;
+  border:1px solid rgba(235,247,255,.25) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.1) !important;
+}
+
+/* 04 · Settings and editors become raised optical panels, not navy-painted boxes. */
+body .hs-backdrop,body .rie-backdrop {
+  background:rgba(1,6,16,.48) !important;
+  backdrop-filter:blur(8px) saturate(150%) !important;
+  -webkit-backdrop-filter:blur(8px) saturate(150%) !important;
+}
+body .hs-dialog,body .rie-panel {
+  position:relative;
+  background:var(--ng-optic-raised) !important;
+  border:1px solid var(--ng-light-rim) !important;
+  box-shadow:var(--ng-shadow-raised) !important;
+  backdrop-filter:blur(65px) saturate(180%) !important;
+  -webkit-backdrop-filter:blur(65px) saturate(180%) !important;
+}
+body .hs-dialog::after,body .rie-panel::after {
+  content:"";
+  position:absolute;top:0;left:8%;width:65%;height:1px;z-index:3;
+  pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.72) 26%,rgba(255,255,255,.13) 81%,transparent);
+  box-shadow:0 1px 14px rgba(199,223,255,.25);
+}
+body .hs-head,body .rie-head,body .rie-foot {
+  background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.025)) !important;
+  border-color:rgba(235,245,255,.19) !important;
+}
+body .hs-form,body .hs-provider,body .hs-pig-provider,
+body .hs-model-row,body .hs-model-result {
+  background:var(--ng-surface-optic) !important;
+  border:1px solid rgba(236,246,255,.23) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.19),inset 0 -1px 0 rgba(2,7,17,.27) !important;
+}
+body .hs-provider.active {
+  background:linear-gradient(128deg,rgba(255,255,255,.12),rgba(255,255,255,.05)) !important;
+  border-color:rgba(var(--ng-accent-rgb),.53) !important;
+}
+body .hs-pig-key,body .hs-fields input,body .hs-fields select,
+body .hs-filter input {
+  background:rgba(5,13,25,.31) !important;
+  border-color:rgba(237,246,255,.24) !important;
+}
+body .hs-dialog button:not(.hs-primary),body .rie-chip,body .rie-cancel {
+  background:var(--ng-surface-optic) !important;
+  border-color:rgba(237,246,255,.23) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.15) !important;
+}
+body .rie-controls {
+  background:linear-gradient(155deg,rgba(255,255,255,.085),rgba(255,255,255,.035)) !important;
+  border-color:var(--ng-rim) !important;
+}
+body .rie-stage {background-color:rgba(3,9,20,.54) !important;}
+body .rie-canvas {filter:none !important;}
+body .result-floating-toolbar,body .result-floating-editor,
+body .result-composer-compact {
+  background:var(--ng-optic-raised) !important;
+  border:1px solid var(--ng-light-rim) !important;
+  box-shadow:var(--ng-shadow-raised) !important;
+  backdrop-filter:blur(60px) saturate(180%) !important;
+  -webkit-backdrop-filter:blur(60px) saturate(180%) !important;
+}
+body .result-floating-toolbar .generated-result-action,
+body .result-composer-compact .result-compact-tools > button,
+body .result-composer-compact .result-settings-trigger {
+  background:var(--ng-surface-optic) !important;
+  border-color:rgba(235,247,255,.24) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.17) !important;
+}
+body .result-composer-compact .result-floating-settings,
+body .result-composer-compact .result-model-popover,
+body .result-submenu,
+body .result-toolbar-menu {
+  background:var(--ng-optic-raised) !important;
+  border:1px solid var(--ng-light-rim) !important;
+  box-shadow:var(--ng-shadow-raised) !important;
+  backdrop-filter:blur(60px) saturate(180%) !important;
+  -webkit-backdrop-filter:blur(60px) saturate(180%) !important;
+}
+body .result-composer-compact .result-submit-icon,
+body .params-panel .generate-button,
+body .hmt-primary,body .hmt-use {
+  box-shadow:0 8px 26px rgba(52,190,129,.23),
+    inset 0 1px 0 rgba(255,255,255,.57),
+    inset 0 -1px 0 rgba(11,72,46,.19) !important;
+}
+
+/* 05 · The standalone flow canvas and settings use the SAME optics. */
+body.ng-flow-page .flow-shell {
+  isolation:isolate;position:relative;
+}
+body.ng-flow-page .flow-shell::before {
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(ellipse 370px 700px at 0% 28%,rgba(122,175,224,.39),transparent 86%),
+    radial-gradient(ellipse 440px 670px at 100% 46%,rgba(135,188,221,.36),transparent 88%),
+    radial-gradient(ellipse 760px 200px at 55% 0%,rgba(119,166,218,.15),transparent 85%);
+}
+body.ng-flow-page .flow-shell > .library,
+body.ng-flow-page .flow-shell > .workspace,
+body.ng-flow-page .flow-shell > .inspector {position:relative;z-index:1;}
+body.ng-flow-page .library,
+body.ng-flow-page .inspector,
+body.ng-flow-page .workspace-header,
+body.ng-flow-page .canvas-toolbar {
+  background:var(--ng-optic) !important;
+  border-color:var(--ng-rim) !important;
+  box-shadow:var(--ng-shadow-small) !important;
+  backdrop-filter:var(--ng-blur) !important;
+  -webkit-backdrop-filter:var(--ng-blur) !important;
+}
+body.ng-flow-page .flow-node,body.ng-flow-page .flow-queue {
+  background:var(--ng-optic-raised) !important;
+  border-color:rgba(239,247,255,.28) !important;
+  box-shadow:var(--ng-shadow-raised) !important;
+  backdrop-filter:blur(55px) saturate(180%) !important;
+}
+body.ng-flow-page .dialog-backdrop {background:rgba(2,6,17,.49) !important;}
+body.ng-flow-page .dialog-backdrop section,body.ng-flow-page .empty-hero {
+  background:var(--ng-optic-raised) !important;
+  border-color:var(--ng-light-rim) !important;
+  box-shadow:var(--ng-shadow-raised) !important;
+  backdrop-filter:var(--ng-blur) !important;
+}
+body.ng-settings-page .section,
+body.ng-settings-page .add-form,
+body.ng-settings-page .provider-card {
+  background:var(--ng-optic) !important;
+  border-color:var(--ng-rim) !important;
+  box-shadow:var(--ng-shadow) !important;
+  backdrop-filter:var(--ng-blur) !important;
+}
+body.ng-legacy-v1 .toolbar,body.ng-legacy-v1 .params-panel,
+body.ng-legacy-v1 .canvas-header {
+  background:var(--ng-optic) !important;
+  border-color:var(--ng-rim) !important;
+  box-shadow:var(--ng-shadow) !important;
+  backdrop-filter:var(--ng-blur) !important;
+}
+
+/* Respect clipping + legibility. No overlaid blur on image canvases. */
+body .hmt-card-media img,body .rie-canvas,
+body .flow-node .node-art img {
+  filter:none !important;
+  backdrop-filter:none !important;
+}
+@media (max-width:700px){
+  html body {
+    background:
+      radial-gradient(ellipse 270px 460px at 0% 38%,rgba(111,168,217,.37),transparent 85%),
+      radial-gradient(ellipse 280px 410px at 100% 42%,rgba(122,173,213,.38),transparent 82%),
+      linear-gradient(115deg,#07101c,#0a1424) !important;
+    background-attachment:fixed !important;
+  }
+  body .main-content::before {
+    background:
+      radial-gradient(ellipse 260px 380px at 1% 19%,rgba(141,191,235,.3),transparent 86%),
+      radial-gradient(ellipse 270px 400px at 97% 56%,rgba(130,176,218,.31),transparent 86%);
+  }
+  body .hmt-hero,body .hmt-dialog,body .hs-dialog {backdrop-filter:blur(46px) saturate(180%) !important;}
+}
+@media (prefers-reduced-motion:reduce) {
+  body .hmt-card::after {transition:none !important;}
+}

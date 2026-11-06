@@ -1,0 +1,131 @@
+/* Hamoki Studio canvas: virtualized image entries, macOS-style derivative stacks. */
+@keyframes hmCanvasWake {
+  from {opacity:0;transform:translate3d(0,9px,0) scale(.976);}
+  to {opacity:1;transform:translate3d(0,0,0) scale(1);}
+}
+@keyframes hmCanvasBranch {
+  from {opacity:0;transform:translate3d(0,var(--branch-offset,36px),0) scale(.74);}
+  to {opacity:1;transform:translate3d(0,0,0) scale(1);}
+}
+#canvas .canvas-node-appear {
+  animation:hmCanvasWake 270ms cubic-bezier(.22,1,.36,1) both;
+}
+#canvas .canvas-branch-appear {
+  animation:hmCanvasBranch 390ms cubic-bezier(.22,1,.36,1) both;
+}
+#canvas .canvas-derived-stack {
+  position:absolute;z-index:26;
+  width:122px;height:52px;
+  display:flex;align-items:center;gap:6px;
+  border:1px solid rgba(174,230,218,.31);
+  border-radius:15px;padding:6px 8px;
+  color:#dbeee7;
+  background:linear-gradient(145deg,rgba(48,78,78,.86),rgba(12,28,37,.90));
+  box-shadow:0 10px 32px rgba(0,0,0,.33),inset 0 1px rgba(255,255,255,.13);
+  backdrop-filter:blur(16px) saturate(140%);
+  -webkit-backdrop-filter:blur(16px) saturate(140%);
+  cursor:pointer;box-sizing:border-box;user-select:none;
+  transition:transform 260ms cubic-bezier(.22,1,.36,1),border-color 180ms,background 180ms,box-shadow 180ms;
+}
+#canvas .canvas-derived-stack:hover,
+#canvas .canvas-derived-stack:focus-visible {
+  transform:translate3d(0,-3px,0) scale(1.035);
+  border-color:rgba(126,235,187,.65);
+  box-shadow:0 15px 36px rgba(0,0,0,.4),0 0 0 2px rgba(97,210,160,.12);
+  outline:0;
+}
+#canvas .canvas-derived-stack.expanded {
+  border-color:rgba(114,220,170,.55);
+  background:linear-gradient(150deg,rgba(42,100,83,.84),rgba(15,39,46,.91));
+}
+#canvas .canvas-derived-thumbs {position:relative;flex:1;height:37px;min-width:0;}
+#canvas .canvas-derived-thumb {
+  position:absolute;top:2px;width:38px;height:33px;
+  object-fit:cover;border:1px solid rgba(227,255,248,.45);
+  border-radius:6px;background:#203139;
+  box-shadow:0 3px 8px rgba(0,0,0,.33);
+  pointer-events:none;
+  transition:transform .28s cubic-bezier(.22,1,.36,1);
+}
+#canvas .canvas-derived-thumb:nth-child(1) {left:1px;transform:rotate(-10deg);}
+#canvas .canvas-derived-thumb:nth-child(2) {left:18px;transform:rotate(0deg);}
+#canvas .canvas-derived-thumb:nth-child(3) {left:37px;transform:rotate(9deg);}
+#canvas .canvas-derived-stack:hover .canvas-derived-thumb:nth-child(1) {transform:translate(-2px,-2px) rotate(-16deg);}
+#canvas .canvas-derived-stack:hover .canvas-derived-thumb:nth-child(2) {transform:translateY(-4px);}
+#canvas .canvas-derived-stack:hover .canvas-derived-thumb:nth-child(3) {transform:translate(3px,-2px) rotate(14deg);}
+#canvas .canvas-derived-count {
+  position:relative;z-index:1;font-size:11px;font-weight:700;
+  line-height:20px;min-width:17px;text-align:center;
+  color:#d8fce9;background:rgba(114,220,170,.19);
+  border-radius:7px;padding:0 3px;
+}
+#canvas .canvas-derived-chevron {font-size:15px;line-height:1;opacity:.84;font-weight:600;}
+.canvas-marquee-selection {
+  position:fixed;pointer-events:none;z-index:2147483000;
+  box-sizing:border-box;border:1px solid rgba(109,228,171,.88);
+  background:linear-gradient(140deg,rgba(91,222,165,.20),rgba(52,167,133,.08));
+  border-radius:8px;box-shadow:0 0 0 1px rgba(18,56,47,.22),inset 0 0 22px rgba(96,229,175,.08);
+  backdrop-filter:blur(1px);
+}
+.canvas-multi-hud {
+  position:fixed;z-index:2147482900;display:flex;gap:8px;align-items:center;
+  min-height:40px;padding:6px 8px 6px 13px;border-radius:13px;
+  background:linear-gradient(145deg,rgba(40,84,75,.96),rgba(13,37,43,.95));
+  border:1px solid rgba(195,252,234,.27);
+  color:#e3f7f0;box-shadow:0 12px 35px rgba(0,0,0,.3);
+  backdrop-filter:blur(22px) saturate(140%);
+  -webkit-backdrop-filter:blur(22px) saturate(140%);
+  font-size:12px;
+}
+.canvas-multi-hud .canvas-multi-count {font-weight:650;white-space:nowrap;}
+.canvas-multi-hud button {
+  appearance:none;font-size:12px;font-weight:600;cursor:pointer;
+  border-radius:8px;border:1px solid rgba(255,255,255,.15);
+  padding:7px 10px;color:#e3f8ef;background:rgba(255,255,255,.07);
+}
+.canvas-multi-hud .canvas-multi-remove {
+  color:#ffe1df;background:rgba(225,94,104,.16);border-color:rgba(234,134,143,.4);
+}
+.canvas-multi-hud button:hover {background:rgba(255,255,255,.15);}
+.canvas-multi-hud .canvas-multi-remove:hover {background:rgba(225,94,104,.28);}
+html.glass-landing body .hm-context-item {display:flex;align-items:center;gap:10px;}
+html.glass-landing body .hm-context-item svg {
+  width:17px;height:17px;flex:0 0 17px;opacity:.88;stroke-width:1.8;
+}
+html.glass-landing body .hm-context-item .hm-context-label {flex:1;min-width:0;}
+@media(prefers-reduced-motion:reduce) {
+  #canvas .canvas-node-appear,#canvas .canvas-branch-appear {animation:none!important;}
+  #canvas .canvas-derived-stack,#canvas .canvas-derived-thumb {transition:none!important;}
+}
+
+/* Compact spring-stack: closed is a tiny thumbnail pile, open is a minimal
+   handle in the whitespace, not a giant overlay over the artwork. */
+#canvas .canvas-derived-stack {
+  width:108px;height:43px;border-radius:13px;padding:4px 6px;gap:3px;
+  transition:left .42s cubic-bezier(.22,1,.36,1),
+    top .42s cubic-bezier(.22,1,.36,1),
+    width .42s cubic-bezier(.22,1,.36,1),
+    height .42s cubic-bezier(.22,1,.36,1),
+    transform .32s cubic-bezier(.22,1,.36,1),
+    background .25s,border-color .25s,box-shadow .25s;
+}
+#canvas .canvas-derived-stack.expanded {
+  width:43px;height:27px;padding:3px 4px;border-radius:10px;gap:1px;
+  box-shadow:0 3px 13px rgba(0,0,0,.22),inset 0 1px rgba(255,255,255,.1);
+}
+#canvas .canvas-derived-thumbs {
+  height:33px;overflow:visible;
+  transition:opacity .24s,transform .36s cubic-bezier(.22,1,.36,1),max-width .32s;
+}
+#canvas .canvas-derived-stack.expanded .canvas-derived-thumbs {
+  opacity:0;max-width:0;flex:0 0 0;transform:scale(.15);pointer-events:none;
+}
+#canvas .canvas-derived-thumb {top:1px;width:34px;height:30px}
+#canvas .canvas-derived-thumb:nth-child(1){left:1px}
+#canvas .canvas-derived-thumb:nth-child(2){left:15px}
+#canvas .canvas-derived-thumb:nth-child(3){left:31px}
+#canvas .canvas-derived-count {font-size:11px;min-width:15px;line-height:18px;padding:0 2px}
+#canvas .canvas-derived-chevron{font-size:12px}
+@media(prefers-reduced-motion:reduce){
+ #canvas .canvas-derived-stack,#canvas .canvas-derived-thumbs{transition:none!important}
+}

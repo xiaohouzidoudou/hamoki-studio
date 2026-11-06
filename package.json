@@ -2,17 +2,15 @@
   "name": "hamoki-studio",
   "private": true,
   "version": "0.6.27",
-  "description": "Invite-only multi-account AI workspace with isolated per-user encrypted provider credentials",
+  "description": "Local single-user AI studio: image generation gateway, project canvas and editing tools",
   "scripts": {
-    "start": "node gateway.js",
-    "test:ui-l2": "node tests/ui-l2-integration.test.js",
-    "test": "node --check server.js && node --check workspace.js && node --check gateway.js && node --check lib/upstream.js && node --check assets/app.js && node --test tests/*.test.js"
+    "start": "node server.js",
+    "test": "node --check server.js && node --check lib/upstream.js && node --check lib/canvas-placement.js && node --test tests/*.test.js"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
-    "mammoth": "^1.13.0",
-    "yaml": "^2.8.1"
+    "@gradio/client": "^2.7.2"
   }
 }

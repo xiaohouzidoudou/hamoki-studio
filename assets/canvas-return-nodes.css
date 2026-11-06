@@ -1,0 +1,36 @@
+/* Empty-view recovery control, positioned over the bottom of the visible canvas. */
+.hamoki-return-nodes{
+ position:fixed;z-index:1090;display:flex;align-items:center;gap:12px;
+ transform:translate(-50%,-100%);padding:7px 9px 7px 14px;
+ min-height:44px;max-width:calc(100vw - 24px);
+ background:var(--glass-mini-bg,linear-gradient(153deg,rgba(43,79,74,.92),rgba(12,32,38,.94) 64%,rgba(18,44,45,.92)));
+ color:var(--glass-ink,#e7f2f0);
+ border:1px solid var(--glass-mini-edge,rgba(219,255,250,.18));border-radius:12px;
+ box-shadow:var(--glass-mini-shadow,0 19px 55px -19px rgba(0,0,0,.82),inset 0 1px 0 rgba(255,255,255,.17));
+ backdrop-filter:var(--glass-blur,blur(25px) saturate(150%));
+ -webkit-backdrop-filter:var(--glass-blur,blur(25px) saturate(150%));
+ font:500 12px/1.4 system-ui,"Microsoft YaHei",sans-serif;
+ white-space:nowrap;pointer-events:auto;
+}
+.hamoki-return-nodes[hidden]{display:none!important}
+.hamoki-return-nodes-go{
+ border:1px solid rgba(206,255,242,.58);border-radius:8px;min-height:30px;padding:5px 10px;
+ background:linear-gradient(110deg,var(--glass-accent,#7de3e0),var(--glass-green,#82eab4));
+ color:#07302c;box-shadow:0 7px 18px rgba(91,207,178,.15);white-space:nowrap;
+ font-family:inherit;font-weight:700;font-size:12px;line-height:1.35;cursor:pointer;
+}
+.hamoki-return-nodes-go:hover{filter:brightness(1.08);box-shadow:0 7px 20px rgba(91,207,178,.24)}
+.hamoki-return-nodes-close{
+ width:24px;height:28px;padding:0;
+ border:0;border-radius:6px;background:transparent;
+ color:var(--glass-muted,#a5c7bd);font:400 16px/1 system-ui;cursor:pointer;
+}
+.hamoki-return-nodes-close:hover{color:var(--glass-ink,#e7f2f0);background:rgba(125,227,224,.12)}
+.hamoki-return-nodes button:focus-visible{outline:2px solid var(--glass-accent,#7de3e0);outline-offset:2px}
+@media(max-width:460px){
+ .hamoki-return-nodes{gap:7px;padding:6px 7px 6px 10px;font-size:11px}
+ .hamoki-return-nodes-go{font-size:11px;min-height:29px;padding:4px 8px}
+}
+@media(prefers-reduced-motion:reduce){
+ .hamoki-return-nodes{backdrop-filter:none;-webkit-backdrop-filter:none}
+}

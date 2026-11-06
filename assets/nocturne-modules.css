@@ -1,0 +1,504 @@
+/*
+ * HAMOKI STUDIO — NOCTURNE GLASS / MODULES
+ * One language across templates, settings, floating composer, tool plaza,
+ * project workflow and legacy standalone pages. No HTML layout alterations.
+ */
+
+/* Template gallery — visual hierarchy follows the same nocturne glass layer. */
+body .hmt-screen {
+  background:transparent !important;color:var(--ng-text) !important;
+}
+body .hmt-scroll {scrollbar-color:rgba(201,222,239,.2) transparent;}
+body .hmt-hero {
+  background:rgba(255,255,255,.078) !important;
+  border:1px solid var(--ng-stroke) !important;
+  box-shadow:var(--ng-shadow) !important;
+  backdrop-filter:var(--ng-blur);-webkit-backdrop-filter:var(--ng-blur);
+  border-radius:22px !important;
+}
+body .hmt-kicker {color:var(--ng-accent) !important;}
+body .hmt-hero h1,body .hmt-section-title h2 {color:var(--ng-text) !important;}
+body .hmt-hero h1 span {color:#a9f1ca !important;}
+body .hmt-hero p,body .hmt-section-title span,body .hmt-footnote {color:var(--ng-muted) !important;}
+body .hmt-counter {border-color:var(--ng-stroke-dim) !important;color:var(--ng-sub) !important;}
+body .hmt-counter strong {color:#e1ffeb !important;}
+body .hmt-search-wrap,body #hmtReferenceFilter {
+  background:rgba(255,255,255,.055) !important;
+  color:var(--ng-text) !important;border:1px solid var(--ng-stroke) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.1);
+  border-radius:13px !important;
+  transition:background .5s var(--ng-ease),border-color .5s var(--ng-ease),box-shadow .5s var(--ng-ease);
+}
+body .hmt-search-wrap:focus-within {
+  background:rgba(255,255,255,.087) !important;
+  border-color:rgba(var(--ng-accent-rgb),.59) !important;
+  box-shadow:0 0 0 3px rgba(var(--ng-accent-rgb),.09) !important;
+}
+body .hmt-search-wrap input {color:#f3f9fc !important;}
+body .hmt-search-wrap kbd {color:var(--ng-muted);border-color:var(--ng-stroke) !important;}
+body .hmt-cat {
+  color:#c0ccda !important;background:rgba(255,255,255,.045) !important;
+  border:1px solid var(--ng-stroke) !important;border-radius:12px !important;
+  transition:background .5s var(--ng-ease),border-color .5s var(--ng-ease),
+     transform .5s var(--ng-ease),color .5s var(--ng-ease);
+}
+body .hmt-cat:hover {background:rgba(255,255,255,.12) !important;border-color:var(--ng-stroke-hover) !important;color:#fff !important;}
+body .hmt-cat[aria-pressed="true"] {
+  color:#d9ffe9 !important;
+  background:rgba(var(--ng-accent-rgb),.15) !important;
+  border-color:rgba(var(--ng-accent-rgb),.55) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.14);
+}
+body .hmt-card {
+  color:var(--ng-text) !important;
+  background:rgba(255,255,255,.062) !important;
+  border:1px solid var(--ng-stroke) !important;
+  border-radius:17px !important;overflow:hidden;
+  box-shadow:var(--ng-shadow-small) !important;
+  backdrop-filter:blur(35px) saturate(180%);
+  -webkit-backdrop-filter:blur(35px) saturate(180%);
+  transition:transform .5s var(--ng-ease),border-color .5s var(--ng-ease),box-shadow .5s var(--ng-ease);
+}
+body .hmt-card:hover {
+  transform:translateY(-4px);
+  border-color:var(--ng-stroke-hover) !important;
+  box-shadow:var(--ng-shadow-raised) !important;
+}
+body .hmt-card-media {background:rgba(7,14,25,.4) !important;}
+body .hmt-card-media img {filter:none !important;}
+body .hmt-card-line h3 {color:var(--ng-text) !important;}
+body .hmt-card-excerpt {color:#a6b7c9 !important;}
+body .hmt-card-ratio,body .hmt-card-models span,body .hmt-detail-tags span {
+  color:#becfe0 !important;
+  background:rgba(255,255,255,.075) !important;
+  border:1px solid var(--ng-stroke-dim) !important;
+  border-radius:8px !important;
+}
+body .hmt-picture-chip,body .hmt-img2img {
+  color:#e8f6f0 !important;
+  background:rgba(10,19,31,.74) !important;
+  border:1px solid rgba(255,255,255,.23) !important;
+  backdrop-filter:blur(24px) saturate(180%);
+}
+body .hmt-secondary,body .hmt-icon-button,body .hmt-copy-prompt,
+body .hmt-empty button,body #hmtDialogClose {
+  color:var(--ng-sub) !important;background:rgba(255,255,255,.075) !important;
+  border:1px solid var(--ng-stroke) !important;border-radius:11px !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.1);
+  transition:background .5s var(--ng-ease),border-color .5s var(--ng-ease),color .5s var(--ng-ease);
+}
+body .hmt-secondary:hover,body .hmt-icon-button:hover,body .hmt-copy-prompt:hover,
+body #hmtDialogClose:hover {background:rgba(255,255,255,.145) !important;border-color:var(--ng-stroke-hover) !important;color:#fff !important;}
+body .hmt-primary,body .hmt-use {
+  background:linear-gradient(120deg,#82edb7,#58c990) !important;
+  border:1px solid #9ef5c7 !important;color:#09271b !important;
+  border-radius:11px !important;
+  box-shadow:0 5px 18px rgba(53,188,127,.19),inset 0 1px rgba(255,255,255,.43) !important;
+  transition:transform .5s var(--ng-ease),box-shadow .5s var(--ng-ease),filter .5s var(--ng-ease);
+}
+body .hmt-primary:hover,body .hmt-use:hover {filter:brightness(1.09);box-shadow:0 10px 24px rgba(53,188,127,.3) !important;}
+body .hmt-empty {background:var(--ng-glass-soft) !important;border:1px dashed var(--ng-stroke) !important;color:var(--ng-sub) !important;}
+body .hmt-toast {background:rgba(18,44,35,.89) !important;border:1px solid rgba(var(--ng-accent-rgb),.48) !important;box-shadow:var(--ng-shadow) !important;color:#ecfff4 !important;backdrop-filter:blur(40px);}
+body .hmt-dialog {
+  background:rgba(21,31,47,.84) !important;
+  color:var(--ng-text) !important;
+  border:1px solid rgba(255,255,255,.23) !important;
+  box-shadow:0 32px 100px rgba(1,4,12,.72),inset 0 1px rgba(255,255,255,.2) !important;
+  backdrop-filter:blur(55px) saturate(180%);
+  -webkit-backdrop-filter:blur(55px) saturate(180%);
+  border-radius:22px !important;
+}
+body .hmt-dialog::backdrop {background:rgba(2,5,12,.78) !important;backdrop-filter:blur(12px) !important;}
+body .hmt-dialog-media {background:rgba(5,10,20,.38) !important;}
+body .hmt-dialog-body {background:rgba(255,255,255,.03) !important;}
+body .hmt-dialog-body h2 {color:#f5f9fc !important;}
+body .hmt-dialog-top,body .hmt-dialog-body label {color:#b5c8d7 !important;}
+body #hmtDetailPrompt {
+  background:rgba(4,12,25,.43) !important;
+  color:var(--ng-text) !important;
+  border:1px solid var(--ng-stroke) !important;
+  border-radius:12px !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+}
+body .hmt-reference-tip {color:#aebecd !important;}
+body .params-panel .hmt-applied-note,body #hmtAppliedNote {
+  color:#e3faeb !important;
+  background:rgba(var(--ng-accent-rgb),.08) !important;
+  border:1px solid rgba(var(--ng-accent-rgb),.33) !important;
+  border-radius:12px !important;
+}
+body #hmtAppliedNote .hmt-return,body #hmtAppliedNote .hmt-remove {
+  background:rgba(255,255,255,.1) !important;border-color:var(--ng-stroke) !important;color:#d8f7e6 !important;
+}
+
+/* Settings — all modal tabs, providers, forms, lists, message states. */
+body .hs-backdrop {
+  background:rgba(2,6,16,.71) !important;
+  backdrop-filter:blur(13px) saturate(155%) !important;
+  -webkit-backdrop-filter:blur(13px) saturate(155%) !important;
+}
+body .hs-dialog {
+  background:rgba(21,32,49,.83) !important;
+  color:var(--ng-text) !important;
+  border:1px solid rgba(255,255,255,.23) !important;
+  border-radius:22px !important;
+  box-shadow:0 34px 110px rgba(1,4,12,.72),inset 0 1px rgba(255,255,255,.2),inset 0 -1px rgba(2,6,16,.5) !important;
+  backdrop-filter:blur(55px) saturate(180%);-webkit-backdrop-filter:blur(55px) saturate(180%);
+}
+body .hs-head {
+  background:rgba(255,255,255,.045) !important;
+  border-color:var(--ng-stroke) !important;
+}
+body .hs-head h2,body .hs-toolbar h3,body .hs-form h3 {color:var(--ng-text) !important;}
+body .hs-head p,body .hs-provider-info small,body .hs-footnote {color:var(--ng-muted) !important;}
+body .hs-dialog button,body .hs-head button {
+  background:rgba(255,255,255,.07) !important;
+  color:var(--ng-sub) !important;
+  border:1px solid var(--ng-stroke) !important;
+  border-radius:11px !important;
+  transition:background .5s var(--ng-ease),border-color .5s var(--ng-ease),color .5s var(--ng-ease),transform .5s var(--ng-ease);
+}
+body .hs-dialog button:hover:not(:disabled) {
+  background:rgba(255,255,255,.13) !important;
+  border-color:var(--ng-stroke-hover) !important;color:#fff !important;
+}
+body .hs-dialog button.hs-primary,body .hs-dialog .hs-primary {
+  background:linear-gradient(120deg,#80eab5,#59c992) !important;
+  color:#09291c !important;
+  border:1px solid #9cedc5 !important;
+  font-weight:730;
+  box-shadow:0 6px 20px rgba(57,186,127,.21),inset 0 1px rgba(255,255,255,.4);
+}
+body .hs-dialog .hs-primary:hover:not(:disabled) {filter:brightness(1.07);color:#09291c !important;}
+body .hs-provider,body .hs-form,body .hs-model-result,body .hs-model-row,
+body .hs-pig-provider {
+  background:rgba(255,255,255,.06) !important;
+  border:1px solid var(--ng-stroke) !important;
+  color:var(--ng-text) !important;
+  border-radius:14px !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.09) !important;
+}
+body .hs-provider.active {background:rgba(var(--ng-accent-rgb),.095) !important;border-color:rgba(var(--ng-accent-rgb),.52) !important;}
+body .hs-provider-info strong {color:var(--ng-text) !important;}
+body .hs-badge {background:rgba(var(--ng-accent-rgb),.13) !important;color:#c6ffe0 !important;}
+body .hs-fields input,body .hs-fields select,body .hs-filter input,
+body .hs-pig-key {
+  background:rgba(6,14,27,.5) !important;
+  border:1px solid var(--ng-stroke) !important;
+  color:var(--ng-text) !important;
+  border-radius:10px !important;
+}
+body .hs-fields input:focus,body .hs-fields select:focus,body .hs-pig-key:focus {
+  border-color:rgba(var(--ng-accent-rgb),.61) !important;
+  box-shadow:0 0 0 3px rgba(var(--ng-accent-rgb),.09);
+}
+body .hs-provider-check.is-success {background:rgba(var(--ng-accent-rgb),.105) !important;border-color:rgba(var(--ng-accent-rgb),.3) !important;color:#b9f7d4 !important;}
+body .hs-provider-check.is-error {background:rgba(255,120,120,.1) !important;border-color:rgba(255,120,120,.3) !important;color:#ffc5c5 !important;}
+body .hs-provider-check.is-pending {background:rgba(255,255,255,.055) !important;border-color:var(--ng-stroke-dim) !important;}
+body .hs-message {background:rgba(var(--ng-accent-rgb),.095) !important;border-color:rgba(var(--ng-accent-rgb),.3) !important;color:#c4ffe0 !important;}
+body .hs-message.error {background:rgba(255,124,140,.095) !important;border-color:rgba(255,124,140,.35) !important;color:#ffb9c3 !important;}
+body .hs-model-row span {color:var(--ng-sub) !important;}
+body .hs-model-row button,body .hs-fetch button {color:#b8f4d3 !important;}
+
+/* Image selected: floating toolbar and composer, menus, settings, choices. */
+body .result-floating-toolbar {
+  background:rgba(24,35,52,.82) !important;
+  border:1px solid var(--ng-stroke-hover) !important;
+  border-radius:15px !important;
+  box-shadow:var(--ng-shadow-raised) !important;
+  backdrop-filter:blur(42px) saturate(180%);
+  -webkit-backdrop-filter:blur(42px) saturate(180%);
+}
+body .result-floating-editor {
+  background:rgba(24,35,52,.87) !important;
+  color:var(--ng-text) !important;
+  border:1px solid var(--ng-stroke-hover) !important;
+  border-radius:17px !important;
+  box-shadow:var(--ng-shadow-raised) !important;
+  backdrop-filter:blur(44px) saturate(180%);
+  -webkit-backdrop-filter:blur(44px) saturate(180%);
+}
+body .result-floating-editor .generated-result-editor-head,
+body .result-composer-footer,
+body .result-editor-docked {
+  background:rgba(255,255,255,.047) !important;
+  border-color:var(--ng-stroke-dim) !important;
+}
+body .result-floating-editor .generated-result-editor-head strong,
+body .result-editor-title strong,body .result-field-label {color:var(--ng-text) !important;}
+body .result-editor-title small,body .result-char-count,body .result-ref-tip,
+body .result-option-hint,body .result-model-subtitle,body .result-submit-hint {
+  color:var(--ng-muted) !important;
+}
+body .result-select,body .result-custom-model,body .result-model-popover,
+body .result-floating-editor .generated-result-prompt,
+body .result-ref-tile,body .result-ref-plus {
+  background:rgba(5,13,26,.44) !important;
+  color:var(--ng-text) !important;border:1px solid var(--ng-stroke) !important;
+  border-radius:11px !important;
+}
+body .result-model-popover,body .result-submenu,body .result-toolbar-menu {
+  background:rgba(23,34,51,.93) !important;
+  color:var(--ng-text) !important;border:1px solid var(--ng-stroke-hover) !important;
+  border-radius:13px !important;
+  box-shadow:var(--ng-shadow-raised) !important;
+  backdrop-filter:var(--ng-blur);-webkit-backdrop-filter:var(--ng-blur);
+}
+body .result-menu-action,body .result-submenu-action,
+body .result-choice,body .result-settings-trigger,
+body .result-model-trigger,body .result-reverse-prompt,
+body .result-optimize,body .result-add-reference,
+body .result-ref-remove,body .result-fetch-models,
+body .result-floating-toolbar button,body .result-floating-editor .generated-result-dismiss {
+  background:rgba(255,255,255,.065) !important;
+  color:#c9d8e5 !important;
+  border:1px solid var(--ng-stroke) !important;
+  border-radius:9px !important;
+  transition:background .5s var(--ng-ease),border-color .5s var(--ng-ease),color .5s var(--ng-ease),transform .5s var(--ng-ease);
+}
+body .result-menu-action:hover,body .result-submenu-action:hover,
+body .result-choice:hover:not(:disabled),
+body .result-floating-toolbar button:hover:not(:disabled),
+body .result-reverse-prompt:hover,body .result-optimize:hover {
+  background:rgba(255,255,255,.125) !important;
+  border-color:var(--ng-stroke-hover) !important;
+  color:#fff !important;
+}
+body .result-choice.active,body .result-model-trigger[aria-expanded="true"] {
+  background:rgba(var(--ng-accent-rgb),.135) !important;
+  color:#ceffe6 !important;border-color:rgba(var(--ng-accent-rgb),.57) !important;
+}
+body .result-floating-editor .generated-result-primary,
+body .result-floating-toolbar .result-download {
+  background:linear-gradient(112deg,#80eab5,#56c68e) !important;
+  border:1px solid #9af3c4 !important;color:#09261b !important;
+  box-shadow:0 5px 18px rgba(52,189,126,.23) !important;
+}
+body .result-floating-editor .generated-result-primary:hover {filter:brightness(1.08);}
+body .result-compose-status,body .result-ref-count {color:#b9f5d4 !important;}
+body .result-menu-sep,body .result-form-section + .result-form-section {border-color:var(--ng-stroke-dim) !important;}
+body .result-ref-mark {background:rgba(18,29,45,.75) !important;border:1px solid var(--ng-stroke-dim);}
+body .generated-result-meta,body .generated-result-meta-text {color:#afbfce !important;}
+body .generated-source-path {stroke:rgba(var(--ng-accent-rgb),.75) !important;}
+
+/* Generation placeholders remain legible and visually distinct from completed art. */
+body .generation-frame {
+  background:rgba(255,255,255,.075) !important;
+  border:1px solid var(--ng-stroke) !important;
+  box-shadow:var(--ng-shadow-small) !important;
+  border-radius:14px !important;overflow:hidden;
+}
+body .generation-frame-caption {
+  color:var(--ng-sub) !important;
+  background:rgba(255,255,255,.048) !important;
+  border-color:var(--ng-stroke-dim) !important;
+}
+body .generation-frame-body {background:rgba(6,13,24,.4) !important;}
+body .generation-frame-label {color:#d8f9e7 !important;}
+body .generation-frame-spinner {border-color:rgba(var(--ng-accent-rgb),.22) !important;border-top-color:var(--ng-accent) !important;}
+body .generation-frame-track {background:rgba(255,255,255,.13) !important;}
+
+/* Game UI tool plaza: same visual language across cards, sidebar, inputs and overlays. */
+body .hg-plaza,body .hg-scroll {background:transparent !important;color:var(--ng-text) !important;}
+body .hg-head,body .hg-editor,body .hg-card,body .hg-notice {
+  background:rgba(255,255,255,.075) !important;
+  border:1px solid var(--ng-stroke) !important;
+  border-radius:18px !important;
+  box-shadow:var(--ng-shadow-small) !important;
+  backdrop-filter:blur(38px) saturate(170%);-webkit-backdrop-filter:blur(38px) saturate(170%);
+}
+body .hg-head h1,body .hg-catalog-head strong,body .hg-editor h2 {color:var(--ng-text) !important;}
+body .hg-head p,body .hg-card-meta,body .hg-section-label,body .hg-editor-summary,
+body .hg-tip,body .hg-foot {color:var(--ng-muted) !important;}
+body .hg-card {
+  transition:transform .5s var(--ng-ease),box-shadow .5s var(--ng-ease),border-color .5s var(--ng-ease);
+}
+body .hg-card:hover {transform:translateY(-4px);border-color:var(--ng-stroke-hover) !important;box-shadow:var(--ng-shadow-raised) !important;}
+body .hg-card-selected {border-color:rgba(var(--ng-accent-rgb),.65) !important;}
+body .hg-search,body .hg-cat,body .hg-kind,body .hg-field input,
+body .hg-field textarea,body .hg-field select,body .hg-stage2-drop {
+  background:rgba(6,14,27,.39) !important;
+  color:var(--ng-text) !important;border:1px solid var(--ng-stroke) !important;
+  border-radius:12px !important;
+}
+body .hg-cat.active,body .hg-kind.active {background:rgba(var(--ng-accent-rgb),.145) !important;color:#d4ffe5 !important;border-color:rgba(var(--ng-accent-rgb),.56) !important;}
+body .hg-card-preview,body .hg-stage2-card-preview {background:rgba(8,16,29,.33) !important;}
+body .hg-card-bottom .hg-open,body .hg-submit {
+  color:#092b20 !important;
+  background:linear-gradient(115deg,#82e9b5,#56c38d) !important;
+  border:1px solid #9af2c6 !important;
+  border-radius:10px !important;
+}
+body .hg-upload,body .hg-fav,body .hg-editor-meta span,
+body .hg-close,body .hg-stage2-replace,body .hg-stage2-remove {
+  background:rgba(255,255,255,.07) !important;
+  border:1px solid var(--ng-stroke) !important;color:var(--ng-sub) !important;
+  border-radius:10px !important;
+}
+body .hg-notice {color:#d9fbe8 !important;}
+body .hg-import-note {background:rgba(var(--ng-accent-rgb),.1) !important;border-color:rgba(var(--ng-accent-rgb),.37) !important;}
+
+/* Standalone workflow canvas: glass controls, crisp pan/zoom/node surfaces. */
+body.ng-flow-page .flow-shell {position:relative;z-index:1;background:transparent !important;}
+body.ng-flow-page .library,body.ng-flow-page .inspector {
+  background:rgba(255,255,255,.065) !important;
+  border-color:var(--ng-stroke) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.1) !important;
+  backdrop-filter:var(--ng-blur);-webkit-backdrop-filter:var(--ng-blur);
+}
+body.ng-flow-page .workspace {background:transparent !important;}
+body.ng-flow-page .workspace-header,body.ng-flow-page .canvas-toolbar {
+  background:rgba(255,255,255,.07) !important;
+  border-bottom:1px solid var(--ng-stroke) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.12) !important;
+  backdrop-filter:var(--ng-blur);-webkit-backdrop-filter:var(--ng-blur);
+}
+body.ng-flow-page .flow-viewport {
+  background:
+    radial-gradient(circle,rgba(183,210,227,.17) .85px,transparent 1.3px) 0 0 / 25px 25px,
+    radial-gradient(ellipse at 60% 30%,rgba(63,92,128,.09),transparent 62%),
+    rgba(4,10,19,.42) !important;
+}
+body.ng-flow-page .search-box,body.ng-flow-page .canvas-toolbar-zoom {
+  background:var(--ng-glass-soft) !important;color:var(--ng-sub) !important;
+  border:1px solid var(--ng-stroke) !important;border-radius:12px !important;
+}
+body.ng-flow-page .project-row.active,body.ng-flow-page .layer-row.active,
+body.ng-flow-page .tool.active {
+  background:rgba(var(--ng-accent-rgb),.12) !important;
+  border-color:rgba(var(--ng-accent-rgb),.47) !important;color:#dbffed !important;
+}
+body.ng-flow-page .tool,body.ng-flow-page .soft-button,
+body.ng-flow-page .icon-btn,body.ng-flow-page .canvas-rail,
+body.ng-flow-page .canvas-rail button,
+body.ng-flow-page .node-footer button,body.ng-flow-page .flow-queue {
+  background:rgba(255,255,255,.065) !important;
+  color:var(--ng-sub) !important;
+  border:1px solid var(--ng-stroke) !important;
+  border-radius:11px !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.09) !important;
+}
+body.ng-flow-page .tool:hover,body.ng-flow-page .soft-button:hover,
+body.ng-flow-page .icon-btn:hover,body.ng-flow-page .node-footer button:hover {
+  background:rgba(255,255,255,.14) !important;color:#fff !important;border-color:var(--ng-stroke-hover) !important;
+}
+body.ng-flow-page .primary-button,body.ng-flow-page .upload-btn {
+  background:linear-gradient(115deg,#83eab6,#59cb95) !important;
+  color:#0b2b1f !important;border:1px solid #a7f4cd !important;border-radius:11px !important;
+}
+body.ng-flow-page .flow-node {
+  background:rgba(255,255,255,.085) !important;
+  border:1px solid var(--ng-stroke) !important;
+  border-radius:16px !important;
+  box-shadow:var(--ng-shadow-raised) !important;
+  backdrop-filter:blur(30px) saturate(170%);
+}
+body.ng-flow-page .flow-node.selected {
+  border-color:rgba(var(--ng-accent-rgb),.72) !important;
+  box-shadow:0 0 0 1px rgba(var(--ng-accent-rgb),.55),var(--ng-shadow-raised) !important;
+}
+body.ng-flow-page .node-header,body.ng-flow-page .node-footer {
+  background:rgba(255,255,255,.065) !important;
+  border-color:var(--ng-stroke-dim) !important;color:var(--ng-text) !important;
+}
+body.ng-flow-page .node-art {background:rgba(5,11,22,.36) !important;}
+body.ng-flow-page .dialog-backdrop {
+  background:rgba(2,6,15,.75) !important;
+  backdrop-filter:blur(11px) !important;
+}
+body.ng-flow-page .dialog-backdrop section,
+body.ng-flow-page .empty-hero {
+  background:rgba(21,34,51,.88) !important;
+  border:1px solid var(--ng-stroke-hover) !important;
+  box-shadow:var(--ng-shadow-raised) !important;
+  backdrop-filter:var(--ng-blur);-webkit-backdrop-filter:var(--ng-blur);
+  border-radius:20px !important;
+}
+body.ng-flow-page .floating-tip,body.ng-flow-page .flow-toast {
+  background:rgba(22,42,43,.86) !important;
+  border:1px solid rgba(var(--ng-accent-rgb),.4) !important;
+  color:#d6fbe6 !important;backdrop-filter:blur(30px);
+}
+body.ng-flow-page .inspector input,body.ng-flow-page .inspector select,
+body.ng-flow-page .inspector textarea,body.ng-flow-page .dialog-body input,
+body.ng-flow-page .dialog-body select,body.ng-flow-page .dialog-body textarea {
+  background:rgba(6,14,26,.46) !important;
+  color:var(--ng-text) !important;border:1px solid var(--ng-stroke) !important;
+  border-radius:10px !important;
+}
+body.ng-flow-page .flow-world,body.ng-flow-page .edge-layer {backdrop-filter:none !important;}
+body.ng-flow-page .node-art img {filter:none !important;}
+
+/* Legacy standalone settings and V1 pages also inherit the exact same glass tokens. */
+body.ng-settings-page {
+  --bg:var(--ng-night);
+  --bg-2:var(--ng-glass);
+  --bg-3:var(--ng-glass-light);
+  --border:var(--ng-stroke);
+  --text:var(--ng-text);
+  --text-2:var(--ng-sub);
+  --text-3:var(--ng-muted);
+  --green:var(--ng-accent);
+  position:relative;
+}
+body.ng-settings-page .section,body.ng-settings-page .add-form,
+body.ng-settings-page .provider-card,body.ng-settings-page .model-card {
+  background:rgba(255,255,255,.075) !important;
+  border:1px solid var(--ng-stroke) !important;
+  border-radius:18px !important;
+  box-shadow:var(--ng-shadow) !important;
+  backdrop-filter:var(--ng-blur);-webkit-backdrop-filter:var(--ng-blur);
+}
+body.ng-settings-page input,body.ng-settings-page textarea,body.ng-settings-page select {
+  background:rgba(7,15,28,.4) !important;
+  color:var(--ng-text) !important;
+  border:1px solid var(--ng-stroke) !important;
+  border-radius:11px !important;
+}
+body.ng-settings-page button:not(.primary) {
+  background:rgba(255,255,255,.075) !important;
+  border:1px solid var(--ng-stroke) !important;
+  color:var(--ng-sub) !important;border-radius:11px !important;
+}
+body.ng-settings-page button.primary {
+  background:linear-gradient(115deg,#84ebb7,#59cb94) !important;
+  border:1px solid #9ef1c6 !important;
+  color:#092719 !important;border-radius:11px !important;
+}
+body.ng-settings-page h1,body.ng-settings-page h2 {color:var(--ng-text) !important;}
+
+body.ng-legacy-v1 .toolbar,body.ng-legacy-v1 .params-panel,
+body.ng-legacy-v1 .canvas-header {
+  background:rgba(255,255,255,.065) !important;
+  border-color:var(--ng-stroke) !important;
+  box-shadow:var(--ng-shadow-small) !important;
+  backdrop-filter:var(--ng-blur);-webkit-backdrop-filter:var(--ng-blur);
+}
+body.ng-legacy-v1 .canvas-container,body.ng-legacy-v1 .canvas-viewport {
+  background:rgba(4,9,18,.38) !important;
+}
+body.ng-legacy-v1 .tool-btn,body.ng-legacy-v1 .ctrl-btn,
+body.ng-legacy-v1 .mode-btn,body.ng-legacy-v1 .param-button,
+body.ng-legacy-v1 .ratio-btn {
+  color:var(--ng-sub) !important;
+  background:var(--ng-glass-soft) !important;
+  border:1px solid var(--ng-stroke) !important;border-radius:11px !important;
+}
+body.ng-legacy-v1 .tool-btn.active,body.ng-legacy-v1 .mode-btn.active,
+body.ng-legacy-v1 .param-button.active {
+  background:rgba(var(--ng-accent-rgb),.15) !important;
+  color:#dcffec !important;
+  border-color:rgba(var(--ng-accent-rgb),.55) !important;
+}
+body.ng-legacy-v1 input,body.ng-legacy-v1 textarea,body.ng-legacy-v1 select{
+  background:rgba(6,15,28,.44) !important;
+  color:var(--ng-text) !important;
+  border:1px solid var(--ng-stroke) !important;border-radius:10px !important;
+}
+@media(max-width:700px){
+  body .hmt-hero,body .hmt-dialog {border-radius:15px !important;}
+  body .hmt-card {border-radius:12px !important;}
+  body .hs-dialog {border-radius:15px !important;}
+  body .hmt-dialog,body .hs-dialog {backdrop-filter:blur(30px) saturate(165%);}
+  body.ng-flow-page .library,body.ng-flow-page .inspector {backdrop-filter:blur(30px) saturate(165%);}
+}

@@ -1,0 +1,372 @@
+/*
+ * Hamoki Studio · Glass Landing permanent visual theme · 2026-11-05
+ * Visual-only global theme, loaded last on all application entry pages.
+ * Reference: luckymaomi.github.io/ui/templates/glass-landing/
+ * Preserve canvas transforms, drag logic, node coordinates and image layering.
+ */
+html.glass-landing {
+  color-scheme:dark;
+  --glass-deep:#050d0f;
+  --glass-ink:#e7f2f0;
+  --glass-sub:rgba(231,242,240,.70);
+  --glass-muted:rgba(231,242,240,.46);
+  --glass-accent:#7de3e0;
+  --glass-green:#82eab4;
+  --glass-edge:rgba(224,255,250,.13);
+  --glass-edge-strong:rgba(224,255,250,.22);
+  --glass-surface:linear-gradient(175deg,rgba(255,255,255,.092),rgba(255,255,255,.023));
+  --glass-surface-quiet:linear-gradient(170deg,rgba(255,255,255,.060),rgba(255,255,255,.016));
+  --glass-shadow:0 30px 80px -32px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.14);
+  --glass-pop-shadow:0 22px 70px -20px rgba(0,0,0,.84), inset 0 1px 0 rgba(255,255,255,.17);
+  --glass-blur:blur(25px) saturate(150%);
+  --glass-ease:cubic-bezier(.22,1,.36,1);
+  --bg-dark:#050d0f; --bg-secondary:#122226; --bg-tertiary:#1b3034;
+  --bg-elevated:#20383a; --text-primary:var(--glass-ink);
+  --text-secondary:var(--glass-sub); --text-muted:var(--glass-muted);
+  --border-color:var(--glass-edge); --border-hover:var(--glass-edge-strong);
+  --accent-green:var(--glass-green); --accent-green-hover:#9cf6c6;
+  --gg-deep:#050d0f; --gg-canvas:#09171a; --gg-bar:#102124;
+  --gg-panel:#102529; --gg-surface:#1b3235;
+  --gg-surface-light:#2b4244; --gg-input:#0e2023;
+  --gg-border:var(--glass-edge); --gg-border-soft:rgba(224,255,250,.09);
+  --gg-text:var(--glass-ink); --gg-sub:var(--glass-sub);
+  --gg-muted:var(--glass-muted); --gg-green:var(--glass-accent);
+  --gg-green-hover:#a1f5d6; --gg-green-tint:rgba(125,227,224,.12);
+  --gg-green-line:rgba(125,227,224,.31);
+  --cf-accent:var(--glass-accent); --cf-text:var(--glass-ink);
+  --cf-muted:var(--glass-muted); --cf-line:var(--glass-edge);
+  --cf-panel:#102327; --cf-pop:#14292d;
+  --cf-tool-text:var(--glass-sub);
+  --bg:#050d0f; --bg-2:#12262a; --bg-3:#183034;
+  --panel:#11262b; --panel2:#1a3035; --line:var(--glass-edge);
+  --fg:var(--glass-ink); --muted:#95b1ad; --accent:var(--glass-accent);
+  --accent2:#2a7966; --green:var(--glass-green);
+}
+html.glass-landing,
+html.glass-landing body {
+  background-color:var(--glass-deep) !important;
+  background-image:
+    radial-gradient(65% 58% at 12% 7%,rgba(16,185,129,.16),transparent 65%),
+    radial-gradient(59% 48% at 85% 8%,rgba(34,211,238,.13),transparent 64%),
+    radial-gradient(68% 60% at 45% 105%,rgba(125,227,224,.11),transparent 70%),
+    linear-gradient(180deg,#050d0f,#071115 62%,#050d0f) !important;
+  color:var(--glass-ink) !important;
+}
+html.glass-landing body::before,
+html.glass-landing body::after {content:none !important;display:none !important;}
+html.glass-landing body ::selection {background:rgba(125,227,224,.27) !important;color:#fff !important;}
+html.glass-landing body * {scrollbar-color:rgba(142,208,198,.26) transparent;}
+html.glass-landing body :where(button,input,textarea,select,summary,[role=button]):focus-visible {
+  outline:2px solid var(--glass-accent) !important;outline-offset:2px !important;
+}
+html.glass-landing body :where(button,summary,[role=button]) {
+  transition:background-color .24s var(--glass-ease),border-color .24s var(--glass-ease),
+    color .24s var(--glass-ease),box-shadow .24s var(--glass-ease),opacity .2s ease,
+    transform .2s var(--glass-ease) !important;
+}
+html.glass-landing body :where(button,summary,[role=button]):active:not(:disabled) {opacity:1;filter:brightness(.94);}
+html.glass-landing body :where(input,select,textarea)::placeholder {color:#76928f !important;opacity:1;}
+html.glass-landing body :where(select) option {background:#13282c !important;color:#e7f2f0 !important;}
+html.glass-landing body :where(input,select,textarea) {accent-color:var(--glass-accent);color-scheme:dark;}
+
+/* Never put fog over the user's artwork. The aurora lives under the app chrome. */
+html.glass-landing body .main-content {
+  background:radial-gradient(90% 80% at 3% 7%,rgba(20,160,131,.11),transparent 65%),
+    radial-gradient(74% 90% at 95% 90%,rgba(15,153,175,.10),transparent 65%),
+    #050d0f !important;
+}
+html.glass-landing body .top-bar {
+  background:linear-gradient(105deg,rgba(15,41,39,.86),rgba(9,25,31,.86) 68%,rgba(16,43,44,.85)) !important;
+  background-image:linear-gradient(105deg,rgba(15,41,39,.86),rgba(9,25,31,.86) 68%,rgba(16,43,44,.85)) !important;
+  border:0 !important;border-bottom:1px solid var(--glass-edge-strong) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 10px 32px rgba(0,0,0,.24) !important;
+  backdrop-filter:var(--glass-blur) !important;-webkit-backdrop-filter:var(--glass-blur) !important;
+}
+html.glass-landing body .top-bar::before,
+html.glass-landing body .top-bar::after {display:none !important;content:none !important;}
+html.glass-landing body .sidebar,
+html.glass-landing body .sidebar.expanded,
+html.glass-landing body .sidebar:not(.expanded) {
+  background:linear-gradient(155deg,rgba(18,48,45,.81),rgba(8,23,29,.75) 56%,rgba(15,39,39,.79)) !important;
+  background-image:linear-gradient(155deg,rgba(18,48,45,.81),rgba(8,23,29,.75) 56%,rgba(15,39,39,.79)) !important;
+  border:0 !important;border-right:1px solid var(--glass-edge) !important;
+  box-shadow:inset -1px 0 rgba(255,255,255,.045),10px 0 30px rgba(0,0,0,.16) !important;
+  backdrop-filter:var(--glass-blur) !important;-webkit-backdrop-filter:var(--glass-blur) !important;
+}
+html.glass-landing body .params-panel {
+  background:linear-gradient(165deg,rgba(19,49,45,.81),rgba(8,25,30,.77) 60%,rgba(13,35,40,.82)) !important;
+  background-image:linear-gradient(165deg,rgba(19,49,45,.81),rgba(8,25,30,.77) 60%,rgba(13,35,40,.82)) !important;
+  border:0 !important;border-left:1px solid var(--glass-edge) !important;
+  box-shadow:inset 1px 0 rgba(255,255,255,.08),-12px 0 35px rgba(0,0,0,.16) !important;
+  backdrop-filter:var(--glass-blur) !important;-webkit-backdrop-filter:var(--glass-blur) !important;
+}
+html.glass-landing body .params-panel .panel-header {
+  background:transparent !important;border-bottom:1px solid rgba(225,255,251,.08) !important;
+  box-shadow:none !important;
+}
+html.glass-landing body .canvas-area,
+html.glass-landing body .canvas-viewport {
+  background-color:#09171a !important;
+  border-color:rgba(160,216,204,.12) !important;
+}
+html.glass-landing body .canvas-viewport {
+  background-image:radial-gradient(circle,rgba(128,185,173,.15) 1px,transparent 1.3px),
+    radial-gradient(ellipse at 50% 45%,rgba(19,53,55,.15),transparent 75%) !important;
+  background-size:22px 22px,100% 100% !important;
+}
+html.glass-landing body .canvas-node.selected {
+  border-color:rgba(125,227,224,.56) !important;
+}
+html.glass-landing body .sidebar .nav-icon-btn,
+html.glass-landing body .sidebar.expanded .nav-icon-btn {
+  background:rgba(255,255,255,.035) !important;background-image:none !important;
+  border:1px solid rgba(255,255,255,.075) !important;
+  color:#b9d2cf !important;box-shadow:inset 0 1px rgba(255,255,255,.035) !important;
+}
+html.glass-landing body .sidebar .nav-icon-btn:hover:not(.active) {
+  background:rgba(125,227,224,.10) !important;border-color:rgba(125,227,224,.26) !important;
+  color:#f3fffc !important;
+}
+html.glass-landing body .sidebar .nav-icon-btn.active,
+html.glass-landing body .sidebar.expanded .nav-icon-btn.active {
+  background:linear-gradient(118deg,rgba(125,227,224,.16),rgba(67,204,145,.055)) !important;
+  border:1px solid rgba(125,227,224,.32) !important;
+  border-left:1px solid rgba(125,227,224,.32) !important;
+  color:#f0fffa !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.09),0 4px 14px rgba(0,0,0,.11) !important;
+}
+html.glass-landing body .sidebar .nav-icon-btn.active::before {content:none !important;display:none !important;}
+html.glass-landing body .sidebar .nav-icon-btn.active svg {stroke:var(--glass-accent) !important;}
+html.glass-landing body .version,
+html.glass-landing body .brand-corner .version {
+  background:rgba(125,227,224,.11) !important;border:1px solid rgba(125,227,224,.23) !important;
+  color:#b3f8e8 !important;
+}
+
+/* Crisp, reflective utility controls — never solid gray rectangles. */
+html.glass-landing body :where(
+  .top-tool-btn,.icon-btn,.clear-canvas-btn,.zoom-btn,.sidebar-toggle,.canvas-zoom-trigger,
+  .params-panel .param-button,.params-panel .ratio-button,.params-panel .mode-tab,
+  .params-panel .model-picker-trigger,.params-panel .optimize-prompt-btn,
+  .params-panel .reference-quick-btn,.params-panel .model-refresh,
+  .queue-tab,.queue-action-btn,.hmt-cat,.hmt-secondary,.hmt-icon-button,
+  .hg-cat,.hg-kind,.hg-upload,.hg-close,.hg-fav,.rie-chip,.rie-cancel,
+  .result-floating-toolbar button,.result-floating-editor button
+) {
+  background:var(--glass-surface-quiet) !important;background-image:var(--glass-surface-quiet) !important;
+  border:1px solid rgba(234,255,250,.13) !important;border-radius:10px !important;
+  color:var(--glass-sub) !important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 7px 20px -14px rgba(0,0,0,.6) !important;
+}
+html.glass-landing body :where(
+  .top-tool-btn,.icon-btn,.clear-canvas-btn,.zoom-btn,.sidebar-toggle,.canvas-zoom-trigger,
+  .params-panel .param-button,.params-panel .ratio-button,.params-panel .mode-tab,
+  .params-panel .model-picker-trigger,.params-panel .optimize-prompt-btn,
+  .queue-tab,.hmt-cat,.hmt-secondary,.hmt-icon-button,.hg-cat,.hg-kind,.hg-upload,
+  .rie-chip,.rie-cancel,.result-floating-toolbar button,.result-floating-editor button
+):hover:not(:disabled) {
+  background:linear-gradient(160deg,rgba(125,227,224,.16),rgba(255,255,255,.045)) !important;
+  background-image:linear-gradient(160deg,rgba(125,227,224,.16),rgba(255,255,255,.045)) !important;
+  border-color:rgba(125,227,224,.37) !important;
+  color:#f4fffd !important;transform:translateY(-1px) !important;
+  box-shadow:0 8px 20px -12px rgba(16,160,129,.3),inset 0 1px rgba(255,255,255,.12) !important;
+}
+html.glass-landing body .zoom-control,
+html.glass-landing body .canvas-zoom-menu {
+  background:linear-gradient(150deg,rgba(28,56,54,.76),rgba(8,27,31,.86)) !important;
+  border:1px solid var(--glass-edge) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.11),0 9px 26px -15px #000 !important;
+  backdrop-filter:var(--glass-blur) !important;-webkit-backdrop-filter:var(--glass-blur) !important;
+}
+html.glass-landing body .params-panel :where(.model-picker-list,.model-selector,.upload-dropzone,.prompt-editor .prompt-textarea,.prompt-textarea,.reference-thumb),
+html.glass-landing body .hs-fields :where(input,select,textarea),
+html.glass-landing body .hs-filter input,
+html.glass-landing body .hs-pig-key,
+html.glass-landing body .hmt-search-wrap,
+html.glass-landing body #hmtReferenceFilter,
+html.glass-landing body #hmtDetailPrompt {
+  background:linear-gradient(155deg,rgba(255,255,255,.053),rgba(255,255,255,.015)) !important;
+  background-image:linear-gradient(155deg,rgba(255,255,255,.053),rgba(255,255,255,.015)) !important;
+  border:1px solid rgba(234,255,250,.15) !important;
+  color:#e7f2f0 !important;border-radius:10px !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.065) !important;
+}
+html.glass-landing body .params-panel .model-picker-list,
+html.glass-landing body .canvas-zoom-menu {
+  background:linear-gradient(165deg,rgba(29,62,57,.96),rgba(12,32,37,.97)) !important;
+  background-image:linear-gradient(165deg,rgba(29,62,57,.96),rgba(12,32,37,.97)) !important;
+  border:1px solid rgba(234,255,250,.24) !important;
+  box-shadow:var(--glass-pop-shadow) !important;
+  backdrop-filter:blur(30px) saturate(160%) !important;-webkit-backdrop-filter:blur(30px) saturate(160%) !important;
+}
+html.glass-landing body .params-panel .model-picker-option:hover,
+html.glass-landing body .params-panel .model-picker-option.active {
+  background:rgba(125,227,224,.13) !important;border-color:rgba(125,227,224,.24) !important;
+}
+html.glass-landing body .params-panel .param-button.active,
+html.glass-landing body .params-panel .ratio-button.active,
+html.glass-landing body .params-panel .mode-tab.active {
+  background:linear-gradient(135deg,rgba(125,227,224,.21),rgba(100,221,160,.10)) !important;
+  border-color:rgba(125,227,224,.48) !important;color:#eafff8 !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.12) !important;
+}
+html.glass-landing body .params-panel .generate-button,
+html.glass-landing body .params-panel button.generate-button,
+html.glass-landing body .queue-cta-green,
+html.glass-landing body .hmt-primary,
+html.glass-landing body .hmt-use,
+html.glass-landing body .hs-primary,
+html.glass-landing body .hg-primary,
+html.glass-landing body .rie-apply {
+  background:linear-gradient(110deg,#7de3e0 0%,#8ceab5 100%) !important;
+  background-image:linear-gradient(110deg,#7de3e0 0%,#8ceab5 100%) !important;
+  border:1px solid rgba(198,255,240,.65) !important;
+  color:#07302c !important;
+  text-shadow:none !important;
+  box-shadow:0 12px 30px -12px rgba(125,227,224,.44),inset 0 1px rgba(255,255,255,.36) !important;
+}
+html.glass-landing body .params-panel .generate-button:hover:not(:disabled),
+html.glass-landing body .hmt-primary:hover:not(:disabled),
+html.glass-landing body .hmt-use:hover:not(:disabled),
+html.glass-landing body .hs-primary:hover:not(:disabled),
+html.glass-landing body .hg-primary:hover:not(:disabled) {
+  background:linear-gradient(105deg,#a4f5ed,#a5f7ca) !important;
+  background-image:linear-gradient(105deg,#a4f5ed,#a5f7ca) !important;
+  border-color:#b8ffea !important;
+  color:#052725 !important;transform:translateY(-1px) !important;
+  box-shadow:0 16px 36px -12px rgba(125,227,224,.55) !important;
+}
+html.glass-landing body .params-panel .generate-button svg {color:#07302c !important;stroke:currentColor !important;}
+html.glass-landing body .params-panel .panel-header h2 {color:var(--glass-ink) !important;}
+html.glass-landing body .params-panel .param-label {color:#bbd5d0 !important;}
+html.glass-landing body .params-panel .char-count,
+html.glass-landing body .params-panel .reference-dimensions,
+html.glass-landing body .params-panel .upload-dropzone #reference-file-name {color:#829d9a !important;}
+
+/* Layered glass sheets across Template / Settings / Game UI popups. */
+html.glass-landing body .hmt-screen,
+html.glass-landing body .hmt-scroll,
+html.glass-landing body .hg-screen {
+  background:transparent !important;background-image:none !important;
+}
+html.glass-landing body .hmt-hero,
+html.glass-landing body .hmt-card,
+html.glass-landing body .hg-card,
+html.glass-landing body .hs-provider,
+html.glass-landing body .hs-form,
+html.glass-landing body .hs-model-result,
+html.glass-landing body .hs-model-row,
+html.glass-landing body .hs-pig-provider {
+  background:var(--glass-surface) !important;background-image:var(--glass-surface) !important;
+  border:1px solid var(--glass-edge) !important;
+  box-shadow:0 20px 50px -30px rgba(0,0,0,.78),inset 0 1px rgba(255,255,255,.11) !important;
+  backdrop-filter:blur(16px) saturate(130%) !important;-webkit-backdrop-filter:blur(16px) saturate(130%) !important;
+}
+html.glass-landing body .hmt-card:hover,
+html.glass-landing body .hg-card:hover {
+  border-color:rgba(125,227,224,.42) !important;
+  box-shadow:0 22px 50px -25px #000b,inset 0 1px rgba(255,255,255,.16) !important;
+}
+html.glass-landing body .hmt-hero h1 span,
+html.glass-landing body .hmt-kicker,
+html.glass-landing body .hg-kicker {color:var(--glass-accent) !important;}
+html.glass-landing body .hmt-cat[aria-pressed="true"],
+html.glass-landing body .hs-provider.active {
+  background:linear-gradient(120deg,rgba(125,227,224,.17),rgba(98,210,151,.065)) !important;
+  border:1px solid rgba(125,227,224,.36) !important;
+  color:#e9fff8 !important;box-shadow:inset 0 1px rgba(255,255,255,.09) !important;
+}
+html.glass-landing body .hs-backdrop,
+html.glass-landing body .dialog-backdrop {background:rgba(1,9,11,.55) !important;backdrop-filter:blur(7px) !important;-webkit-backdrop-filter:blur(7px) !important;}
+html.glass-landing body .hs-dialog,
+html.glass-landing body .hmt-dialog,
+html.glass-landing body .rie-panel,
+html.glass-landing body .hg-dialog,
+html.glass-landing body.ng-flow-page .dialog-backdrop .flow-dialog {
+  background:linear-gradient(155deg,rgba(37,74,68,.91),rgba(15,37,43,.94) 58%,rgba(20,48,48,.95)) !important;
+  background-image:linear-gradient(155deg,rgba(37,74,68,.91),rgba(15,37,43,.94) 58%,rgba(20,48,48,.95)) !important;
+  border:1px solid rgba(234,255,250,.23) !important;
+  border-radius:17px !important;
+  box-shadow:var(--glass-pop-shadow) !important;
+  backdrop-filter:blur(32px) saturate(160%) !important;-webkit-backdrop-filter:blur(32px) saturate(160%) !important;
+}
+html.glass-landing body .hmt-dialog::backdrop {background:rgba(0,8,9,.64) !important;backdrop-filter:blur(9px) !important;}
+html.glass-landing body .hs-head,
+html.glass-landing body .hmt-dialog-body,
+html.glass-landing body.ng-flow-page .flow-dialog>header,
+html.glass-landing body.ng-flow-page .flow-dialog>footer {
+  background:rgba(255,255,255,.025) !important;border-color:rgba(234,255,250,.10) !important;
+}
+html.glass-landing body .hmt-popup,
+html.glass-landing body .result-floating-toolbar,
+html.glass-landing body .result-floating-editor,
+html.glass-landing body .result-composer-compact,
+html.glass-landing body.ng-flow-page .queue-popover,
+html.glass-landing body.ng-flow-page .floating-tip {
+  background:linear-gradient(150deg,rgba(31,66,61,.91),rgba(12,32,39,.94)) !important;
+  background-image:linear-gradient(150deg,rgba(31,66,61,.91),rgba(12,32,39,.94)) !important;
+  border:1px solid rgba(234,255,250,.18) !important;
+  box-shadow:var(--glass-pop-shadow) !important;
+  backdrop-filter:blur(24px) saturate(155%) !important;-webkit-backdrop-filter:blur(24px) saturate(155%) !important;
+}
+
+/* Dedicated workflow page: glass toolbars + practical opaque artwork stage. */
+html.glass-landing body.ng-flow-page .library,
+html.glass-landing body.ng-flow-page .inspector {
+  background:linear-gradient(155deg,rgba(19,48,45,.88),rgba(9,27,31,.83)) !important;
+  border-color:var(--glass-edge) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.10) !important;
+  backdrop-filter:var(--glass-blur) !important;-webkit-backdrop-filter:var(--glass-blur) !important;
+}
+html.glass-landing body.ng-flow-page .workspace,
+html.glass-landing body.ng-flow-page .flow-viewport {
+  background-color:#09171a !important;
+}
+html.glass-landing body.ng-flow-page .flow-viewport {
+  background-image:radial-gradient(circle,rgba(141,204,193,.16) 1px,transparent 1px),
+    radial-gradient(ellipse at 54% 42%,rgba(16,78,73,.17),transparent 65%) !important;
+  background-size:22px 22px,100% 100% !important;
+}
+html.glass-landing body.ng-flow-page :where(.workspace-header,.canvas-toolbar,.flow-queue,.inspector-tabs) {
+  background:linear-gradient(120deg,rgba(22,51,49,.85),rgba(11,30,35,.84)) !important;
+  border-color:var(--glass-edge) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.09) !important;
+}
+html.glass-landing body.ng-flow-page :where(.flow-node,.empty-hero,.canvas-rail,.search-box,.canvas-toolbar-zoom,.recent-card) {
+  background:var(--glass-surface) !important;border:1px solid var(--glass-edge) !important;
+  box-shadow:inset 0 1px rgba(255,255,255,.10),0 13px 35px -18px #000 !important;
+}
+html.glass-landing body.ng-flow-page .node-header {background:rgba(255,255,255,.06) !important;border-color:var(--glass-edge) !important;}
+html.glass-landing body.ng-flow-page .flow-node.selected {border-color:var(--glass-accent) !important;box-shadow:0 0 0 1px rgba(125,227,224,.48),0 12px 32px #0009 !important;}
+html.glass-landing body.ng-flow-page :where(.project-row.active,.layer-row.active,.tool.active,.inspector-tab.active) {
+  color:#baf8eb !important;background:rgba(125,227,224,.11) !important;
+  border-color:rgba(125,227,224,.26) !important;
+}
+html.glass-landing body.ng-flow-page .inspector-tab.active::after {background:var(--glass-accent) !important;}
+html.glass-landing body.ng-flow-page :where(.soft-button,.tool,.icon-btn,.canvas-rail button,.node-footer button) {
+  background:var(--glass-surface-quiet) !important;border-color:var(--glass-edge) !important;color:var(--glass-sub) !important;
+}
+html.glass-landing body.ng-flow-page :where(.primary-button,.upload-btn) {
+  background:linear-gradient(110deg,#7de3e0,#8ceab5) !important;
+  color:#07302c !important;border:1px solid #b5f7e2 !important;
+  box-shadow:0 10px 28px -10px rgba(125,227,224,.34) !important;
+}
+
+/* Standalone legacy settings route, if opened directly. */
+html.glass-landing body :where(.settings-card,.setting-card,.settings-section,.form-group,.card,.modal-content) {
+  border-color:var(--glass-edge) !important;
+}
+html.glass-landing body :where(.settings-card,.setting-card,.settings-section,.modal-content) {
+  background:var(--glass-surface) !important;box-shadow:var(--glass-shadow) !important;
+  backdrop-filter:var(--glass-blur) !important;-webkit-backdrop-filter:var(--glass-blur) !important;
+}
+@media (max-width:700px) {
+  html.glass-landing body .top-bar {box-shadow:inset 0 1px rgba(255,255,255,.08) !important;}
+  html.glass-landing body .sidebar,
+  html.glass-landing body .params-panel {backdrop-filter:blur(17px) !important;-webkit-backdrop-filter:blur(17px) !important;}
+  html.glass-landing body .hs-dialog,
+  html.glass-landing body .hmt-dialog {max-width:calc(100vw - 16px) !important;}
+}
+@media (prefers-reduced-motion:reduce) {
+  html.glass-landing body :where(button,summary,[role=button]) {transition:none !important;transform:none !important;}
+}

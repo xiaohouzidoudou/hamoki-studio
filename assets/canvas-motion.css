@@ -1,0 +1,150 @@
+/* Hamoki Studio canvas micro-interactions. Intentionally excludes #canvas
+   transforms: zoom/scroll positioning belongs to script.js. */
+:root {
+  --hm-motion-ease: cubic-bezier(.22, 1, .36, 1);
+  --hm-motion-quick: 150ms;
+  --hm-motion-normal: 240ms;
+  --hm-motion-blue: rgba(10,132,255,.54);
+}
+
+/* A card must never jump 2px on hover: its world position is authoritative. */
+body .canvas-node,
+body .canvas-node.generated-result-node {
+  transition: border-color 190ms ease, box-shadow 230ms var(--hm-motion-ease),
+              background-color 190ms ease !important;
+}
+body .canvas-node:hover,
+body .canvas-node.canvas-note.canvas-rich-node:hover {
+  transform: none !important;
+  box-shadow: 0 7px 24px rgba(0,0,0,.20) !important;
+}
+body .canvas-node.selected,
+body .canvas-node.generated-result-node.selected,
+body .canvas-node.canvas-note.canvas-rich-node.selected,
+body .canvas-node.selected:hover,
+body .canvas-node.canvas-note.canvas-rich-node.selected:hover {
+  transform: none !important;
+  border-color: rgba(10,132,255,.82) !important;
+  box-shadow: 0 0 0 1px rgba(10,132,255,.25),
+              0 0 17px rgba(10,132,255,.13),
+              0 7px 24px rgba(0,0,0,.20) !important;
+}
+body .canvas-node.hm-motion-dragging,
+body .canvas-node.hm-motion-resizing,
+body .canvas-node.hm-motion-dragging:hover,
+body .canvas-node.hm-motion-resizing:hover {
+  transform: none !important;
+  transition: none !important;
+  box-shadow: 0 0 0 1px rgba(10,132,255,.30),
+              0 13px 32px rgba(0,0,0,.27) !important;
+}
+body .canvas-node.hm-motion-dragging { cursor: grabbing !important; }
+body .canvas-viewport.canvas-panning,
+body .canvas-viewport.canvas-panning .canvas-node { cursor: grabbing !important; }
+
+/* Press feedback: only controls, never the art, viewport or text inputs.
+   Keep the hitbox unchanged and respect existing hidden-button logic. */
+body :is(
+  .top-tool-btn,.icon-btn,.clear-canvas-btn,.zoom-btn,.canvas-zoom-trigger,
+  .sidebar-toggle,.sidebar .nav-icon-btn,.queue-tab,.queue-collapse-btn,
+  .queue-pause-button,.params-panel .generate-button,
+  .params-panel .param-button,.params-panel .ratio-button,
+  .params-panel .mode-tab,.params-panel .model-picker-trigger,
+  .hmt-cat,.hmt-primary,.hmt-icon-button,.hmt-use,
+  .hmt-detail-actions button,.canvas-zoom-menu button
+):not(:disabled) {
+  transition: transform var(--hm-motion-quick) var(--hm-motion-ease),
+              background-color 185ms ease, color 185ms ease,
+              border-color 185ms ease, box-shadow 185ms ease !important;
+}
+body :is(
+  .top-tool-btn,.icon-btn,.clear-canvas-btn,.zoom-btn,.canvas-zoom-trigger,
+  .sidebar-toggle,.sidebar .nav-icon-btn,.queue-tab,.queue-collapse-btn,
+  .queue-pause-button,.params-panel .generate-button,
+  .params-panel .param-button,.params-panel .ratio-button,
+  .params-panel .mode-tab,.params-panel .model-picker-trigger,
+  .hmt-cat,.hmt-primary,.hmt-icon-button,.hmt-use,
+  .hmt-detail-actions button,.canvas-zoom-menu button
+):active:not(:disabled) {
+  transform: scale(.965) !important;
+}
+body .canvas-node:not(.canvas-note) > :is(.canvas-node-download,.canvas-node-at):active:not(:disabled) {
+  transform: translateY(0) scale(.94) !important;
+}
+body .canvas-node .canvas-node-delete:active:not(:disabled) {
+  transform: scale(.93) !important;
+}
+
+/* Native macOS-like overlays: enter gently; never translate the canvas. */
+body .canvas-area .canvas-zoom-menu:not([hidden]),
+body .params-panel .model-picker-list:not([hidden]),
+body .hmt-popup:not([hidden]) {
+  animation: hm-menu-enter 205ms var(--hm-motion-ease) both;
+  transform-origin: top right;
+}
+/* Detail lightbox centers with translate(-50%,-50%): preserve that transform
+   throughout animation so its close button never falls outside the viewport. */
+body .hmt-dialog[open] {
+  animation: hm-centered-dialog-enter 250ms var(--hm-motion-ease) both;
+}
+body .hs-dialog[open] {
+  animation: hm-dialog-enter 250ms var(--hm-motion-ease) both;
+}
+body .hmt-dialog[open]::backdrop,
+body .hs-dialog[open]::backdrop {
+  animation: hm-backdrop-enter 225ms ease-out both;
+}
+body .hmt-screen:not([hidden]),
+body .params-panel.hm-motion-view-enter {
+  animation: hm-page-enter 260ms var(--hm-motion-ease) both;
+}
+body .hmt-grid .hmt-card {
+  transition: border-color 185ms ease, box-shadow 185ms ease,
+              transform 220ms var(--hm-motion-ease) !important;
+}
+body .hmt-grid .hmt-card:hover {
+  transform: translateY(-2px) !important;
+}
+body .hmt-grid .hmt-card:active {
+  transform: translateY(0) scale(.993) !important;
+}
+
+@keyframes hm-menu-enter {
+  from { opacity:0; transform: translateY(-6px) scale(.985); }
+  to { opacity:1; transform: translateY(0) scale(1); }
+}
+@keyframes hm-dialog-enter {
+  from { opacity:0; transform: translateY(9px) scale(.985); }
+  to { opacity:1; transform: translateY(0) scale(1); }
+}
+@keyframes hm-centered-dialog-enter {
+  from { opacity:0; transform: translate(-50%,calc(-50% + 9px)) scale(.985); }
+  to { opacity:1; transform: translate(-50%,-50%) scale(1); }
+}
+@keyframes hm-backdrop-enter {
+  from { opacity:0; }
+  to { opacity:1; }
+}
+@keyframes hm-page-enter {
+  from { opacity:0; transform: translateX(9px); }
+  to { opacity:1; transform: translateX(0); }
+}
+
+/* Do not animate geometries, block keyboard navigation or delay reduced-motion users. */
+@media (prefers-reduced-motion: reduce) {
+  body .canvas-node,
+  body .canvas-node:hover,
+  body .canvas-node.selected,
+  body .canvas-node.hm-motion-dragging,
+  body .canvas-node.hm-motion-resizing,
+  body :is(button,.hmt-card,.hmt-screen,.params-panel,.canvas-zoom-menu,.model-picker-list,.hmt-dialog,.hs-dialog),
+  html body :is(.sidebar .nav-icon-btn, .top-bar button, .sidebar-toggle,
+     .params-panel .param-button, .params-panel .ratio-button,
+     .params-panel .mode-tab, .params-panel .generate-button,
+     .params-panel .model-picker-trigger, .hmt-dialog[open],
+     .canvas-node, .canvas-node.generated-result-node,
+     .canvas-node.selected, .canvas-node.canvas-note.canvas-rich-node) {
+    animation: none !important;
+    transition-duration: .01ms !important;
+  }
+}

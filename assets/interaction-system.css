@@ -1,0 +1,70 @@
+/* 2026-11-05 interaction design system.
+   Loaded LAST on index.html so every rule here overrides legacy themes.
+   Scope: canvas nodes, cards, form controls. Tokens are global via :root. */
+
+:root{
+  --sel-green:#74f69b;
+  --sel-glow:rgba(116,246,155,.3);
+  --shadow-xs:0 1px 2px rgba(0,0,0,.05);
+  --shadow-sm:0 2px 8px rgba(0,0,0,.1);
+  --shadow-md:0 4px 16px rgba(0,0,0,.15);
+  --shadow-lg:0 12px 28px rgba(0,0,0,.2);
+}
+
+/* ── Task 1 · unified 12px corner system ───────────────────────────── */
+/* Node body, its selection ring and focus rings all share one radius;
+   the old -2px pseudo-element double ring is retired in favor of glow. */
+.canvas-node{border-radius:12px}
+.canvas-node.selected,
+.canvas-node.generated-result-node.selected{border-radius:12px}
+.canvas-node.selected:after{content:none;border:0;box-shadow:none}
+
+/* ── Task 2 · soft selection: 1px inner line + outer glow ──────────── */
+.canvas-node{
+  transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease,background-color .2s ease;
+}
+.canvas-node.selected,
+.canvas-node.generated-result-node.selected{
+  border-color:var(--sel-green);
+  border-width:1px;
+  box-shadow:0 0 0 1px var(--sel-green),0 0 16px var(--sel-glow),var(--shadow-lg);
+}
+
+/* ── Task 4 · hover lift on cards ──────────────────────────────────── */
+.canvas-node:hover{
+  transform:translateY(-2px);
+  box-shadow:var(--shadow-lg);
+}
+/* Selected + hovered keeps the glow instead of dropping it. */
+.canvas-node.selected:hover,
+.canvas-node.generated-result-node.selected:hover{
+  transform:translateY(-2px);
+  border-color:var(--sel-green);
+  box-shadow:0 0 0 1px var(--sel-green),0 0 16px var(--sel-glow),var(--shadow-lg);
+}
+
+/* ── Rich note follows the same system (overrides canvas-zoom-richnotes) ── */
+body .canvas-node.canvas-note.canvas-rich-node{
+  border-radius:12px;
+  box-shadow:var(--shadow-md);
+}
+body .canvas-node.canvas-note.canvas-rich-node.selected{
+  border-color:var(--sel-green);
+  box-shadow:0 0 0 1px var(--sel-green),0 0 16px var(--sel-glow),var(--shadow-lg);
+}
+body .canvas-node.canvas-note.canvas-rich-node:hover{
+  transform:translateY(-2px);
+  box-shadow:var(--shadow-lg)!important;
+}
+body .canvas-node.canvas-note.canvas-rich-node.selected:hover{
+  transform:translateY(-2px);
+  box-shadow:0 0 0 1px var(--sel-green),0 0 16px var(--sel-glow),var(--shadow-lg)!important;
+}
+
+/* ── Task 1 · form controls: one consistent rounded mint focus ring ── */
+:is(input,textarea,select,[contenteditable="true"])
+  :not(.hamoki-main-rich-prompt):not(.result-rich-prompt):not(.hamoki-rich-prompt)
+  :is(:focus,:focus-visible){
+  outline:2px solid rgba(116,246,155,.42);
+  outline-offset:2px;
+}

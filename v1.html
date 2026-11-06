@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="glass-landing">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hamoki Studio V1</title>
+    <link rel="stylesheet" href="v1-style.css">
+    <link rel="stylesheet" href="assets/glass-landing-theme.css?v=20261105-2">
+    <link rel="stylesheet" href="assets/global-border-trace.css?v=1">
+    <link rel="stylesheet" href="assets/glass-component-fidelity.css?v=20261105-5">
+    <script src="assets/glass-selects.js?v=20261105-2" defer></script>
+</head>
+<body class="ng-legacy-v1">
+    <!-- 左侧工具栏 -->
+    <div class="toolbar">
+        <div class="logo-container">
+            <img src="logo.png" alt="Hamoki Studio" class="logo">
+        </div>
+
+        <div class="tool-buttons">
+            <button class="tool-btn active" data-tool="select" title="选择工具">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/>
+                </svg>
+            </button>
+
+            <button class="tool-btn" data-tool="hand" title="拖动画布">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/>
+                    <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/>
+                    <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/>
+                    <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
+                </svg>
+            </button>
+
+            <button class="tool-btn" data-tool="image" title="添加图片">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                    <polyline points="21 15 16 10 5 21"/>
+                </svg>
+            </button>
+        </div>
+
+        <div class="toolbar-bottom">
+            <button class="tool-btn" data-tool="settings" title="设置">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M12 1v6m0 6v6m6-12l-4.5 4.5m-3 3L6 19m13-7h-6m-6 0H1m18-6l-4.5 4.5m-3 3L7 7"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- 中央画布区域 -->
+    <div class="canvas-container">
+        <div class="canvas-header">
+            <div class="canvas-info">
+                <span class="zoom-level">100%</span>
+            </div>
+            <div class="canvas-controls">
+                <button class="ctrl-btn" id="fit-canvas" title="适应画布">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                    </svg>
+                </button>
+                <button class="ctrl-btn" id="clear-canvas" title="清空画布">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="canvas-viewport" id="canvas-viewport">
+            <div class="canvas" id="canvas">
+                <!-- 图片会动态添加到这里 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧参数面板 -->
+    <div class="params-panel">
+        <div class="panel-section">
+            <h3 class="section-title">图片生成</h3>
+
+            <!-- 模式切换 -->
+            <div class="mode-switch">
+                <button class="mode-btn active" data-mode="text2img">文生图</button>
+                <button class="mode-btn" data-mode="img2img">图生图</button>
+            </div>
+        </div>
+
+        <!-- 模型选择 -->
+        <div class="panel-section">
+            <label class="param-label">模型</label>
+            <select class="param-select" id="model-select">
+                <option value="haiyinb2.1">HaiYi NB 2.1</option>
+                <option value="sd-xl">Stable Diffusion XL</option>
+                <option value="midjourney">Midjourney Style</option>
+            </select>
+        </div>
+
+        <!-- 提示词 -->
+        <div class="panel-section">
+            <label class="param-label">提示词</label>
+            <textarea class="param-textarea" id="prompt" rows="4" placeholder="描述你想生成的图片内容..."></textarea>
+            <div class="char-count"><span id="prompt-count">0</span> / 1000</div>
+        </div>
+
+        <!-- 参考图（图生图模式下显示） -->
+        <div class="panel-section" id="reference-section" style="display: none;">
+            <label class="param-label">参考图</label>
+            <div class="reference-upload">
+                <input type="file" id="reference-input" accept="image/*" style="display: none;">
+                <button class="upload-btn" id="upload-reference">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    上传参考图
+                </button>
+                <div id="reference-preview" class="reference-preview"></div>
+            </div>
+        </div>
+
+        <!-- 分辨率 -->
+        <div class="panel-section">
+            <label class="param-label">分辨率</label>
+            <div class="resolution-btns">
+                <button class="res-btn active" data-res="1k">1K</button>
+                <button class="res-btn" data-res="2k">2K</button>
+            </div>
+        </div>
+
+        <!-- 比例 -->
+        <div class="panel-section">
+            <label class="param-label">比例</label>
+            <div class="ratio-grid">
+                <button class="ratio-btn" data-ratio="9:16">9:16</button>
+                <button class="ratio-btn" data-ratio="2:3">2:3</button>
+                <button class="ratio-btn" data-ratio="3:4">3:4</button>
+                <button class="ratio-btn" data-ratio="4:5">4:5</button>
+                <button class="ratio-btn active" data-ratio="16:9">16:9</button>
+                <button class="ratio-btn" data-ratio="3:2">3:2</button>
+                <button class="ratio-btn" data-ratio="4:3">4:3</button>
+                <button class="ratio-btn" data-ratio="5:4">5:4</button>
+            </div>
+        </div>
+
+        <!-- 生成数量 -->
+        <div class="panel-section">
+            <label class="param-label">生成数量</label>
+            <div class="count-btns">
+                <button class="count-btn active" data-count="1">1</button>
+                <button class="count-btn" data-count="2">2</button>
+                <button class="count-btn" data-count="3">3</button>
+            </div>
+        </div>
+
+        <!-- 生成按钮 -->
+        <div class="panel-section">
+            <button class="generate-btn" id="generate-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+                生成图片
+            </button>
+        </div>
+    </div>
+
+    <script src="v1-script.js"></script>
+    <script src="assets/global-border-trace.js?v=1"></script>
+</body>
+</html>

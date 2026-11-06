@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN" class="glass-landing">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Hamoki Studio · 游戏 UI 工作流</title>
+  <link rel="stylesheet" href="gameui-flow.css?v=1">
+  <link rel="stylesheet" href="assets/canvas-original-preview.css?v=glass-preview-1">
+  <link rel="stylesheet" href="assets/glass-landing-theme.css?v=20261105-2">
+  <link rel="stylesheet" href="assets/global-border-trace.css?v=1">
+  <link rel="stylesheet" href="assets/glass-component-fidelity.css?v=20261105-5">
+  <link rel="stylesheet" href="assets/glass-ui-layer.css?v=20261106-1">
+  <script src="assets/glass-ui-layer.js?v=20261106-1" defer></script>
+  <script src="assets/glass-selects.js?v=20261105-2" defer></script>
+  <script src="assets/canvas-original-preview.js?v=glass-preview-1" defer></script>
+</head>
+<body class="ng-flow-page">
+<svg class="symbol-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+ <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+ <symbol id="i-board" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.8"/><rect x="13" y="3" width="8" height="8" rx="1.8"/><rect x="3" y="13" width="8" height="8" rx="1.8"/><rect x="13" y="13" width="8" height="8" rx="1.8"/></symbol>
+ <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8" r="1.7"/><path d="m21 16-5.3-5.2L5 21"/></symbol>
+ <symbol id="i-node" viewBox="0 0 24 24"><rect x="2" y="4" width="7" height="7" rx="2"/><rect x="15" y="13" width="7" height="7" rx="2"/><path d="M9 7.5h3a5 5 0 0 1 5 5V13"/></symbol>
+ <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7.5a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+ <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></symbol>
+ <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 17v3h16v-3"/></symbol>
+ <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 17v3h16v-3"/></symbol>
+ <symbol id="i-save" viewBox="0 0 24 24"><path d="M4 3h14l3 3v15H3V3z"/><path d="M7 3v7h10V3M7 21v-8h10v8"/></symbol>
+ <symbol id="i-cursor" viewBox="0 0 24 24"><path d="m4 3 5.2 18 3.7-7 7.1-3.2z"/></symbol>
+ <symbol id="i-hand" viewBox="0 0 24 24"><path d="M9 12V5a2 2 0 0 1 4 0v6-7a2 2 0 0 1 4 0v8-4a2 2 0 0 1 4 0v7c0 4-3 7-7 7H9c-2 0-3.7-1-5-3l-2-4a2 2 0 0 1 3.5-2z"/></symbol>
+ <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l2.2-2.2a5 5 0 1 0-7-7L10.6 6M14 11a5 5 0 0 0-7.5-.5l-2.2 2.2a5 5 0 0 0 7 7l2.1-2.1"/></symbol>
+ <symbol id="i-magic" viewBox="0 0 24 24"><path d="m12 2 2.2 7.1L21 11l-6.8 2.1L12 20l-2.2-6.9L3 11l6.8-1.9L12 2zM19 18l.8 2.2L22 21l-2.2.8L19 24l-.8-2.2L16 21l2.2-.8z"/></symbol>
+ <symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="5" cy="6" r="3"/><circle cx="5" cy="18" r="3"/><path d="m8 8 12 12M8 16 20 4"/></symbol>
+ <symbol id="i-pencil" viewBox="0 0 24 24"><path d="m4 20 4.2-1 12-12a2.3 2.3 0 0 0-3.2-3.2l-12 12zM15 6l3 3"/></symbol>
+ <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 10a9 9 0 1 1 2 8M3 4v6h6M12 7v5l3 2"/></symbol>
+ <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5zM3 12l9 5 9-5M3 16l9 5 9-5"/></symbol>
+ <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 6v6h-6M4 18v-6h6"/><path d="M5 10a8 8 0 0 1 13.8-3.5L20 12M4 12l1.3 5A8 8 0 0 0 19 14"/></symbol>
+ <symbol id="i-fit" viewBox="0 0 24 24"><path d="M8 3H4v4M16 3h4v4M20 17v4h-4M8 21H4v-4"/></symbol>
+ <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M9 6V4h6v2m4 0-1 15H6L5 6M10 10v7M14 10v7"/></symbol>
+ <symbol id="i-close" viewBox="0 0 24 24"><path d="M5 5l14 14M19 5 5 19"/></symbol>
+ <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+ <symbol id="i-check" viewBox="0 0 24 24"><path d="m4 12 5.5 5.5L20 6"/></symbol>
+ <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.01"/></symbol>
+ <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6-10-6-10-6Z"/><circle cx="12" cy="12" r="2.8"/></symbol>
+ <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M10 2h4l.6 2.5 2 1.1 2.4-.9 2 3.6-1.8 1.7v2.3l1.8 1.7-2 3.6-2.4-.9-2 1.1L14 22h-4l-.6-2.5-2-1.1-2.4.9-2-3.6 1.8-1.7v-2.3L3 10l2-3.6 2.4.9 2-1.1z"/></symbol>
+ <symbol id="i-undo" viewBox="0 0 24 24"><path d="m9 8-5 5 5 5M4 13h10a6 6 0 0 1 6 6"/></symbol>
+</svg>
+<div class="flow-shell">
+ <aside class="library">
+   <div class="library-heading"><strong>项目资源</strong><button class="icon-btn" id="new-project" title="新建项目" aria-label="新建项目"><svg><use href="#i-plus"></use></svg></button></div>
+   <label class="search-box"><svg><use href="#i-search"></use></svg><input id="flow-search" type="search" placeholder="搜索节点、图片、素材…" autocomplete="off" aria-label="搜索节点"></label>
+   <div class="section-label"><span>项目</span><span id="project-count"></span></div>
+   <nav id="flow-project-list" class="project-list" aria-label="项目列表"></nav>
+   <div class="section-heading"><span>当前画布</span><button class="mini-link" id="add-note" title="添加便签"><svg><use href="#i-plus"></use></svg> 便签</button></div>
+   <nav id="flow-layer-list" class="layer-list" aria-label="画布节点"></nav>
+   <div class="section-heading recent"><span>最近生成</span><button class="mini-link" id="flow-show-history">查看全部 <svg><use href="#i-chevron"></use></svg></button></div>
+   <div id="flow-recents" class="recents"></div>
+   <div class="library-bottom">
+     <input id="flow-upload" type="file" hidden accept="image/png,image/jpeg,image/webp" multiple>
+     <button id="flow-upload-btn" class="upload-btn"><svg><use href="#i-upload"></use></svg> 上传参考图</button>
+     <small>素材与衍生关系自动保存到当前项目</small>
+   </div>
+ </aside>
+
+ <main class="workspace">
+   <header class="workspace-header">
+     <div class="breadcrumbs">
+       <div class="crumb-name"><svg><use href="#i-node"></use></svg><strong>自由画布</strong><span>/</span><span id="flow-project-title">正在加载</span></div>
+       <span class="crumb-status"><span class="status-dot"></span> 自由拖拽 · 版本衍生 · UI 拆件</span>
+     </div>
+     <div class="toolbar-actions">
+       <button id="flow-backup" class="soft-button" title="下载可恢复的项目备份"><svg><use href="#i-save"></use></svg><span>保存版本</span></button>
+       <button id="flow-export" class="primary-button" title="下载选中素材"><svg><use href="#i-download"></use></svg><span>导出素材</span></button>
+       <button id="flow-settings" class="soft-button icon-only" title="中转站与模型设置" aria-label="打开设置"><svg><use href="#i-settings"></use></svg></button>
+     </div>
+   </header>
+   <div class="canvas-toolbar">
+     <span class="mode-title">节点画布</span>
+     <div class="tools-group" role="group" aria-label="画布工具">
+       <button class="tool active" data-tool="select" title="选择并拖动节点"><svg><use href="#i-cursor"></use></svg> 选择</button>
+       <button class="tool" data-tool="pan" title="拖动画布"><svg><use href="#i-hand"></use></svg> 漫游</button>
+     </div>
+     <div class="canvas-toolbar-zoom">
+       <button id="zoom-out" title="缩小" aria-label="缩小"><svg><path d="M5 12h14"/></svg></button><span id="zoom-readout">100%</span>
+       <button id="zoom-in" title="放大" aria-label="放大"><svg><use href="#i-plus"></use></svg></button>
+       <button id="zoom-fit" title="适应内容" aria-label="适应内容"><svg><use href="#i-fit"></use></svg></button>
+     </div>
+   </div>
+   <section class="flow-viewport" id="flow-viewport" tabindex="0" aria-label="节点画布：滚轮缩放，中键或漫游工具拖动画布">
+     <div class="canvas-help"><span class="status-dot"></span> 滚轮缩放 · 中键移动 · 选中图片 Ctrl+C 复制 / Ctrl+V 粘贴</div>
+     <div class="flow-world" id="flow-world">
+       <svg class="edge-layer" id="flow-edges" width="6000" height="4000" viewBox="0 0 6000 4000" aria-hidden="true"></svg>
+       <div id="flow-nodes" class="node-layer"></div>
+     </div>
+     <div id="flow-empty" class="empty-hero" hidden>
+       <div class="empty-icon"><svg><use href="#i-magic"></use></svg></div>
+       <span class="eyebrow">HAMOKI CREATIVE WORKFLOW</span>
+       <h2>从第一张游戏 UI 开始创作</h2>
+       <p>上传参考图片，或添加便签整理想法。生成的版本会沿着连线持续延伸，所有操作保留在项目中。</p>
+       <button class="primary-button" id="empty-upload"><svg><use href="#i-upload"></use></svg> 添加第一张图片</button>
+     </div>
+     <div class="canvas-rail"><button id="rail-add" title="添加参考图片" aria-label="添加参考图片"><svg><use href="#i-image"></use></svg></button><button id="rail-note" title="添加便签" aria-label="添加便签"><svg><use href="#i-pencil"></use></svg></button><button id="rail-fit" title="适应内容" aria-label="适应内容"><svg><use href="#i-fit"></use></svg></button></div>
+     <div class="floating-tip" id="flow-floating-tip" hidden></div>
+   </section>
+   <footer class="flow-queue">
+     <div class="queue-compact" id="flow-queue-summary"><span class="queue-dot"></span><strong>生成队列</strong><span id="flow-queue-text">正在检查任务…</span></div>
+     <button id="flow-queue-toggle" class="mini-link" aria-expanded="false">查看队列 <svg><use href="#i-chevron"></use></svg></button>
+     <div id="flow-queue-popover" class="queue-popover" hidden></div>
+   </footer>
+ </main>
+
+ <aside class="inspector" id="flow-inspector">
+   <button id="flow-inspector-toggle" class="inspector-mobile-toggle" type="button" aria-expanded="false" aria-controls="flow-inspector-content" aria-label="展开属性面板">属性</button>
+   <div class="inspector-tabs" role="tablist">
+     <button class="inspector-tab active" data-tab="properties" role="tab" aria-selected="true">属性</button>
+     <button class="inspector-tab" data-tab="variants" role="tab" aria-selected="false">变体</button>
+     <button class="inspector-tab" data-tab="history" role="tab" aria-selected="false">历史</button>
+   </div>
+   <div id="flow-inspector-content" class="inspector-content"></div>
+   <div class="inspector-footer"><svg><use href="#i-check"></use></svg><span id="flow-save-state">所有更改自动保存</span></div>
+ </aside>
+</div>
+<div id="flow-toast" class="flow-toast" role="status" aria-live="polite" hidden></div>
+<div id="flow-dialog" class="dialog-backdrop" hidden>
+  <section class="flow-dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+    <header><div><span class="eyebrow" id="dialog-eyebrow">CREATIVE STUDIO</span><h2 id="dialog-title">新建操作</h2></div><button id="dialog-close" class="icon-btn" aria-label="关闭弹窗"><svg><use href="#i-close"></use></svg></button></header>
+    <div id="dialog-body" class="dialog-body"></div>
+    <footer id="dialog-footer"></footer>
+  </section>
+</div>
+<script src="assets/hamoki-clipboard.js?v=1"></script>
+<script src="assets/canvas-core.js?v=1"></script>
+<script src="gameui-flow.js?v=glass-context-20261106"></script>
+<script src="gameui-flow-tools.js?v=1"></script>
+<script src="gameui-layered.js?v=1"></script>
+<script src="assets/global-border-trace.js?v=1"></script>
+</body>
+</html>

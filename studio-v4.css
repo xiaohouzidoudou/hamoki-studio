@@ -1,0 +1,154 @@
+/* 2026-11-04 compact image generator controls; loaded after legacy themes. */
+.params-panel .panel-header{height:59px;min-height:59px;padding:14px 19px 8px}
+.params-panel .panel-header h2{font-size:17px}
+.params-panel .panel-header h2 svg{width:21px;height:21px}
+.params-panel .panel-content{padding:3px 18px 16px}
+.params-panel .param-group{margin-bottom:12px}
+.params-panel .param-label{margin-bottom:6px;font-size:12px}
+.params-panel .model-picker{position:relative}
+.params-panel .model-picker-trigger{
+  display:flex;align-items:center;gap:8px;width:100%;min-width:0;height:35px;
+  padding:0 9px;border:1px solid #3b5c51;border-radius:9px;
+  background:linear-gradient(100deg,#1e3834,#17292d);color:#e7f6ec;
+  font-size:12px;font-weight:640;cursor:pointer;transition:border-color .2s,background .2s;
+}
+.params-panel .model-picker-trigger:hover,.params-panel .model-picker-trigger[aria-expanded="true"]{border-color:#6cdc9b;background:#25453a}
+.params-panel .model-picker-trigger:focus-visible{outline:2px solid #83e7ad;outline-offset:2px}
+.params-panel .model-picker-icon,.params-panel .model-option-icon{
+  display:grid;place-items:center;width:24px;height:24px;flex:0 0 24px;
+  border-radius:7px;background:#204a3e;color:#86f6b4;border:1px solid #397b5c;font-size:16px;
+}
+.params-panel .model-picker-icon svg,.params-panel .model-option-icon svg{display:block;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8}
+.params-panel .model-picker-name{display:block;flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;text-align:left;font-size:12px}
+.params-panel .model-picker-trigger>svg{color:#9bbeaf;flex-shrink:0}
+.params-panel .model-picker-list{
+  position:absolute;z-index:40;left:0;right:0;top:calc(100% + 5px);max-height:206px;
+  border:1px solid #457461;border-radius:10px;padding:5px;overflow-y:auto;
+  background:#172529;box-shadow:0 12px 34px rgba(0,0,0,.65);
+}
+.params-panel .model-picker-list[hidden]{display:none}
+.params-panel .model-picker-option{
+  width:100%;display:flex;align-items:center;gap:7px;text-align:left;
+  padding:5px 7px;min-height:34px;margin:1px 0;border:1px solid transparent;
+  border-radius:7px;background:transparent;color:#d5e7df;cursor:pointer;
+}
+.params-panel .model-picker-option:hover,.params-panel .model-picker-option:focus-visible{background:#25443a;border-color:#397456;outline:0}
+.params-panel .model-picker-option.active{background:#1f4435;border-color:#43885e}
+.params-panel .model-option-icon{width:22px;height:22px;flex-basis:22px;font-size:14px}
+.params-panel .model-option-text{min-width:0;flex:1;display:flex;flex-direction:column;gap:1px}
+.params-panel .model-option-text strong{font-size:11px;font-weight:670;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.params-panel .model-option-text small{font-size:10px;color:#94afa5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.params-panel .model-option-check{color:#72efac;font-size:13px}
+.params-panel #provider-select[hidden],.params-panel #model-select[hidden]{display:none}
+.params-panel .prompt-editor{position:relative}
+.params-panel .prompt-editor .prompt-textarea{
+  display:block;height:164px;min-height:164px;width:100%;resize:vertical;
+  padding:10px 11px 42px;line-height:1.6;font-size:12px;
+}
+.params-panel .optimize-prompt-btn{
+  position:absolute;right:9px;bottom:9px;height:26px;min-width:82px;
+  padding:0 9px;background:#23473a;border:1px solid #3e8d63;border-radius:7px;
+  color:#adf8cf;font-size:11px;cursor:pointer;font-weight:650;
+  transition:background .2s,border-color .2s;
+}
+.params-panel .optimize-prompt-btn{display:flex;align-items:center;justify-content:center;gap:5px}
+.params-panel .optimize-prompt-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8}
+.params-panel .optimize-prompt-btn:hover{background:#30664b;border-color:#77dca3}
+.params-panel .optimize-prompt-btn:focus-visible{outline:2px solid #8fffc0}
+.params-panel .char-count{margin-top:2px;font-size:10px}
+.params-panel .reference-state-row{display:flex;justify-content:space-between;align-items:center;gap:7px}
+.params-panel .reference-state-row .param-label{margin:0 0 5px}
+.params-panel .reference-mode-indicator{font-size:10px;color:#86efb2;background:#1e3c32;border:1px solid #315f48;border-radius:12px;padding:3px 7px;white-space:nowrap;margin-bottom:5px}
+.params-panel .reference-dimensions{font-size:10px;color:#93aca8;margin-top:5px;line-height:1.5}
+.params-panel .upload-dropzone{height:49px;border-radius:9px;padding:7px}
+/* Muted helper text in the existing graphite theme; keep it easy to edit. */
+.params-panel .upload-dropzone #reference-file-name{
+  flex:0 1 auto;min-width:0;max-width:none;white-space:normal;
+  overflow:visible;text-overflow:clip;text-align:left;line-height:1.35;
+  color:#84919E;
+}
+.params-panel #prompt-input::placeholder{
+  color:#798695;opacity:1;
+}
+.params-panel .button-group,.params-panel .ratio-group{gap:5px}
+.params-panel .param-button,.params-panel .ratio-button{
+  height:23px;min-height:23px;padding:0 7px;font-size:11px;line-height:1;
+  border-radius:7px;min-width:0;white-space:nowrap;
+}
+.params-panel .ratio-group{display:flex;flex-wrap:wrap;gap:5px}
+.params-panel .ratio-button{flex:1 1 auto;min-width:38px}
+.params-panel .ratio-button[data-value="auto"]{min-width:53px;flex:1.25}
+.params-panel .generate-button{height:46px;min-height:46px;font-size:15px;border-radius:10px}
+@media(max-width:880px){
+  .params-panel .panel-content{padding-left:13px;padding-right:13px}
+  .params-panel .prompt-editor .prompt-textarea{height:150px;min-height:150px}
+}
+/* Free canvas elements can be grabbed anywhere except their controls. */
+/* The canvas keeps rounded corners so the green focus frame follows them. */
+.canvas-viewport{
+  border-radius:18px;
+}
+.canvas-viewport:focus-visible{outline:2px solid rgba(93,223,162,.32);outline-offset:-3px;border-radius:18px}
+.canvas-node{cursor:grab;touch-action:none;user-select:none}
+.canvas-node:active{cursor:grabbing}
+.canvas-node-image{pointer-events:none;-webkit-user-drag:none}
+.canvas-node button{cursor:pointer}
+
+/* Multi-image reference picker: precisely three thumbnails per row. */
+.params-panel .reference-state-actions {
+  display:flex;align-items:center;justify-content:flex-end;gap:7px;min-width:0;
+}
+.params-panel .reference-count {
+  font-size:10px;color:#d0e8db;white-space:nowrap;font-variant-numeric:tabular-nums;
+}
+.params-panel .reference-grid {
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;margin-top:9px;width:100%;min-width:0;
+}
+.params-panel .reference-grid[hidden]{display:none}
+.params-panel .reference-thumb {
+  position:relative;min-width:0;overflow:hidden;
+  border:1px solid #365b4f;border-radius:9px;background:#16272a;
+  box-shadow:0 2px 9px #03110d3b;
+  transition:border-color .18s cubic-bezier(.22,1,.36,1),transform .18s cubic-bezier(.22,1,.36,1);
+}
+.params-panel .reference-thumb:hover{border-color:#66d9a0;transform:translateY(-1px)}
+.params-panel .reference-thumb>img {
+  display:block;width:100%;aspect-ratio:4/3;object-fit:cover;
+  background:#101b1d;border:0;
+}
+.params-panel .reference-thumb-name {
+  display:block;min-width:0;max-width:100%;
+  padding:5px 5px 6px;font-size:10px;line-height:1.15;
+  color:#c5dbd1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+}
+.params-panel .reference-thumb-remove {
+  position:absolute;right:4px;top:4px;z-index:2;
+  display:grid;place-items:center;width:26px;height:26px;padding:0;
+  border:1px solid #b8d2c270;border-radius:7px;
+  background:rgba(10,19,20,.83);color:#f2fff8;cursor:pointer;
+  transition:background .16s,border-color .16s,transform .16s;
+}
+.params-panel .reference-thumb-remove svg{width:15px;height:15px;pointer-events:none}
+.params-panel .reference-thumb-remove:hover{
+  background:#6b3336;border-color:#f0979b;transform:scale(1.05);
+}
+.params-panel .reference-thumb-remove:focus-visible{
+  outline:2px solid #83f1b6;outline-offset:2px;
+}
+.params-panel .upload-dropzone.is-full{opacity:.64;cursor:not-allowed;pointer-events:none}
+.params-panel .reference-feedback {
+  color:#ffd2b1;font-size:11px;line-height:1.5;margin:5px 0 0;
+}
+.params-panel .reference-feedback[hidden]{display:none}
+@media(max-width:400px) {
+  .params-panel .reference-grid{gap:6px}
+  .params-panel .reference-thumb-remove{width:24px;height:24px}
+}
+@media(prefers-reduced-motion:reduce) {
+  .params-panel .reference-thumb,
+  .params-panel .reference-thumb-remove{transition:none}
+}
+@media(prefers-reduced-motion:reduce){
+  .params-panel .model-picker-trigger,.params-panel .model-picker-option,.params-panel .optimize-prompt-btn{transition:none}
+}

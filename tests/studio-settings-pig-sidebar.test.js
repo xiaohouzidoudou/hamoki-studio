@@ -1,0 +1,48 @@
+'use strict';
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const root=path.resolve(__dirname,'..');
+const read=name=>fs.readFileSync(path.join(root,name),'utf8');
+test('sidebar toggle exposes its current action and remains interactive',()=>{
+  const html=read('index.html'),script=read('script.js'),css=read('studio-v3.css');
+  assert.match(html,/id="sidebar-toggle"[^>]+aria-expanded="true"/);
+  assert.match(html,/sidebar-toggle-label">收起侧栏/);
+  assert.match(html,/sidebar-chevron/);
+  assert.match(script,/expanded \? '收起侧栏' : '展开侧栏'/);
+  assert.match(script,/toggle\.setAttribute\('aria-expanded',String\(expanded\)\)/);
+  assert.match(css,/\.sidebar:not\(\.expanded\) \.sidebar-toggle-label \{display:none;\}/);
+});
+test('preset is first, fixed and only asks for API Key',()=>{
+  const js=read('settings-v2.js');
+  assert.doesNotMatch(js,/hs-tab-quick|hs-quick-token|selectTier\(|快捷设置/);
+  assert.match(js,/name:'生图的小猪'/);
+  assert.match(js,/url:'https:\/\/pig\.tuut\.cc\/v1'/);
+  assert.match(js,/mode:'openai'/);
+  assert.match(js,/imageMode:'images'/);
+  assert.match(js,/imageModel:'gpt-image-2\.5-flare'/);
+  assert.match(js,/visionModel:'gpt-6\.1-terra'/);
+  assert.match(js,/list\.append\(renderPreset\(pinned\)\)/);
+  assert.match(js,/const others=providers\.filter\(p=>p\.id!==pinned\?\.id\)/);
+  assert.match(js,/input\.type='password'/);
+  assert.match(js,/if\(key\)data\.apiKey=key/);
+  assert.match(js,/method:existing\?'PUT':'POST'/);
+  assert.match(js,/\/activate/);
+  assert.doesNotMatch(js,/console\.log\(.*key/i);
+});
+test('provider check feedback stays inside its own row, not at the top of settings',()=>{
+  const js=read('settings-v2.js'),css=read('settings-v2.css');
+  assert.match(js,/providerCheckResults = new Map\(\)/);
+  assert.match(js,/box\.dataset\.providerId=p\.id/);
+  assert.match(js,/box\.append\(info,check,actions\)/);
+  assert.match(js,/renderProviderCheck\(p\.id\)/);
+  assert.match(js,/setProviderCheck\(p\.id,'pending','正在测试'/);
+  assert.match(js,/setProviderCheck\(p\.id,'success','连接成功'/);
+  assert.match(js,/setProviderCheck\(p\.id,'error','连接失败'/);
+  assert.match(js,/setProviderCheck\(p\.id,'error','测试失败'/);
+  assert.doesNotMatch(js,/notice\(result\.reachable/);
+  assert.match(css,/\.hs-provider-check\.is-success/);
+  assert.match(css,/\.hs-provider-check\.is-error/);
+  assert.match(css,/@media\(max-width:650px\)/);
+});

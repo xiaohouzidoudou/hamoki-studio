@@ -1,0 +1,146 @@
+/* Custom output dimensions and unobtrusive navigation.
+   Loaded after legacy theme layers to keep these controls consistent. */
+.params-panel .custom-size-group{margin-top:2px}
+.params-panel .custom-size-header{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  min-height:25px;
+}
+.params-panel .custom-size-header .param-label{margin:0;color:#a7b3b6}
+.params-panel .custom-size-toggle{
+  min-height:24px;min-width:47px;padding:0 10px;border-radius:7px;
+  border:1px solid #46565b;background:#1c292f;color:#acb9bc;
+  font-size:11px;font-weight:600;cursor:pointer;
+  transition:color .2s,border-color .2s,background .2s;
+}
+.params-panel .custom-size-toggle.active{
+  border-color:#4f9e75;background:rgba(53,129,90,.19);color:#99ebbd;
+}
+.params-panel .custom-size-toggle:focus-visible{
+  outline:2px solid #76d4a1;outline-offset:2px;
+}
+.params-panel .custom-size-fields{
+  margin-top:8px;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) auto;
+  gap:8px;align-items:end;
+}
+.params-panel .custom-size-fields[hidden],
+.params-panel .custom-size-hint[hidden]{display:none!important}
+.params-panel .custom-size-fields label{
+  min-width:0;display:flex;flex-direction:column;gap:4px;color:#8fa1a5;
+  font-size:10px;
+}
+.params-panel .custom-size-fields input{
+  display:block;box-sizing:border-box;width:100%;min-width:0;height:31px;
+  padding:0 9px;background:#151f27;color:#d9e6e2;
+  border:1px solid #3a4e54;border-radius:7px;
+  font:500 12px/1.2 ui-sans-serif,system-ui,sans-serif;font-variant-numeric:tabular-nums;
+  appearance:textfield;-moz-appearance:textfield;
+}
+.params-panel .custom-size-fields input::-webkit-inner-spin-button,
+.params-panel .custom-size-fields input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.params-panel .custom-size-fields input:focus{
+  border-color:#64b48c;outline:1px solid rgba(115,218,165,.30);
+}
+.params-panel .custom-size-times{padding-bottom:7px;color:#6d7d85;font-size:13px}
+.params-panel .custom-size-unit{padding-bottom:8px;color:#73858d;font-size:11px}
+.params-panel .custom-size-hint{
+  margin:6px 0 0;color:#758791;font-size:10px;line-height:1.45;
+}
+.params-panel :is(#resolution-group,#ratio-group).custom-size-locked{opacity:.32}
+.params-panel :is(#resolution-group,#ratio-group).custom-size-locked button{
+  cursor:not-allowed;pointer-events:none;
+}
+/* Compact navigation: restore the original glyph size, shrink only its card.
+   Keep the green active accent and the same click-to-expand sidebar behavior. */
+body .sidebar .nav-icon-btn svg{
+  width:25px!important;height:25px!important;flex-shrink:0;
+}
+body .sidebar .sidebar-toggle svg{
+  width:18px!important;height:18px!important;
+}
+@media (min-width:761px){
+  body .sidebar:not(.expanded) .sidebar-nav{
+    padding:0;gap:9px;align-items:center;
+  }
+  body .sidebar:not(.expanded) .nav-icon-btn,
+  body .sidebar:not(.expanded) .nav-icon-btn[data-view="works"],
+  body .sidebar:not(.expanded) .nav-icon-btn[data-view="library"],
+  body .sidebar:not(.expanded) .nav-icon-btn[data-view="settings"]{
+    width:38px;height:38px;min-width:38px;min-height:38px;
+    padding:0;margin-left:auto;margin-right:auto;
+    justify-content:center;gap:0;border-radius:10px;
+  }
+  body .sidebar:not(.expanded) .nav-icon-btn[data-view="works"]{margin-top:13px}
+  body .sidebar.expanded .nav-icon-btn{
+    height:42px;min-height:42px;gap:12px;border-radius:10px;
+  }
+  body .sidebar.expanded .nav-icon-btn[data-view="works"],
+  body .sidebar.expanded .nav-icon-btn[data-view="library"],
+  body .sidebar.expanded .nav-icon-btn[data-view="settings"]{height:40px;min-height:40px}
+}
+@media (min-width:761px) and (max-width:1120px){
+  body .sidebar.expanded{width:214px;flex-basis:214px}
+  body .sidebar.expanded .sidebar-nav{padding:0 13px}
+  body .sidebar.expanded .nav-icon-btn{width:100%;height:42px;min-height:42px;padding:0 15px;justify-content:flex-start;gap:12px}
+  body .sidebar.expanded .nav-icon-btn span{display:block!important;font-size:13px}
+  body .sidebar.expanded .sidebar-toggle{margin:0 13px 15px;width:calc(100% - 26px);padding:0 12px;justify-content:flex-start}
+  body .sidebar.expanded .sidebar-toggle-label{display:inline!important}
+}
+@media (max-width:760px){
+  body .sidebar .nav-icon-btn svg{width:20px!important;height:20px!important}
+}
+@media (prefers-reduced-motion:reduce){
+  .params-panel .custom-size-toggle{transition:none}
+}
+
+/* Collapsed navigation rail: one compact, consistently aligned icon column.
+   Inactive icons are unboxed; the mint focus card is reserved for selection. */
+@media (min-width:761px){
+  body .sidebar:not(.expanded){
+    width:52px!important;flex:0 0 52px!important;
+    padding-top:12px;
+  }
+  body .sidebar:not(.expanded) .sidebar-nav{
+    box-sizing:border-box;width:100%;padding:0!important;
+    display:flex;flex-direction:column;align-items:center;
+    gap:8px!important;
+  }
+  body .sidebar:not(.expanded) .sidebar-toggle{
+    box-sizing:border-box;width:34px!important;height:34px!important;
+    min-width:34px;min-height:34px;
+    padding:0!important;margin:0 auto 12px!important;
+    display:flex;align-items:center;justify-content:center;
+    border-radius:9px;
+  }
+  body .sidebar:not(.expanded) .nav-icon-btn,
+  body .sidebar:not(.expanded) .nav-icon-btn[data-view="works"],
+  body .sidebar:not(.expanded) .nav-icon-btn[data-view="library"],
+  body .sidebar:not(.expanded) .nav-icon-btn[data-view="settings"]{
+    box-sizing:border-box;flex:0 0 34px;
+    width:34px!important;height:34px!important;
+    min-width:34px;min-height:34px;
+    padding:0!important;margin:0 auto!important;
+    display:flex;align-items:center;justify-content:center;
+    gap:0!important;border-radius:9px;
+    transform:none;
+  }
+  body .sidebar:not(.expanded) .nav-icon-btn svg{
+    width:25px!important;height:25px!important;
+  }
+  body .sidebar:not(.expanded) .nav-icon-btn:not(.active){
+    background:transparent!important;
+    border-color:transparent!important;
+    box-shadow:none!important;
+  }
+  body .sidebar:not(.expanded) .nav-icon-btn:not(.active):hover,
+  body .sidebar:not(.expanded) .nav-icon-btn:not(.active):focus-visible{
+    background:rgba(255,255,255,.08)!important;
+    border-color:rgba(132,190,177,.25)!important;
+    transform:none;
+  }
+  body .sidebar:not(.expanded) .nav-icon-btn[data-view="works"]{
+    margin-top:14px!important;
+  }
+  body .sidebar:not(.expanded) .nav-icon-btn[data-view="works"]::before{
+    left:3px;right:3px;top:-8px;opacity:.5;
+  }
+}

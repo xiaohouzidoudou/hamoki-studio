@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="glass-landing">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设置 - Hamoki Studio</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #0a0e1a;
+            --bg-2: #131823;
+            --bg-3: #1a1f2e;
+            --border: #2a3140;
+            --text: #e8eaed;
+            --text-2: #9aa0a6;
+            --text-3: #5f6368;
+            --green: #4ade80;
+            --red: #ef4444;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            padding: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .subtitle {
+            color: var(--text-2);
+            font-size: 14px;
+            margin-bottom: 32px;
+        }
+
+        h2 {
+            font-size: 18px;
+            margin: 32px 0 16px;
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .section {
+            background: var(--bg-2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .provider-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .provider {
+            background: var(--bg-3);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            transition: all 0.2s;
+        }
+
+        .provider:hover {
+            border-color: var(--green);
+        }
+
+        .provider.active {
+            border-color: var(--green);
+            background: rgba(74, 222, 128, 0.05);
+        }
+
+        .provider-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .provider-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .provider-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+            font-size: 15px;
+        }
+
+        .provider-url {
+            font-size: 13px;
+            color: var(--text-2);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .provider-badge {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: rgba(74, 222, 128, 0.15);
+            color: var(--green);
+            font-weight: 600;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        button {
+            background: var(--bg-3);
+            border: 1px solid var(--border);
+            color: var(--text-2);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        button:hover {
+            border-color: var(--green);
+            color: var(--text);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        button.primary {
+            background: var(--green);
+            color: var(--bg);
+            border: none;
+        }
+
+        button.primary:hover {
+            background: #22c55e;
+        }
+
+        button.danger {
+            border-color: var(--red);
+            color: var(--red);
+        }
+
+        button.danger:hover {
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: var(--text-2);
+            font-weight: 500;
+        }
+
+        input, select {
+            width: 100%;
+            background: var(--bg-3);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--green);
+            background: var(--bg);
+        }
+
+        .add-form {
+            background: var(--bg-3);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .add-form.show {
+            display: block;
+        }
+
+        .message {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-top: 16px;
+            font-size: 13px;
+            display: none;
+        }
+
+        .message.show {
+            display: block;
+        }
+
+        .message.error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--red);
+        }
+
+        .message.success {
+            background: rgba(74, 222, 128, 0.1);
+            border: 1px solid rgba(74, 222, 128, 0.3);
+            color: var(--green);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 48px 24px;
+            color: var(--text-2);
+        }
+
+        .empty-state svg {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 24px;
+            color: var(--text-2);
+        }
+
+        .test-result {
+            margin-top: 12px;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            background: var(--bg);
+        }
+
+        .test-result.success {
+            border: 1px solid var(--green);
+        }
+
+        .test-result.failed {
+            border: 1px solid var(--red);
+        }
+
+        .test-detail {
+            margin-top: 8px;
+            font-size: 12px;
+            color: var(--text-2);
+        }
+    </style>
+    <link rel="stylesheet" href="assets/glass-landing-theme.css?v=20261105-2">
+    <link rel="stylesheet" href="assets/global-border-trace.css?v=1">
+    <link rel="stylesheet" href="assets/glass-component-fidelity.css?v=20261105-5">
+    <script src="assets/glass-selects.js?v=20261105-2" defer></script>
+</head>
+<body class="ng-settings-page">
+    <h1>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24"/>
+        </svg>
+        设置
+    </h1>
+    <div class="subtitle">配置中转站和模型参数</div>
+
+    <div class="section">
+        <h2>中转站配置</h2>
+
+        <button id="add-btn" class="primary" style="margin-bottom: 20px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            添加中转站
+        </button>
+
+        <div id="add-form" class="add-form">
+            <h3 style="margin-bottom: 20px; font-size: 16px;">添加新的中转站</h3>
+
+            <div class="form-group">
+                <label>名称 *</label>
+                <input type="text" id="name" placeholder="例如：OpenAI 官方">
+            </div>
+
+            <div class="form-group">
+                <label>接口类型 *</label>
+                <select id="mode">
+                    <option value="openai">OpenAI 兼容</option>
+                    <option value="gemini">Gemini</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>基础地址 *</label>
+                <input type="text" id="url" placeholder="https://api.openai.com/v1">
+            </div>
+
+            <div class="form-group">
+                <label>API Key *</label>
+                <input type="password" id="apiKey" placeholder="sk-...">
+            </div>
+
+            <div class="form-group">
+                <label>图像生成模式</label>
+                <select id="imageMode">
+                    <option value="images">images (DALL-E 标准)</option>
+                    <option value="chat">chat (通过对话接口)</option>
+                    <option value="responses">responses (响应接口)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>图像生成模型</label>
+                <input type="text" id="imageModel" placeholder="gpt-image-2">
+            </div>
+
+            <div class="form-group">
+                <label>视觉模型（图片反推）</label>
+                <input type="text" id="visionModel" placeholder="gpt-4o-mini">
+            </div>
+
+            <div id="form-message" class="message"></div>
+
+            <div class="btn-group" style="margin-top: 20px;">
+                <button id="save-btn" class="primary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                    保存
+                </button>
+                <button id="cancel-btn">取消</button>
+            </div>
+        </div>
+
+        <div id="loading" class="loading">加载中...</div>
+        <div id="providers" class="provider-list"></div>
+    </div>
+
+    <script>
+        const API = '/api/providers';
+
+        let providers = [];
+        let activeId = null;
+
+        // 加载中转站列表
+        async function loadProviders() {
+            try {
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('providers').style.display = 'none';
+
+                const res = await fetch(API);
+                if (!res.ok) throw new Error('加载失败');
+
+                const data = await res.json();
+                providers = data.providers || [];
+                activeId = data.activeId;
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('providers').style.display = 'flex';
+                renderProviders();
+            } catch (e) {
+                document.getElementById('loading').innerHTML = `<span style="color: var(--red);">加载失败: ${e.message}</span>`;
+            }
+        }
+
+        // 渲染中转站列表
+        function renderProviders() {
+            const container = document.getElementById('providers');
+
+            if (!providers.length) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="8" x2="12" y2="12"/>
+                            <line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
+                        <div>暂无中转站配置</div>
+                        <div style="font-size: 13px; margin-top: 8px;">点击上方"添加中转站"按钮开始配置</div>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = providers.map((p, index) => {
+                const colors = [
+                    'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                    'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                    'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+                    'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+                ];
+                const color = colors[index % colors.length];
+                const initial = p.name.substring(0, 2).toUpperCase();
+
+                return `
+                    <div class="provider ${p.id === activeId ? 'active' : ''}" data-id="${p.id}">
+                        <div class="provider-icon" style="background: ${color}">
+                            ${escapeHtml(initial)}
+                        </div>
+                        <div class="provider-info">
+                            <div class="provider-name">
+                                ${escapeHtml(p.name)}
+                                ${p.id === activeId ? '<span class="provider-badge">当前使用</span>' : ''}
+                            </div>
+                            <div class="provider-url">${escapeHtml(p.url)} · ${p.mode === 'openai' ? 'OpenAI' : 'Gemini'}</div>
+                        </div>
+                        <div class="btn-group">
+                            ${p.id !== activeId ? `<button onclick="activateProvider('${p.id}')">激活</button>` : ''}
+                            <button onclick="checkProvider('${p.id}')">测试连接</button>
+                            <button class="danger" onclick="deleteProvider('${p.id}')">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="3 6 5 6 21 6"/>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 激活中转站
+        window.activateProvider = async function(id) {
+            try {
+                const res = await fetch(`${API}/${id}/activate`, { method: 'POST' });
+                if (!res.ok) throw new Error('激活失败');
+
+                const data = await res.json();
+                activeId = data.activeId;
+                renderProviders();
+                showMessage('success', '已激活');
+            } catch (e) {
+                showMessage('error', '激活失败: ' + e.message);
+            }
+        };
+
+        // 测试连接
+        window.checkProvider = async function(id) {
+            const providerEl = document.querySelector(`[data-id="${id}"]`);
+            const existingResult = providerEl.querySelector('.test-result');
+            if (existingResult) existingResult.remove();
+
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'test-result';
+            resultDiv.innerHTML = '测试中...';
+            providerEl.appendChild(resultDiv);
+
+            try {
+                const res = await fetch(`${API}/${id}/check`);
+                const data = await res.json();
+
+                if (data.reachable) {
+                    resultDiv.className = 'test-result success';
+                    resultDiv.innerHTML = `
+                        ✓ 连接成功 (${data.latencyMs}ms)
+                        <div class="test-detail">找到 ${data.models?.length || 0} 个模型</div>
+                    `;
+                } else {
+                    resultDiv.className = 'test-result failed';
+                    resultDiv.innerHTML = `
+                        ✗ 连接失败
+                        <div class="test-detail">${data.error || '未知错误'}</div>
+                    `;
+                }
+
+                setTimeout(() => resultDiv.remove(), 5000);
+            } catch (e) {
+                resultDiv.className = 'test-result failed';
+                resultDiv.innerHTML = `✗ 测试失败: ${e.message}`;
+                setTimeout(() => resultDiv.remove(), 5000);
+            }
+        };
+
+        // 删除中转站
+        window.deleteProvider = async function(id) {
+            if (!confirm('确定要删除此中转站吗？所有配置将丢失。')) return;
+
+            try {
+                const res = await fetch(`${API}/${id}`, { method: 'DELETE' });
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || '删除失败');
+                }
+
+                const data = await res.json();
+                activeId = data.activeId;
+                await loadProviders();
+                showMessage('success', '已删除');
+            } catch (e) {
+                showMessage('error', '删除失败: ' + e.message);
+            }
+        };
+
+        // 显示添加表单
+        document.getElementById('add-btn').onclick = () => {
+            document.getElementById('add-form').classList.add('show');
+            document.getElementById('name').focus();
+        };
+
+        // 取消
+        document.getElementById('cancel-btn').onclick = () => {
+            document.getElementById('add-form').classList.remove('show');
+            clearForm();
+        };
+
+        // 保存
+        document.getElementById('save-btn').onclick = async () => {
+            const name = document.getElementById('name').value.trim();
+            const mode = document.getElementById('mode').value;
+            const url = document.getElementById('url').value.trim();
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const imageMode = document.getElementById('imageMode').value;
+            const imageModel = document.getElementById('imageModel').value.trim() || 'gpt-image-2';
+            const visionModel = document.getElementById('visionModel').value.trim() || (mode === 'gemini' ? 'gemini-2.5-flash' : 'gpt-4o-mini');
+
+            if (!name || !url || !apiKey) {
+                showFormMessage('error', '请填写必填项（名称、地址、API Key）');
+                return;
+            }
+
+            try {
+                document.getElementById('save-btn').disabled = true;
+                document.getElementById('save-btn').textContent = '保存中...';
+
+                const res = await fetch(API, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, mode, url, apiKey, imageMode, imageModel, visionModel })
+                });
+
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || '保存失败');
+                }
+
+                await loadProviders();
+                document.getElementById('add-form').classList.remove('show');
+                clearForm();
+                showMessage('success', '添加成功');
+            } catch (e) {
+                showFormMessage('error', e.message);
+            } finally {
+                document.getElementById('save-btn').disabled = false;
+                document.getElementById('save-btn').innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                    保存
+                `;
+            }
+        };
+
+        function clearForm() {
+            document.getElementById('name').value = '';
+            document.getElementById('url').value = '';
+            document.getElementById('apiKey').value = '';
+            document.getElementById('imageModel').value = '';
+            document.getElementById('visionModel').value = '';
+            document.getElementById('form-message').classList.remove('show');
+        }
+
+        function showFormMessage(type, msg) {
+            const el = document.getElementById('form-message');
+            el.className = `message ${type} show`;
+            el.textContent = msg;
+        }
+
+        function showMessage(type, msg) {
+            const existing = document.querySelector('.section > .message');
+            if (existing) existing.remove();
+
+            const el = document.createElement('div');
+            el.className = `message ${type} show`;
+            el.textContent = msg;
+            document.querySelector('.section').appendChild(el);
+
+            setTimeout(() => el.remove(), 3000);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 初始化
+        loadProviders();
+    </script>
+    <script src="assets/global-border-trace.js?v=1"></script>
+</body>
+</html>

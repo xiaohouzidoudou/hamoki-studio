@@ -1,0 +1,41 @@
+/* A single mint-green primary action: "添加到队列".
+   Keep all other controls in the existing macOS vibrancy palette. */
+body .params-panel button.generate-button {
+  background: linear-gradient(150deg, #5ce29a 0%, #37c778 100%) !important;
+  background-color: #40d084 !important;
+  color: #092719 !important;
+  border: 1px solid rgba(132, 246, 181, .42) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28),
+              0 3px 13px rgba(45, 203, 115, .16) !important;
+}
+body .params-panel button.generate-button svg {
+  color: #092719 !important;
+  stroke: currentColor !important;
+}
+body .params-panel button.generate-button:hover:not(:disabled) {
+  background: linear-gradient(150deg, #75edac 0%, #46d88a 100%) !important;
+  background-color: #4cdd90 !important;
+  border-color: rgba(173, 255, 211, .62) !important;
+  color: #062317 !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35),
+              0 5px 18px rgba(45, 203, 115, .23) !important;
+}
+body .params-panel button.generate-button:active:not(:disabled) {
+  background: #32b970 !important;
+  box-shadow: inset 0 2px 5px rgba(6, 46, 26, .16) !important;
+}
+body .params-panel button.generate-button:focus-visible {
+  outline: 2px solid #a0f4c1 !important;
+  outline-offset: 3px;
+}
+body .params-panel button.generate-button:disabled {
+  background: #315a42 !important;
+  background-image: none !important;
+  color: rgba(220, 240, 228, .65) !important;
+  border-color: rgba(135, 198, 159, .15) !important;
+  box-shadow: none !important;
+  cursor: not-allowed;
+}
+body .params-panel button.generate-button:disabled svg {
+  color: inherit !important;
+}
