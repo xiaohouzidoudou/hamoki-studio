@@ -974,6 +974,10 @@
     if(![1,2,4].includes(config.count))throw Error('每次最多生成4张图片');
     if(config.transparentBg && (provider.mode!=='openai'||(provider.imageMode||'images')!=='images'))
       throw Error('透明背景需要支持 OpenAI Images 的中转站；请选择普通输出或换模型');
+    if(config.outpaint&&(
+      provider.mode!=='openai'||(provider.imageMode||'images')!=='images'||
+      !config.mask||!config.maskSourceImage||!config.outpaintRect
+    ))throw Error('真正的 AI 扩图需要原图画布与蒙版，并使用支持 Images Edits 的模型');
     const refs=(config.references||[]).filter(r=>r.file).map(r=>r.file);
     const hasCurrent=!!config.includeSource;
     if(refs.length+(hasCurrent?1:0)>5)throw Error('本次最多5张参考图片');
@@ -1011,6 +1015,10 @@
       ratio,resolution:config.resolution,count:config.count,quality:config.quality||'auto',
       customSize:config.customSize||null,
       transparentBg:!!config.transparentBg,
+      ...(config.outpaint?{
+        mask:config.mask,maskSourceImage:config.maskSourceImage,
+        outpaintRect:config.outpaintRect
+      }:{}),
       references:dataRefs,sourceId:hasCurrent?h.id:null,
       sourceNodeId:hasCurrent?node.id:null,
       canvasX:Math.round(config.outpaint?node.x:node.x+node.w+36),
