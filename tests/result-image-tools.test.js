@@ -20,12 +20,13 @@ test('image toolbar keeps common actions on the bar and moves background removal
   assert.match(composer,/result-toolbar-more-trigger/);
 });
 
-test('More menu exposes AI outpainting and crop tools, but no fake HD upscale',()=>{
+test('primary toolbar exposes AI outpainting; More keeps crop tools but no fake HD upscale',()=>{
   for(const action of ['expand','resize','grid9','trim-edge','auto-crop']){
     assert.ok(composer.includes("'"+action+"'"),'missing action '+action);
   }
   assert.doesNotMatch(composer,/menuAction\('hd','高清','upscale'\)/);
-  assert.match(composer,/menuAction\('expand','扩图','outpaint'\)/);
+  assert.match(composer,/\['expand','扩图','outpaint'\]/);
+  assert.doesNotMatch(composer,/menuAction\('expand'/);
   assert.match(composer,/function prepareAiOutpaint\(\)/);
   assert.match(composer,/if\(action==='expand'\)\{prepareAiOutpaint\(\);return;\}/);
   assert.match(composer,/richPrompt\.replace\(next,\{notify:true\}\)/);

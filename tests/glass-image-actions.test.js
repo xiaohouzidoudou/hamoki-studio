@@ -24,7 +24,8 @@ test('all image action menus use site-owned glass UI instead of native confirms'
 
 test('fake HD and local outpainting are disabled, AI outpainting keeps the source image',()=>{
   assert.doesNotMatch(composer,/menuAction\('hd'/);
-  assert.match(composer,/menuAction\('expand','扩图','outpaint'\)/);
+  assert.match(composer,/\['expand','扩图','outpaint'\]/);
+  assert.doesNotMatch(composer,/menuAction\('expand'/);
   assert.match(composer,/function prepareAiOutpaint\(\)/);
   assert.match(composer,/if\(action==='expand'\)\{prepareAiOutpaint\(\);return;\}/);
   assert.match(composer,/includeSource:!!ctx\.nodeId/);

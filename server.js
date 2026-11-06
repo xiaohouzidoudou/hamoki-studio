@@ -8,6 +8,7 @@ const zlib=require('node:zlib');
 const {spawn}=require('node:child_process');
 const {checkedURL,imageFromDataURL,guessMime,extension,reverse,generate,listModels,imageSize}=require('./lib/upstream');
 const {normalizeCustomImageSize}=require('./lib/custom-image-size');
+const {checkRect,preserveOutpaint}=require('./lib/outpaint-preserve');
 const {pack}=require('./lib/zip');
 const {normalizeGroupSettings,layoutNodes}=require('./lib/canvas-group-layout');
 const {placeGeneratedImage,placeRelatedImage}=require('./lib/v1-canvas-placement');
@@ -246,10 +247,15 @@ async function execute(job){const abort=new AbortController();controllers.set(jo
   for(const f of job.referenceMedia||[])media.push(fetchMedia(f));
   const mask=job.maskMedia?fetchMedia(job.maskMedia):null;if(mask&&job.maskSourceMedia){const override=fetchMedia(job.maskSourceMedia);if(override.mime!=='image/png'||JSON.stringify(pngDimensions(override.bytes))!==JSON.stringify(pngDimensions(mask.bytes)))throw Error('局部重绘：PNG 源图与蒙版尺寸不一致');if(!media.length)throw Error('局部重绘缺少源图');media[0]=override}
   if(mask&&!(p.mode==='openai'&&(p.imageMode||'images')==='images'))throw Error('当前接口不支持蒙版局部重绘，请使用 OpenAI 图片接口');
-  const output=DEMO_MODE ? {mime:'image/webp',bytes:fs.readFileSync(path.join(ROOT,'assets/hamoki-avatar-128.webp'))} : await generate(p,job,media,mask,abort.signal);
+  let output=DEMO_MODE ? {mime:'image/webp',bytes:fs.readFileSync(path.join(ROOT,'assets/hamoki-avatar-128.webp'))} : await generate(p,job,media,mask,abort.signal);
+  // Restore the original patch after AI editing. No original pixels are redrawn.
+  if(job.outpaintRect){
+   if(!job.maskSourceMedia)throw Error('扩图原始画布缺失');
+   output=await preserveOutpaint(output,fetchMedia(job.maskSourceMedia),job.outpaintRect);
+  }
   recordCapability(p,mask?'mask':job.transparentBg?'transparentBackground':media.length?'referenceImage':'textToImage',true,job.model,{ratio:job.ratio,resolution:job.resolution,customSize:job.customSize||null,durationMs:Date.now()-t0});
   if(job.status==='cancelled')return;
-  const file=storeMedia(output),id=crypto.randomUUID();const entry={id,file,createdAt:time(),projectId:job.projectId||defaultProject()?.id,providerId:job.providerId,providerName:job.providerName,model:job.model,prompt:job.prompt,ratio:job.ratio,resolution:job.resolution,customSize:job.customSize||null,parentId:job.sourceId||null,groupId:job.groupId||null,referenceMedia:job.referenceMedia||[],masked:!!mask,transparentBg:!!job.transparentBg,editInstruction:job.editInstruction||'',roleHints:job.roleHints||[],jobId:job.id,favorite:false,durationMs:Date.now()-t0};
+  const file=storeMedia(output),id=crypto.randomUUID();const entry={id,file,createdAt:time(),projectId:job.projectId||defaultProject()?.id,providerId:job.providerId,providerName:job.providerName,model:job.model,prompt:job.prompt,ratio:job.ratio,resolution:job.resolution,customSize:job.customSize||null,parentId:job.sourceId||null,groupId:job.groupId||null,referenceMedia:job.referenceMedia||[],masked:!!mask,outpaint:!!job.outpaintRect,transparentBg:!!job.transparentBg,editInstruction:job.editInstruction||'',roleHints:job.roleHints||[],jobId:job.id,favorite:false,durationMs:Date.now()-t0};
   history.unshift(entry);saveHistory();appendGeneratedNode(entry,job);job.resultId=id;jobStatusOk(job,'done');
 }catch(e){if(job.status==='cancelled')return;job.error=String(e?.message||'请求失败').slice(0,380);job.durationMs=Date.now()-t0;job.completionUncertain=!!(e.completionUncertain||e.timeout||[504,524].includes(e.upstreamStatus));
   if(e.upstreamStatus===429&&job.attempts<3){
@@ -257,7 +263,7 @@ async function execute(job){const abort=new AbortController();controllers.set(jo
     job.status='queued';job.nextRunAt=Date.now()+delay;job.error+='（上游429限流，'+Math.ceil(delay/1000)+' 秒后重试，最多3次）';job.updatedAt=time();saveJobs();schedule();
   }else jobStatusOk(job,'failed');
 }finally{controllers.delete(job.id)}}
-function makeJob(b,store,providerId,model,groupId){const p=provider(providerId);if(!p)throw Error('服务商不存在');emptyProvider(p);return {id:crypto.randomUUID(),groupId,providerId,providerName:p.name,model:assertModel(model||p.imageModel),name:trim(b.name,40)||'',prompt:b.prompt,editInstruction:b.editInstruction||'',roleHints:store.roleHints||[],transparentBg:!!b.transparentBg,ratio:b.ratio,resolution:b.resolution,customSize:b.customSize||null,quality:b.quality,sourceId:b.sourceId||null,referenceMedia:store.input,maskMedia:store.mask,maskSourceMedia:store.maskSource,projectId:b.projectId,sourceNodeId:b.sourceNodeId||null,canvasX:b.canvasX,canvasY:b.canvasY,planned:b.planned||null,preview:b.preview||null,batchIndex:b.batchIndex||0,createdAt:time(),updatedAt:time(),status:'queued',attempts:0,resultId:null,error:'',retryOf:b.retryOf||null}}
+function makeJob(b,store,providerId,model,groupId){const p=provider(providerId);if(!p)throw Error('服务商不存在');emptyProvider(p);return {id:crypto.randomUUID(),groupId,providerId,providerName:p.name,model:assertModel(model||p.imageModel),name:trim(b.name,40)||'',prompt:b.prompt,editInstruction:b.editInstruction||'',roleHints:store.roleHints||[],outpaintRect:b.outpaintRect||null,transparentBg:!!b.transparentBg,ratio:b.ratio,resolution:b.resolution,customSize:b.customSize||null,quality:b.quality,sourceId:b.sourceId||null,referenceMedia:store.input,maskMedia:store.mask,maskSourceMedia:store.maskSource,projectId:b.projectId,sourceNodeId:b.sourceNodeId||null,canvasX:b.canvasX,canvasY:b.canvasY,planned:b.planned||null,preview:b.preview||null,batchIndex:b.batchIndex||0,createdAt:time(),updatedAt:time(),status:'queued',attempts:0,resultId:null,error:'',retryOf:b.retryOf||null}}
 const REFERENCE_ROLES={shape:'角色造型、身份及结构',color:'颜色与配色，不复制其主体',style:'绘画风格、线条和上色技巧，不复制内容',pose:'动作与构图',background:'背景与场景',general:'综合参考'};
 function modelReferenceLimit(providerConfig,model){
  return providerConfig?.mode==='openai'&&
@@ -313,13 +319,21 @@ function validateCreation(b){
  const candidate=b.sourceId||images.find(n=>n.historyId)?.historyId;
  const source=candidate?history.find(h=>h.id===candidate&&h.projectId===targetProject.id):null;
  if(candidate&&!source)throw Error('找不到当前项目中的源图片');
+ const outpaintRect=b.outpaintRect?checkRect(b.outpaintRect):null;
+ if(outpaintRect){
+  if(!source||!b.mask||!b.maskSourceImage)throw Error('扩图必须包含原图、透明留白画布和对应蒙版');
+  if(customSize&&customSize!==outpaintRect.width+'x'+outpaintRect.height)
+   throw Error('扩图尺寸与蒙版画布不匹配');
+  if(targets.some(t=>{const p=provider(t.providerId);return !p||p.mode!=='openai'||(p.imageMode||'images')!=='images'}))
+   throw Error('精准 AI 扩图需要支持 Images Edits 蒙版的模型');
+ }
  if(b.mask&&!source)throw Error('局部蒙版必须先选择一张已生成图片');
  if(b.mask&&targets.some(t=>{const p=provider(t.providerId);return !p||p.mode!=='openai'||(p.imageMode||'images')!=='images'}))throw Error('局部蒙版需要支持 OpenAI Images Edits 的接口');
  const transparentBg=!!b.transparentBg;
  if(transparentBg&&targets.some(t=>{const p=provider(t.providerId);return !p||p.mode!=='openai'||(p.imageMode||'images')!=='images'}))throw Error('透明背景当前仅允许 OpenAI Images 模式（模型仍需支持透明输出）');
  const editMode=!!source&&b.editMode!=='new';
  const prompt=editMode?('根据第一张参考原图精确编辑。除本轮明确要求改变的内容外，保持主体身份、脸部、服装结构、姿势、画面构图和风格一致。\n历史创作描述：'+source.prompt.slice(0,6500)+'\n本轮修改要求：'+instruction):instruction;
- return {prompt,editInstruction:instruction,refs,referenceNodes:images,count,targets,ratio,resolution,customSize,quality,transparentBg,sourceId:source?.id||null,sourceNodeId,projectId:targetProject.id,canvasX:num(b.canvasX,180),canvasY:num(b.canvasY,170),mask:b.mask||null,maskSourceImage:b.maskSourceImage||null};
+ return {prompt,editInstruction:instruction,refs,referenceNodes:images,count,targets,ratio,resolution,customSize,quality,transparentBg,sourceId:source?.id||null,sourceNodeId,projectId:targetProject.id,canvasX:num(b.canvasX,180),canvasY:num(b.canvasY,170),mask:b.mask||null,maskSourceImage:b.maskSourceImage||null,outpaintRect};
 }
 function submit(b){
  const valid=validateCreation(b);

@@ -813,13 +813,14 @@
       }finally{button.disabled=false;}
     };
     for(const [action,name,icon] of [
-      ['edit','编辑','edit'],['reference','引用','reference'],
+      ['edit','编辑','edit'],['expand','扩图','outpaint'],['reference','引用','reference'],
       ['reuse','做同款','reuse'],['reverse','反推','reverse'],
       ['remove-bg','去背景','cutout']
     ]){
       const b=makeButton(name,icon,'generated-result-action result-toolbar-action');
       b.dataset.action=action;
-      b.title=action==='remove-bg'?'去背景：用抠图提示词替换当前描述并开启透明背景':name;
+      b.title=action==='remove-bg'?'去背景：用抠图提示词替换当前描述并开启透明背景':
+        action==='expand'?'AI 扩图：在画布外围生成新内容，不拉伸原图':name;
       b.onclick=()=>act(action,b);
       primary.append(b);
     }
@@ -914,7 +915,6 @@
     };
     const separator=()=>mk('div','result-menu-sep');
     menuContent.append(
-      menuAction('expand','扩图','outpaint'),
       menuAction('resize','缩放','resize'),
       cropGroup,
       menuAction('grid9','九宫格缩放','grid9'),
@@ -927,7 +927,6 @@
       menuAction('delete','移除画布图片','trash')
     );
     const menuTitles={
-      expand:'在独立弹窗选择扩图方向、参考图和提示词，点击生成后调用 AI',
       resize:'本地按比例或像素重采样',
       grid9:'裁成 3×3 九宫格切片',
       grid:'把图片等分为 2×2 四张切片',
