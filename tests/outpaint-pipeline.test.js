@@ -10,7 +10,7 @@ const backend=fs.readFileSync(require.resolve('../server.js'),'utf8');
 test('outpaint request sends mask plus padded original through existing jobs',()=>{
  assert.match(studio,/mask:config\.mask,maskSourceImage:config\.maskSourceImage/);
  assert.match(studio,/outpaintRect:config\.outpaintRect/);
- assert.match(backend,/outpaintRect:outpaintRect/);
+ assert.match(backend,/outpaintRect:b\.outpaintRect\|\|null/);
  assert.match(backend,/preserveOutpaint\(/);
 });
 test('reject invalid rectangles before paid work is queued',()=>{
