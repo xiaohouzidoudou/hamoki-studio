@@ -1,0 +1,17 @@
+FROM node:24-alpine
+WORKDIR /app
+ENV NODE_ENV=production STUDIO_HOST=127.0.0.1 STUDIO_PORT=8032 STUDIO_SECURE_COOKIES=1 STUDIO_DATA_DIR=/app/backend-v2/data
+RUN apk add --no-cache python3 py3-pillow py3-yaml
+COPY --chown=node:node backend-v2/package.json backend-v2/package-lock.json ./backend-v2/
+RUN cd backend-v2 && npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
+COPY --chown=node:node server.js index.html script.js style.css settings.html settings-v2.js settings-v2.css studio-optimized.css studio-v2.css studio-v2.js studio-v3.css studio-v4.css flow-entry.css flow-entry.js gameui-flow-tools.js gameui-flow.css gameui-flow.html gameui-flow.js gameui-layered.js v1-script.js v1-style.css v1.html logo.png ./
+COPY --chown=node:node lib ./lib
+COPY --chown=node:node vendor ./vendor
+COPY --chown=node:node assets ./assets
+COPY --chown=node:node backend-v2/src ./backend-v2/src
+COPY --chown=node:node backend-v2/web ./backend-v2/web
+RUN mkdir -p /app/backend-v2/data && chown -R node:node /app/backend-v2/data
+USER node
+EXPOSE 8032
+HEALTHCHECK --interval=30s --timeout=8s --start-period=15s --retries=3 CMD node -e "require('node:http').get('http://127.0.0.1:8032/api/auth/status',r=>{r.resume();process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
+CMD ["node","backend-v2/src/index.ts"]

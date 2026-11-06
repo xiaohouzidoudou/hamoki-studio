@@ -2,7 +2,8 @@
 .env.*
 !.env.example
 data/
-backend-v2/
+backend-v2/data/
+backend-v2/node_modules/
 node_modules/
 *.log
 *.backup

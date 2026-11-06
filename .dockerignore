@@ -4,6 +4,8 @@
 !.env.example
 data
 node_modules
+backend-v2/data
+backend-v2/node_modules
 *.log
 *Windows*
 *.bat

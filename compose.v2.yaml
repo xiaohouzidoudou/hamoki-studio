@@ -1,0 +1,29 @@
+services:
+  studio-v2:
+    build:
+      context: .
+      dockerfile: Dockerfile.v2
+    image: hamoki-studio:1.1.0-secure
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      STUDIO_HOST: 127.0.0.1
+      STUDIO_PORT: 8032
+      STUDIO_DATA_DIR: /app/backend-v2/data
+      STUDIO_SECURE_COOKIES: "1"
+      STUDIO_MAX_USERS: ${STUDIO_MAX_USERS:-12}
+      SUB2_BASE_URL: ${SUB2_BASE_URL:-}
+    volumes:
+      - studio_v2_data:/app/backend-v2/data
+    mem_limit: 1024m
+    pids_limit: 120
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=96m,noexec,nosuid
+volumes:
+  studio_v2_data:
