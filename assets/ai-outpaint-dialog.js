@@ -55,7 +55,7 @@
             '<div class="haop-model-row"><select class="haop-model-select" id="haop-model-select" aria-label="扩图模型，默认跟随原图"></select>'+
               '<button type="button" class="haop-model-fetch" title="获取当前原图中转商可用的模型">获取</button></div>'+
             '<input type="text" class="haop-model-custom" maxlength="120" placeholder="输入生图模型 ID" aria-label="自定义生图模型 ID" hidden>'+
-            '<p class="haop-model-note">默认使用原图模型，也可以选择其他模型。</p></div>'+
+            '<p class="haop-model-note">默认跟随原图模型。中转站和模型需支持 Images Edits 透明蒙版及指定尺寸；兼容接口不代表已验证，生成可能扣费。</p></div>'+
         '</section></div>'+
         '<footer class="haop-footer"><p class="haop-error" role="alert" hidden></p>'+
           '<div class="haop-foot-actions"><span>生成图与原图建立关联，在画布下方显示。</span>'+
@@ -162,9 +162,9 @@
         const images=ids.filter(m=>/image|flux|banana|seedream|dall-e|qwen.*img|imagen|hidream|z-image/i.test(m));
         const items=(images.length?images:ids).slice(0,140);
         renderModels(items);
-        modelNote.textContent='可选模型已更新，其他参数仍跟随原图。';
+        modelNote.textContent='可选模型已更新；模型和中转站必须支持透明蒙版及指定尺寸，兼容性尚需验证。';
       }catch(err){
-        modelNote.textContent='模型列表暂不可用，可使用手动输入模型 ID。';
+        modelNote.textContent='模型列表暂不可用，可手动输入；中转站须支持透明蒙版及指定尺寸。';
       }finally{
         if(root.isConnected){modelFetch.disabled=false;modelFetch.textContent='获取';}
       }

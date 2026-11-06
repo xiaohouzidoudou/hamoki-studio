@@ -31,3 +31,15 @@ test('masked outpaint preserves original region pixel-for-pixel',async t=>{
  const verification=spawnSync(py,['-c',"from PIL import Image; import io,sys; im=Image.open(io.BytesIO(sys.stdin.buffer.read())).convert('RGBA'); assert im.size==(64,48); assert im.getpixel((10,20))==(224,42,12,255); assert im.getpixel((50,20))==(21,41,200,255)"],{input:result.bytes,encoding:null});
  assert.equal(verification.status,0,String(verification.stderr));
 });
+test('preserves every source pixel on asymmetric margins and rejects unexpected output dimensions',async()=>{
+ const py=process.env.STUDIO_PYTHON||'python3';
+ const make=(code)=>{const r=spawnSync(py,['-c',code],{encoding:null,maxBuffer:1024*1024});assert.equal(r.status,0,String(r.stderr));return {mime:'image/png',bytes:r.stdout}};
+ const source=make("from PIL import Image;import sys; im=Image.new('RGBA',(80,64)); p=im.load(); [(p.__setitem__((x,y),(x%256,y%256,(x*y)%256,255))) for y in range(11,44) for x in range(7,48)];im.save(sys.stdout.buffer,'PNG')");
+ const generated=make("from PIL import Image;import sys;Image.new('RGBA',(80,64),(9,20,30,255)).save(sys.stdout.buffer,'PNG')");
+ const rect={width:80,height:64,x:7,y:11,w:41,h:33};
+ const result=await preserveOutpaint(generated,source,rect);
+ const check=spawnSync(py,['-c',"from PIL import Image;import io,sys;im=Image.open(io.BytesIO(sys.stdin.buffer.read())).convert('RGBA'); assert all(im.getpixel((x,y))==(x%256,y%256,(x*y)%256,255) for y in range(11,44) for x in range(7,48));assert im.getpixel((0,0))==(9,20,30,255)"],{input:result.bytes});
+ assert.equal(check.status,0,String(check.stderr));
+ const wrong=make("from PIL import Image;import sys;Image.new('RGBA',(81,64)).save(sys.stdout.buffer,'PNG')");
+ await assert.rejects(preserveOutpaint(wrong,source,rect),/尺寸/);
+});

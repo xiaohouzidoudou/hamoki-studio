@@ -1,6 +1,5 @@
 /* Pixel-accurate outpainting layout shared by the browser and tests.
-   The original always has a uniform scale factor; extra pixels are margins,
-   never a stretch of existing pixels. */
+   Source pixels keep their original dimensions; extra pixels are margins. */
 'use strict';
 (function(root,factory){
   const api=factory();
@@ -30,6 +29,8 @@
     return {w,h,left,right,top,bottom,outW:w+left+right,outH:h+top+bottom,margins:m};
   }
   function plan(width,height,amplitude,model){
+    if(!/^gpt-image-(?:1|2)(?:$|[.\-])/i.test(String(model||'')))
+      throw Error('该模型尚未接入蒙版扩图，不能使用普通图生图代替');
     const g=geometry(width,height,amplitude);
     const precision=isPreciseModel(model);
     let outputWidth,outputHeight,ratio,customSize=null;
@@ -37,21 +38,15 @@
     if(precision){
       if(aspect>3||aspect<1/3)
         throw Error('扩展后宽高比超过模型 3:1 限制，请降低扩展幅度后分次扩图');
-      const maxScale=Math.min(4096/g.outW,4096/g.outH,Math.sqrt(MAX_PIXELS/(g.outW*g.outH)));
-      const minScale=Math.max(512/g.outW,512/g.outH);
-      if(maxScale<minScale)throw Error('扩图画布无法满足该模型尺寸限制，请减少扩展幅度');
-      const factor=Math.min(maxScale,Math.max(1,minScale));
+      const factor=1;
       // Prefer rounding OUTWARDS: an added right/left margin must not make
       // the original image a few pixels smaller merely to align to 16px.
-      const upW=Math.ceil(g.outW*factor/16)*16;
-      const upH=Math.ceil(g.outH*factor/16)*16;
+      const upW=Math.max(512,Math.ceil(g.outW*factor/16)*16);
+      const upH=Math.max(512,Math.ceil(g.outH*factor/16)*16);
       if(upW<=4096&&upH<=4096&&upW*upH<=MAX_PIXELS&&
          upW<=upH*3&&upH<=upW*3){
         outputWidth=upW;outputHeight=upH;
-      }else{
-        outputWidth=Math.min(4096,Math.max(512,Math.floor(g.outW*factor/16)*16));
-        outputHeight=Math.min(4096,Math.max(512,Math.floor(g.outH*factor/16)*16));
-      }
+      }else throw Error('原图和扩展区域超出模型尺寸限制；为保留原图像素，请减少扩展幅度或使用更小的原图');
       if(outputWidth*outputHeight>MAX_PIXELS)
         throw Error('扩图像素超出模型限制，请分次扩图');
       if(outputWidth>outputHeight*3||outputHeight>outputWidth*3)
@@ -64,22 +59,23 @@
         {ratio:'3:2',width:1536,height:1024},
         {ratio:'2:3',width:1024,height:1536}
       ];
-      const selected=variants.reduce((a,b)=>
+      const fitting=variants.filter(v=>v.width>=g.outW&&v.height>=g.outH);
+      if(!fitting.length)throw Error('该模型的固定输出尺寸放不下原图和扩展区域，无法无损扩图');
+      const selected=fitting.reduce((a,b)=>
         Math.abs(Math.log((b.width/b.height)/aspect))<
         Math.abs(Math.log((a.width/a.height)/aspect))?b:a
       );
       outputWidth=selected.width;outputHeight=selected.height;ratio=selected.ratio;
     }
-    // Fit the entire requested extended canvas, not just the source rectangle,
-    // into the real output area using the SAME scale for X and Y.
-    const scale=Math.min(outputWidth/g.outW,outputHeight/g.outH);
-    const sourceWidth=Math.min(outputWidth,Math.max(1,Math.round(g.w*scale)));
-    const sourceHeight=Math.min(outputHeight,Math.max(1,Math.round(g.h*scale)));
+    // Fit the entire requested canvas without resizing the source.
+    const scale=1;
+    const sourceWidth=g.w;
+    const sourceHeight=g.h;
     const emptyX=outputWidth-sourceWidth,emptyY=outputHeight-sourceHeight;
     // Keep directional intent: right-only has x=0, left-only anchors right,
     // top-only anchors bottom; extra native-ratio padding follows the same side.
-    const x=g.left+g.right?Math.round(emptyX*g.left/(g.left+g.right)):Math.round(emptyX/2);
-    const y=g.top+g.bottom?Math.round(emptyY*g.top/(g.top+g.bottom)):Math.round(emptyY/2);
+    const x=g.left+g.right?g.left+Math.round((emptyX-g.left-g.right)*g.left/(g.left+g.right)):Math.round(emptyX/2);
+    const y=g.top+g.bottom?g.top+Math.round((emptyY-g.top-g.bottom)*g.top/(g.top+g.bottom)):Math.round(emptyY/2);
     if(x<0||y<0||x+sourceWidth>outputWidth||y+sourceHeight>outputHeight)
       throw Error('扩图区域计算失败');
     return {
