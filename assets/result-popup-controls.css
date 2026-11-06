@@ -19,6 +19,7 @@
   display:block;flex:0 0 15px;width:15px;height:15px;stroke:currentColor;
 }
 .result-floating-toolbar .generated-result-action:hover{background:#2b4938;border-color:#42765a;color:#f6fff9}
+.result-floating-toolbar .result-toolbar-action[data-action="expand"]{border-color:#64c49342;background:#58bd8521;color:#dcf8e5}
 .result-floating-toolbar button:focus-visible,
 .result-toolbar-more summary:focus-visible{outline:2px solid #69e3a1;outline-offset:2px}
 .result-toolbar-more{position:relative;flex:0 0 auto;min-width:0}
