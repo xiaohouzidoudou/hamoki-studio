@@ -14,6 +14,7 @@
 ## 身份认证与账户隔离
 
 - `/login` 只有 Sub2 邮箱和密码。账号核实后由 Sub2 返回的用户 ID 创建 Studio 身份；用户无需在 Studio 注册第二次，也无需输入激活码。
+- 当 Sub2 启用了 Cloudflare Turnstile 时，Studio 从 Sub2 公共设置读取站点 Key，登录页面显示相同验证码并把 `turnstile_token` 一并传给 Sub2。需在该 Turnstile widget 的允许域名中包含 Studio 正式域名，否则验证码无法签发；不要关闭 Sub2 的防护来绕过问题。
 - Sub2 密码仅用于身份验证请求，不持久化；服务器保存加密的访问令牌、刷新令牌、专属生图 Key。
 - 每个 Studio 账号使用独立本地 Node worker，`data/users/<id>` 私有目录和独立的服务商配置，每位用户图片与预览占用上限 1 GiB。
 - 旧 Studio 本地账号即使保留 SQLite 会话，现也无法登录。旧激活资料不再使用，数据暂保留以便回滚。

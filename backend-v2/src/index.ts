@@ -86,10 +86,15 @@ function loginReply(reply,user,req){
   return {user,quota:accounts.quota(user.id)};
 }
 app.get('/api/auth/status',async(req)=>({user:accounts.session(cookie(req)),loginProvider:'sub2',sub2Enabled:sub2.enabled}));
+app.get('/api/auth/captcha',async()=>{
+  if(!sub2.enabled)return {enabled:false,siteKey:''};
+  const config=await sub2.publicSettings();
+  return {enabled:config.turnstileEnabled,siteKey:config.turnstileEnabled?config.turnstileSiteKey:''};
+});
 app.post('/api/auth/sub2-login',async(req,reply)=>{
   if(!sub2.enabled)reject('Sub2 登录暂不可用',503);
-  throttle('sub2-login:'+sourceIP(req),6,15*60000);
-  const {profile,tokens}=await sub2.login(req.body?.email,req.body?.password);
+  throttle('sub2-login:'+sourceIP(req),12,15*60000);
+  const {profile,tokens}=await sub2.login(req.body?.email,req.body?.password,req.body?.turnstile_token);
   const u=accounts.sub2Identity(profile.id,profile.username||profile.email||'',tokens);
   if(u.status==='disabled')reject('此 Studio 账号已被禁用',403);
   const result=loginReply(reply,u,req);

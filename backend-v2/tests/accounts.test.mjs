@@ -22,10 +22,13 @@ function mockSub2(){
   let result={},status=200;
   const token=String(req.headers.authorization||'').replace(/^Bearer /,'');
   const id=Number(token.replace(/^mock-/,''));
-  if(req.url==='/api/v1/auth/login'){
+  if(req.url==='/api/v1/settings/public'){
+   result={data:{turnstile_enabled:true,turnstile_site_key:'mock-site-key-1234'}};
+  }else if(req.url==='/api/v1/auth/login'){
    let params={};try{params=JSON.parse(raw)}catch{};
    const found=users[params.email];
-   if(!found||params.password!=='RealSub2Password'){status=401;result={message:'Sub2 邮箱或密码不正确'}}
+   if(params.turnstile_token!=='mock-turnstile-solution'){status=403;result={message:'turnstile verification failed'}}
+   else if(!found||params.password!=='RealSub2Password'){status=401;result={message:'Sub2 邮箱或密码不正确'}}
    else result={data:{access_token:'mock-'+found.id,expires_in:1800}};
   }else if(req.url==='/api/v1/user/profile'){
    if(![1,2,3].includes(id)){status=401;result={message:'bad token'}}
@@ -59,7 +62,7 @@ test('only verified Sub2 accounts can login; admin pinned, data isolated, dedupe
   const raw=await r.text();let json;try{json=JSON.parse(raw)}catch{json=raw}
   return {code:r.status,data:json,cookie:r.headers.get('set-cookie')?.split(';')[0],headers:r.headers};
  }
- const login=async(email,password='RealSub2Password')=>api('/api/auth/sub2-login',{method:'POST',body:{email,password}});
+ const login=async(email,password='RealSub2Password')=>api('/api/auth/sub2-login',{method:'POST',body:{email,password,turnstile_token:'mock-turnstile-solution'}});
  try{
   for(let n=0;n<90&&!stdout.includes('backend-v2 available');n++)await sleep(100);
   assert.match(stdout,/backend-v2 available/,stderr);
@@ -67,6 +70,8 @@ test('only verified Sub2 accounts can login; admin pinned, data isolated, dedupe
   const anon=await api('/api/auth/status');assert.equal(anon.code,200);
   assert.equal(anon.data.loginProvider,'sub2');assert.equal(anon.data.user,null);
   assert.equal(anon.data.needsActivation,undefined);
+  const captcha=await api('/api/auth/captcha');assert.equal(captcha.code,200);
+  assert.equal(captcha.data.enabled,true);assert.equal(captcha.data.siteKey,'mock-site-key-1234');
   const form=await api('/login');assert.equal(form.code,200);
   assert.match(form.data,/使用 Sub2 账号登录/);assert.doesNotMatch(form.data,/首次激活码|data-mode="register"/);
   for(const route of ['/api/auth/register','/api/auth/login','/api/auth/activate']){
@@ -77,6 +82,7 @@ test('only verified Sub2 accounts can login; admin pinned, data isolated, dedupe
   assert.equal((await api('/')).code,302);
   assert.equal((await api('/api/projects')).code,401);
   assert.equal((await api('/api/account/me')).code,401);
+  assert.equal((await api('/api/auth/sub2-login',{method:'POST',body:{email:'owner@example.com',password:'RealSub2Password'}})).code,403);
   assert.equal((await login('owner@example.com','wrong')).code,401);
   const csrf=await api('/api/auth/sub2-login',{method:'POST',origin:'https://evil.example',body:{email:'owner@example.com',password:'RealSub2Password'}});
   assert.equal(csrf.code,403);

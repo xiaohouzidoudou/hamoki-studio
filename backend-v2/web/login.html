@@ -19,6 +19,8 @@ input::placeholder{color:#6c8a7c}
 button{margin-top:26px;display:block;width:100%;padding:13px;border:0;border-radius:12px;color:#062215;font-size:15px;font-weight:650;background:#64ce94;cursor:pointer;transition:background .2s,transform .18s}
 button:hover{background:#80dfaa}button:active{transform:scale(.985)}button:disabled{opacity:.55;cursor:wait}
 #message{min-height:21px;margin:12px 0 0;color:#ffb9ac;font-size:13px}
+#captcha{margin-top:18px;min-height:65px}
+[hidden]{display:none!important}
 .foot{display:flex;gap:8px;align-items:center;padding-top:19px;margin-top:5px;border-top:1px solid #a3c5b223;color:#8da79b;font-size:12px;line-height:1.6}
 .foot b{color:#85dcb0;font-weight:500}
 @media(max-width:390px){.panel{padding:27px 22px}h1{font-size:23px}}
@@ -35,25 +37,59 @@ button:hover{background:#80dfaa}button:active{transform:scale(.985)}button:disab
     <input id="email" type="email" autocomplete="username" placeholder="请输入 Sub2 登录邮箱" maxlength="254" required autofocus>
     <label for="password">Sub2 密码</label>
     <input id="password" type="password" autocomplete="current-password" placeholder="请输入 Sub2 密码" maxlength="128" required>
+    <div id="captcha" hidden></div>
     <button id="submit" type="submit">登录并进入画布</button>
   </form>
   <div id="message" role="alert" aria-live="polite"></div>
   <div class="foot"><span>●</span><span><b>独立账号</b> · 个人图片与 API Key 分开保存，Sub2 密码不在 Studio 存储</span></div>
 </main>
 <script>
-const form=document.getElementById('form'),email=document.getElementById('email'),password=document.getElementById('password'),submit=document.getElementById('submit'),message=document.getElementById('message');
-form.addEventListener('submit',async event=>{
-  event.preventDefault();
-  message.textContent='';submit.disabled=true;submit.textContent='正在验证 Sub2 账号…';
+const form=document.getElementById('form'),email=document.getElementById('email'),password=document.getElementById('password'),submit=document.getElementById('submit'),message=document.getElementById('message'),captcha=document.getElementById('captcha');
+let captchaRequired=false,captchaToken='',widgetId=null,wasLoggedIn=false;
+async function initializeLogin(){
   try{
-    const response=await fetch('/api/auth/sub2-login',{method:'POST',headers:{'Content-Type':'application/json','X-Studio-Request':'1'},credentials:'same-origin',body:JSON.stringify({email:email.value.trim(),password:password.value})});
+    const status=await fetch('/api/auth/status',{cache:'no-store'}).then(r=>r.json());
+    if(status.user){location.replace('/');return}
+    if(status.sub2Enabled===false)throw Error('Sub2 服务暂时不可用');
+    const response=await fetch('/api/auth/captcha',{cache:'no-store'});
+    if(!response.ok)throw Error('暂时无法读取 Sub2 登录验证配置');
+    const options=await response.json();
+    if(options.enabled!==true)return;
+    captchaRequired=true;
+    if(!options.siteKey||!/^[a-zA-Z0-9_-]{10,80}$/.test(options.siteKey))throw Error('Sub2 人机验证未正确配置');
+    captcha.hidden=false;
+    const script=document.createElement('script');
+    script.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+    script.async=true;
+    script.onload=()=>{
+      if(!window.turnstile){message.textContent='人机验证组件加载失败';return}
+      widgetId=window.turnstile.render(captcha,{
+        sitekey:options.siteKey,theme:'dark',appearance:'always',
+        callback:token=>{captchaToken=token;message.textContent=''},
+        'expired-callback':()=>{captchaToken=''},
+        'error-callback':()=>{captchaToken='';message.textContent='验证码暂不可用，请检查网络或当前域名的 Turnstile 授权';}
+      });
+    };
+    script.onerror=()=>{message.textContent='人机验证服务加载失败，请检查网络后刷新页面'};
+    document.head.appendChild(script);
+  }catch(error){message.textContent=error.message||'无法加载登录配置';submit.disabled=true}
+}
+form.addEventListener('submit',async event=>{
+  event.preventDefault();message.textContent='';
+  if(captchaRequired&&!captchaToken){message.textContent='请先完成 Sub2 人机验证';return}
+  submit.disabled=true;submit.textContent='正在验证 Sub2 账号…';
+  try{
+    const response=await fetch('/api/auth/sub2-login',{method:'POST',headers:{'Content-Type':'application/json','X-Studio-Request':'1'},credentials:'same-origin',body:JSON.stringify({email:email.value.trim(),password:password.value,...(captchaToken?{turnstile_token:captchaToken}:{})})});
     const data=await response.json().catch(()=>({}));
     if(!response.ok)throw Error(data.error||'登录失败，请检查 Sub2 账号和密码');
-    password.value='';
+    wasLoggedIn=true;password.value='';
     location.replace('/');
-  }catch(error){message.textContent=error.message||'登录失败';}
-  finally{submit.disabled=false;submit.textContent='登录并进入画布';}
+  }catch(error){message.textContent=error.message||'登录失败'}
+  finally{
+    if(captchaRequired&&!wasLoggedIn){captchaToken='';if(window.turnstile&&widgetId!==null)window.turnstile.reset(widgetId)}
+    submit.disabled=false;submit.textContent='登录并进入画布';
+  }
 });
-fetch('/api/auth/status',{cache:'no-store'}).then(r=>r.json()).then(data=>{if(data.user)location.replace('/');else if(data.sub2Enabled===false){message.textContent='Sub2 服务暂时不可用';submit.disabled=true;}}).catch(()=>{});
+initializeLogin();
 </script>
 </body></html>

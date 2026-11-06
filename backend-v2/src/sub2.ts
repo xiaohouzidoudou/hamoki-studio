@@ -2,7 +2,7 @@ const readBody = async res => {
   const str=await res.text();
   let obj;try{obj=JSON.parse(str)}catch{throw Object.assign(Error('Sub2 返回非 JSON 响应'),{statusCode:502})}
   if(!res.ok||obj?.code&&obj.code!==0&&obj.code!==200&&obj.code!==1&&obj.code!=='SUCCESS'){
-    throw Object.assign(Error(obj?.message||obj?.error||'Sub2 API 请求失败'),{statusCode:res.status===401?401:502});
+    throw Object.assign(Error(obj?.message||obj?.error||'Sub2 API 请求失败'),{statusCode:[400,401,403,409,422,429].includes(res.status)?res.status:502});
   }
   return obj?.data??obj;
 };
@@ -17,6 +17,10 @@ export class Sub2Client {
     this.base=b;
   }
   get enabled(){return !!this.base}
+  async publicSettings(){
+    const data=await this.request('/api/v1/settings/public',null,{timeout:6000});
+    return {turnstileEnabled:data?.turnstile_enabled===true,turnstileSiteKey:typeof data?.turnstile_site_key==='string'?data.turnstile_site_key:''};
+  }
   async request(path,token,{method='GET',body,timeout=10000,idempotencyKey}={}){
     if(!this.enabled)throw Object.assign(Error('Sub2 尚未配置'),{statusCode:503});
     const headers={accept:'application/json'};
@@ -28,9 +32,10 @@ export class Sub2Client {
     catch{throw Object.assign(Error('Sub2 暂时不可达'),{statusCode:502})}
     return readBody(response);
   }
-  async login(email,password){
+  async login(email,password,turnstileToken){
     if(typeof email!=='string'||typeof password!=='string'||email.length>254||password.length>128)throw Object.assign(Error('登录参数不合法'),{statusCode:400});
-    const result=await this.request('/api/v1/auth/login',null,{method:'POST',body:{email,password}});
+    if(turnstileToken!==undefined&&(typeof turnstileToken!=='string'||turnstileToken.length>2048))throw Object.assign(Error('人机验证参数不合法'),{statusCode:400});
+    const result=await this.request('/api/v1/auth/login',null,{method:'POST',body:{email,password,...(turnstileToken?{turnstile_token:turnstileToken}:{})}});
     if(result?.requires_2fa)throw Object.assign(Error('Sub2 当前账号需要二次验证，请先使用 Sub2 控制台；Studio 尚未实现该验证流程'),{statusCode:409});
     if(!result?.access_token)throw Object.assign(Error('Sub2 登录未返回授权 Token，检查验证码/版本配置'),{statusCode:409});
     const profile=await this.profile(result.access_token);

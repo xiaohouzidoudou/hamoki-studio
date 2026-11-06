@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.v2
-    image: hamoki-studio:1.2.0-sub2-only
+    image: hamoki-studio:1.2.1-sub2-turnstile
     network_mode: host
     restart: unless-stopped
     environment:
