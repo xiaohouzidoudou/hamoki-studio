@@ -1,16 +1,16 @@
 /* Low-profile model selector + left-side prompt-history glass drawer. */
-.params-panel .panel-header {display:flex;align-items:center;gap:10px;overflow:visible!important;}
+.params-panel .panel-header {display:flex;align-items:center;gap:10px;overflow:visible!important;position:relative;}
 .params-panel .panel-header h2 {flex:0 0 auto;white-space:nowrap;min-width:0;}
 .params-panel .panel-header .header-model-group {
   flex:1 1 0;min-width:0;max-width:176px;margin:0!important;padding:0!important;
-  align-self:center;position:relative;z-index:20;
+  align-self:center;position:static;
 }
 .params-panel .panel-header .header-model-group #model-label {
   position:absolute!important;clip-path:inset(50%);width:1px;height:1px;overflow:hidden;
   margin:0;padding:0;white-space:nowrap;
 }
 .params-panel .panel-header .model-picker {
-  position:relative;max-width:100%;width:100%;font-weight:400;
+  position:static;max-width:100%;width:100%;font-weight:400;
 }
 .params-panel .panel-header .model-picker-trigger {
   height:29px;min-height:29px;width:100%;padding:4px 7px;border-radius:8px;
@@ -30,8 +30,8 @@
 }
 .params-panel .panel-header .model-picker-trigger > svg{width:12px;height:12px;opacity:.75;}
 .params-panel .panel-header .model-picker-list {
-  position:absolute;left:auto;right:0;top:calc(100% + 8px);
-  width:min(335px,78vw);max-height:min(400px,55vh);
+  position:absolute;left:12px;right:12px;top:calc(100% + 6px);
+  width:auto;max-width:calc(100% - 24px);max-height:min(400px,55vh);
   z-index:300;background:rgba(14,34,36,.97);border:1px solid rgba(166,226,202,.26);
   border-radius:13px;box-shadow:0 21px 60px rgba(0,0,0,.49);
   backdrop-filter:blur(25px) saturate(140%);
