@@ -280,7 +280,8 @@ async function proxy(req,reply){
   }
   // Node's built-in reverse proxy streams to the account's own loopback-only worker.
   reply.hijack();
-  const opts={hostname:'127.0.0.1',port:active.port,path:req.raw.url,method:req.method,headers:{...req.raw.headers,host:'127.0.0.1:'+active.port,'x-studio-account':u.id}};
+  // Preserve the original public Host for the legacy worker's Origin-vs-Host CSRF guard.
+  const opts={hostname:'127.0.0.1',port:active.port,path:req.raw.url,method:req.method,headers:{...req.raw.headers,'x-studio-account':u.id}};
   delete opts.headers.cookie;
   const upstream=http.request(opts,res=>{
     reply.raw.writeHead(res.statusCode||502,{...res.headers,'cache-control':res.headers['cache-control']||'private, no-store'});
