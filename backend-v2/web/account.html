@@ -4,9 +4,9 @@
 <style>
 :root{color-scheme:dark;font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 10% 0,#204338,#081012 58%);color:#e3f3eb;font-size:14px}
-main{width:min(900px,100%);padding:24px 18px 70px;margin:0 auto}a{color:#88dcac;text-decoration:none}a:hover{text-decoration:underline}
+main{width:min(900px,100%);padding:20px 18px 48px;margin:0 auto}a{color:#88dcac;text-decoration:none}a:hover{text-decoration:underline}
 h1{font-size:25px;font-weight:650;margin:20px 0 9px}h2{font-size:16px;font-weight:600;margin:0 0 13px}
-.desc,.muted{color:#9db9aa;line-height:1.65}section{padding:24px;margin:18px 0;border:1px solid #b5ddc527;border-radius:18px;background:#deffef0b;box-shadow:0 18px 42px #0002;backdrop-filter:blur(18px)}
+.desc,.muted{color:#9db9aa;line-height:1.65}section{padding:22px;margin:14px 0;border:1px solid #b5ddc527;border-radius:18px;background:#deffef0b;box-shadow:0 18px 42px #0002;backdrop-filter:blur(18px)}
 .row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:12px 0;border-bottom:1px solid #c4ebd018}.row:last-child{border:0}
 button{border:1px solid #73c99e3e;background:#2e7354;color:#e7f7ed;font:inherit;padding:9px 13px;border-radius:11px;cursor:pointer;transition:background .2s,transform .2s}
 button:hover{background:#378e67}button:active{transform:scale(.985)}button.secondary{background:#ffffff11;border-color:#ffffff26}button:disabled{opacity:.5}
@@ -15,12 +15,12 @@ button:hover{background:#378e67}button:active{transform:scale(.985)}button.secon
 @media(prefers-reduced-motion:reduce){button{transition:none}}
 </style></head>
 <body><main>
-<a href="/">← 返回自由画布</a><h1>账号与管理</h1><p class="desc">与 Sub2 账号自动关联，无需额外的 Studio 密码。</p><p id="notice" role="alert" aria-live="polite"></p>
+<h1>账号与管理</h1><p class="desc">与 Sub2 账号自动关联，无需额外的 Studio 密码。</p><p id="notice" role="alert" aria-live="polite"></p>
 <section><h2>当前账号</h2><div class="row"><span id="who">加载中…</span><button id="logout" class="secondary">退出登录</button></div><div class="row"><span id="quota" class="muted">正在读取空间使用情况…</span></div></section>
 <section><h2>Sub2 生图账号</h2><p class="desc">余额和可用模型来自你登录的 Sub2 账号，API Key 仅保存在服务器个人加密空间。</p>
 <div class="row"><span id="balance">尚未读取余额</span><button id="balanceBtn" class="secondary">刷新余额</button></div>
-<div class="row"><span id="models" class="muted">尚未读取生图模型</span><button id="modelsBtn" class="secondary">查询模型</button></div>
-<div class="row"><span id="sync" class="muted">生图模型未同步</span><button id="keyBtn">同步到画布</button></div></section>
+
+</section>
 <section id="admin"><h2>用户管理 <small class="muted">· 仅 Sub2 管理员可见</small></h2><p class="desc">可以禁用或恢复用户在 Studio 的访问。密码由用户在 Sub2 自行管理。</p><div id="users"></div></section>
 </main>
 <script>
@@ -42,8 +42,6 @@ async function init(){
  await act(async()=>{$('balance').textContent='读取中…';const x=await call('/api/account/sub2/balance');$('balance').textContent=x.balance==null?'Sub2 未返回余额':'Sub2 余额：'+x.balance+' USD';});
 }
 $('balanceBtn').addEventListener('click',()=>act(async()=>{const x=await call('/api/account/sub2/balance');$('balance').textContent=x.balance==null?'余额暂不可用':'Sub2 余额：'+x.balance+' USD';}));
-$('modelsBtn').addEventListener('click',()=>act(async()=>{const x=await call('/api/account/sub2/models');$('models').textContent=x.needsProvision?'需要先同步生图密钥':(x.models.length?x.models.join('、'):'未找到图像模型');}));
-$('keyBtn').addEventListener('click',()=>act(async()=>{const x=await call('/api/account/sub2/provision','POST');$('sync').textContent=x.configured?'已同步 '+x.modelCount+' 个生图模型':'已保存专用 Key，画布模型尚未同步';}));
 $('logout').addEventListener('click',()=>act(async()=>{await call('/api/auth/logout','POST');location.replace('/login');}));
 init().catch(()=>location.replace('/login'));
 </script></body></html>
