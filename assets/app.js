@@ -615,8 +615,18 @@ function editNote(n,card){if(!card)return;const old=card.querySelector('.note-co
 function startNodeDrag(e,n){
  canvasPreviewCandidate=e.target.closest('.node-image-box')&&e.button===0&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&!spaceDown&&tool!=='hand'?{id:n.id,pointerId:e.pointerId,at:Date.now(),x:e.clientX,y:e.clientY,dragged:false}:null;if(e.button!==0&&e.pointerType!=='touch')return;if((e.ctrlKey||e.metaKey)&&n.kind!=='note'){e.preventDefault();e.stopPropagation();selectNode(n.id,true);return}if(spaceDown||tool==='hand'){startPan(e);return}e.stopPropagation();e.preventDefault();if(e.shiftKey){selectNode(n.id,true);return}
  if(!multiNodeIds.has(n.id)){
-  const together=n.groupId?currentProject.nodes.filter(x=>x.groupId===n.groupId).map(x=>x.id):[n.id];
-  multiNodeIds=new Set(together);selectedNodeId=n.id;renderNodes();
+  // Moving a source also moves all generations descended from it, even when their stack is collapsed.
+   const together=new Set(n.groupId?currentProject.nodes.filter(x=>x.groupId===n.groupId).map(x=>x.id):[n.id]);
+   let changed=true;
+   while(changed){
+    changed=false;
+    for(const child of currentProject.nodes){
+     if(child.parentNodeId&&together.has(child.parentNodeId)&&!together.has(child.id)){
+      together.add(child.id);changed=true;
+     }
+    }
+   }
+   multiNodeIds=together;selectedNodeId=n.id;renderNodes();
  }
  const group=currentProject.nodes.filter(x=>multiNodeIds.has(x.id));
  gesture={type:'move-multi',id:e.pointerId,origin:boardXY(e),before:snapshotScene(group.map(x=>x.id))};$('board').setPointerCapture(e.pointerId)}
