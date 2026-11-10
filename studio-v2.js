@@ -813,6 +813,21 @@
       }
     });
   }
+  async function openPsLite(node,h){
+    if(!window.HamokiPsLite?.open)throw Error('PS Lite 编辑器尚未加载，请刷新页面');
+    const url=urlFor(node);
+    if(!url)throw Error('图片原图不可访问');
+    return window.HamokiPsLite.open({
+      url,
+      onApply:async output=>{
+        const created=await saveCanvasBlob(node,output.blob,'本地编辑 · '+(h?.model||'Hamoki'));
+        await refresh();
+        if(created?.id)revealCanvasNode(created.id);
+        toast('编辑结果已存为新图片，原图保持不变');
+        return true;
+      }
+    });
+  }
   async function runLocalImageAction(node,h,action){
     if(action==='hd'||action==='expand'){
       toast('本地高清插值与本地扩图已停用。请使用 AI 图像生成器完成扩图',true);
@@ -1043,6 +1058,7 @@
       },
       onGenerate:config=>submitFromResultComposer(node,h,config),
       onAction:async(action,ui)=>{
+        if(action==='edit')return openPsLite(node,h);
         if(action==='download'){
           const link=make('a');
           link.href=picture;link.download='Hamoki-'+h.id+'.png';
