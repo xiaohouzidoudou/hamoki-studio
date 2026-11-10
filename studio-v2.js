@@ -2,6 +2,163 @@
 (() => {
   let projectId = null, projectNodes = [], projectGroups = [], historyItems = [], dragging = false, selectedId = null;
   const selectedNodeIds = new Set();
+  const importer=window.HamokiCanvasLocalImport;
+  const deferredReferenceFiles=new WeakMap();
+  let localQueue=null;
+  function currentLocal(id){return localQueue?.get(id)||null;}
+  function localQueueReady(){
+    if(localQueue||!importer)return localQueue;
+    localQueue=importer.createQueue({
+      storage:importer.indexedStore(window.indexedDB),
+      upload:importer.xhrTransport,makeURL:blob=>URL.createObjectURL(blob),
+      revokeURL:url=>URL.revokeObjectURL(url),makeId:()=>crypto.randomUUID(),
+      maxConcurrent:2,
+      notify:(type,item,detail)=>{
+        if(type==='added'){
+          if(item.projectId===projectId&&!projectNodes.some(n=>n.id===item.id))
+            projectNodes.push(item.node);
+          if(item.projectId===projectId)renderCanvas();
+        }else if(type==='removed'){
+          projectNodes=projectNodes.filter(n=>n.id!==item.id);
+          selectedNodeIds.delete(item.id);
+          if(selectedId===item.id)selectedId=null;
+          renderCanvas();
+        }else if(type==='storage-error'){
+          toast('本地图片暂存失败，刷新可能无法恢复：'+detail.message,true);
+        }else if(type==='failed'){
+          toast('图片上传失败，可点击重试：'+detail.message,true);
+          updateLocalIndicator(item);
+        }else if(type==='state'||type==='progress'||type==='geometry'){
+          updateLocalIndicator(item);
+        }
+      },
+      onCommit:async(item,remote)=>{
+        // Preserve the most recent user geometry if it changed while uploading.
+        let geo,result;
+        for(let attempt=0;attempt<6;attempt++){
+          geo={x:item.node.x,y:item.node.y,w:item.node.w,h:item.node.h};
+          result=await api('/api/projects/'+item.projectId+'/nodes/'+remote.id,{
+            method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(geo)
+          });
+          if(item.removed)return;
+          if(['x','y','w','h'].every(k=>geo[k]===item.node[k]))break;
+          if(attempt===5)throw Error('图片位置仍在更新，请稍后重试保存');
+        }
+        const finalNode={...remote,...(result.node||{}),...geo};
+        const card=canvas()?.querySelector('.canvas-node[data-id="'+item.id+'"]');
+        if(card){
+          // Decode before swapping the existing image: no blank intermediary frame.
+          let target=finalNode.previewUrl||finalNode.url;
+          async function imageReady(src){
+            return new Promise(resolve=>{
+              const image=new Image();
+              image.onload=()=>resolve(true);image.onerror=()=>resolve(false);
+              image.src=src;
+            });
+          }
+          if(target&&!await imageReady(target)){
+            if(target!==finalNode.url&&await imageReady(finalNode.url))target=finalNode.url;
+            else throw Error('服务端图片尚不可读取，将保留本地预览并可重试');
+          }
+          if(item.removed)return;
+          const original=card.querySelector('.canvas-node-image');
+          if(original&&target){original.dataset.preview=target;original.src=target;}
+          card.dataset.id=finalNode.id;
+          card.classList.remove('canvas-import-pending');
+          card.querySelector('.canvas-import-status')?.remove();
+        }
+        Object.assign(item.node,finalNode,{__local:false});
+        for(const entry of [...undoStack,...redoStack])
+          if(entry.nodeId===item.id)entry.nodeId=finalNode.id;
+        // A crop can be created before its source has finished importing.
+        for(const child of localQueue.nodes(item.projectId))
+          if(child.id!==item.id&&child.parentNodeId===item.id)
+            localQueue.update(child.id,{parentNodeId:finalNode.id});
+        if(selectedNodeIds.delete(item.id))selectedNodeIds.add(finalNode.id);
+        if(selectedId===item.id)selectedId=finalNode.id;
+        window.HamokiViewport?.syncBounds();
+      },
+      onCancelRemote:importer.cancelServerImport
+    });
+    return localQueue;
+  }
+  function updateLocalIndicator(item){
+    const card=canvas()?.querySelector('.canvas-node[data-id="'+item.id+'"]');
+    if(!card)return;
+    const row=card.querySelector('.canvas-import-status');
+    if(!row)return;
+    const state=row.querySelector('.canvas-import-label');
+    const bar=row.querySelector('.canvas-import-fill');
+    const retry=row.querySelector('.canvas-import-retry');
+    if(state)state.textContent=item.phase==='deferred'?'本地草稿 · 生成时上传':
+      item.phase==='failed'?'上传失败':
+      item.phase==='queued'?'等待上传':
+      item.phase==='committing'?'正在保存位置':
+      '上传 '+item.progress+'%';
+    if(bar)bar.style.width=item.progress+'%';
+    if(retry)retry.hidden=item.phase!=='failed';
+    row.classList.toggle('is-error',item.phase==='failed');
+    row.classList.toggle('is-deferred',item.phase==='deferred');
+  }
+  function localImportCard(card,node){
+    const item=currentLocal(node.id);
+    if(!item)return;
+    card.classList.add('canvas-import-pending');
+    const row=make('div','canvas-import-status');
+    row.setAttribute('role','status');row.setAttribute('aria-live','off');
+    const text=make('span','canvas-import-label'),progress=make('div','canvas-import-track');
+    progress.append(make('span','canvas-import-fill'));
+    const retry=make('button','canvas-import-retry','重试');retry.type='button';
+    retry.onclick=event=>{event.stopPropagation();localQueue.retry(node.id);};
+    const cancel=make('button','canvas-import-cancel');
+    cancel.type='button';cancel.title='取消此图片上传并移除本地草稿';
+    cancel.setAttribute('aria-label','取消上传 '+(node.title||'图片'));
+    cancel.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5 19 19M19 5 5 19"/></svg>';
+    cancel.onclick=event=>{
+      event.stopPropagation();
+      void localQueue.cancel(node.id).catch(error=>
+        toast('已移除图片，但服务端取消确认失败：'+error.message,true));
+    };
+    for(const button of [retry,cancel]){
+      button.addEventListener('pointerdown',event=>event.stopPropagation());
+      button.addEventListener('dblclick',event=>event.stopPropagation());
+    }
+    row.append(text,progress,retry,cancel);card.append(row);
+    text.textContent=item.phase==='deferred'?'本地草稿 · 生成时上传':
+      item.phase==='failed'?'上传失败':item.phase==='queued'?'等待上传':
+      item.phase==='committing'?'正在保存位置':'上传 '+item.progress+'%';
+    row.classList.toggle('is-deferred',item.phase==='deferred');
+    row.classList.toggle('is-error',item.phase==='failed');
+    retry.hidden=item.phase!=='failed';
+    row.querySelector('.canvas-import-fill').style.width=item.progress+'%';
+  }
+  function localImage(file,placement={},deferred=false){
+    if(!projectId)throw Error('项目画布尚未加载');
+    const viewport=document.getElementById('canvas-viewport'),zoom=state.zoom||1;
+    const origin=window.HamokiViewport?.worldOrigin?.()||{left:0,top:0};
+    const baseX=((viewport?.scrollLeft||0)-origin.left+(viewport?.clientWidth||600)/2)/zoom;
+    const baseY=((viewport?.scrollTop||0)-origin.top+(viewport?.clientHeight||450)/2)/zoom;
+    return localQueueReady().add(file,{
+      projectId,name:placement.name||file.name,
+      x:placement.x??Math.round(baseX-144),
+      y:placement.y??Math.round(baseY-144),
+      w:placement.w||288,h:placement.h||288,
+      parentNodeId:placement.parentNodeId||null,deferred
+    });
+  }
+  async function prepareGenerationReferences(files){
+    const pending=[...new Set((files||[]).map(file=>deferredReferenceFiles.get(file)).filter(Boolean))];
+    async function uploadLineage(id,visited=new Set()){
+      const item=currentLocal(id);
+      if(!item||visited.has(id))return;
+      visited.add(id);
+      if(item.parentNodeId&&currentLocal(item.parentNodeId))
+        await uploadLineage(item.parentNodeId,visited);
+      if(currentLocal(id))await localQueue.ensure(id);
+    }
+    for(const id of pending)await uploadLineage(id);
+  }
+
   const expandedStacks = new Set();
   let canvasViewportSignature = '', viewportRefreshFrame = 0, animatedStackKey = '';
   let suppressCardClickId = null;
@@ -358,6 +515,13 @@
         api('/api/history')
       ]);
       projectNodes = details.project?.nodes || [];
+      // An upload may have committed during a refresh; dedupe by client import ID.
+      const queue=localQueueReady();
+      try{await queue?.restore(projectId);}catch(error){toast('本地图片恢复失败：'+error.message,true);}
+      for(const node of queue?.nodes(projectId)||[]){
+        if(!projectNodes.some(existing=>existing.id===node.id||existing.clientImportId===node.id))
+          projectNodes.push(node);
+      }
       projectGroups = details.project?.groups || [];
       // A fresh visit shows the clean board. Floating tools appear only after selection.
       for(const id of [...selectedNodeIds])if(!projectNodes.some(item=>item.id===id))selectedNodeIds.delete(id);
@@ -629,7 +793,9 @@
           const blob=await response.blob();
           const type=blob.type||'image/png';
           const suffix=type==='image/webp'?'webp':type==='image/jpeg'?'jpg':'png';
-          return new File([blob],'hamoki-reference-'+(i+1)+'.'+suffix,{type});
+          const file=new File([blob],'hamoki-reference-'+(i+1)+'.'+suffix,{type});
+          if(mode==='reference'&&currentLocal(node.id))deferredReferenceFiles.set(file,node.id);
+          return file;
         }));
         if(files.some(file=>!file.size||file.size>12*1024*1024)||
           files.reduce((sum,f)=>sum+f.size,0)>40*1024*1024)
@@ -817,10 +983,12 @@
     await window.HamokiResultImageEditor.open({
       url,mode,
       onApply:async output=>{
-        const created=await saveCanvasBlob(node,output.blob,name+' · '+(h?.model||'Hamoki'));
-        await refresh();
-        if(created?.id)revealCanvasNode(created.id);
-        toast(name+'结果已保存为画布新图，原图保持不变');
+        const created=localImage(output.blob,{
+          name:name+' · '+(h?.model||'Hamoki'),parentNodeId:node.id,
+          x:node.x+node.w+52,y:node.y,w:288,h:288
+        },true);
+        revealCanvasNode(created.id);
+        toast(name+'结果已留在浏览器本地；生成引用时才上传');
         return true;
       }
     });
@@ -845,9 +1013,9 @@
         const canvas=cropSource(source,rect);
         const blob=await canvasToPng(canvas);
         const name=action==='trim-edge'?'边缘裁切':'自动裁切';
-        await saveCanvasBlob(node,blob,name+' · '+(h?.model||'Hamoki'));
-        await refresh();
-        toast('已完成'+name+'，输出 '+rect.w+' × '+rect.h+' px');
+        localImage(blob,{name:name+' · '+(h?.model||'Hamoki'),
+          x:node.x+node.w+52,y:node.y,parentNodeId:node.id,w:288,h:288},true);
+        toast('已完成'+name+'，结果保存在本地，生成引用时上传');
         return;
       }
       if(action==='grid9'){
@@ -1005,6 +1173,8 @@
         if(objectUrl)URL.revokeObjectURL(objectUrl);
       }
     }
+    await prepareGenerationReferences(refs);
+    if(hasCurrent&&currentLocal(node.id))await localQueue.ensure(node.id);
     // Send via the SAME local /api/jobs as the right-hand generator, without
     // mutating or clearing any prompt or references the user already has there.
     const dataRefs=await Promise.all(refs.map(fileData));
@@ -1104,6 +1274,7 @@
       const type=['image/png','image/jpeg','image/webp'].includes(blob.type)?blob.type:'image/png';
       const suffix=type==='image/jpeg'?'jpg':type==='image/webp'?'webp':'png';
       const file=new File([blob],(item.title||'画布引用').slice(0,50)+'.'+suffix,{type});
+      if(currentLocal(item.id))deferredReferenceFiles.set(file,item.id);
       if(!file.size||file.size>12*1024*1024)throw Error('参考图必须小于12MB');
       if(apiRefs.add([file])!==1)throw Error('右侧参考图区域没有接收这张图片');
       const newEntry=state.referenceImages?.[state.referenceImages.length-1];
@@ -1556,6 +1727,7 @@
         });
         card.append(refButton);
       }
+      if(currentLocal(node.id))localImportCard(card,node);
       const footer = make('div','canvas-node-foot');
       footer.append(make('span','',node.kind === 'generated' ? '生成作品' : node.kind === 'note' ? '备注' : '参考图片'));
       const remove = make('button','canvas-node-delete','×');
@@ -1607,7 +1779,8 @@ for (const direction of ['nw','n','ne','e','se','s','sw','w']) {
               return;
             }
             try{
-              await api('/api/projects/'+projectId+'/nodes/'+node.id,{
+              if(currentLocal(node.id))localQueue.update(node.id,updated);
+              else await api('/api/projects/'+projectId+'/nodes/'+node.id,{
                 method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(updated)
               });
               Object.assign(node,updated);
@@ -1685,7 +1858,8 @@ for (const direction of ['nw','n','ne','e','se','s','sw','w']) {
           const ny=Math.round(initial.y+(e.clientY-y)/(state.zoom||1));
           card.style.left=nx+'px';card.style.top=ny+'px';
           try {
-            await api('/api/projects/'+projectId+'/nodes/'+node.id,
+            if(currentLocal(node.id))localQueue.update(node.id,{x:nx,y:ny});
+            else await api('/api/projects/'+projectId+'/nodes/'+node.id,
               {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({x:nx,y:ny})});
             node.x=nx;node.y=ny;
             rememberGeometry(node.id,initial,rectOf(node));
@@ -1784,9 +1958,12 @@ for (const direction of ['nw','n','ne','e','se','s','sw','w']) {
       {title:singleNote?'删除反推提示词面板':multiple?'批量移除画布元素':'移除画布图片',
         confirmLabel:multiple?'移除 '+selected.length+' 个':'移除',danger:true}))return;
     try{
-      await api('/api/projects/'+projectId+'/nodes/selection',{
+      const local=selected.filter(id=>currentLocal(id));
+      const remote=selected.filter(id=>!currentLocal(id));
+      for(const id of local)await localQueue.cancel(id);
+      if(remote.length)await api('/api/projects/'+projectId+'/nodes/selection',{
         method:'DELETE',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({nodeIds:selected})
+        body:JSON.stringify({nodeIds:remote})
       });
       focusNode(null);await refresh();
       toast('已从画布移除 '+selected.length+' 张 · 原图保留');
@@ -1801,6 +1978,8 @@ for (const direction of ['nw','n','ne','e','se','s','sw','w']) {
     if (!projectId) return toast('画布尚未加载',true);
     if (!(await window.HamokiGlassUI.confirm('清空当前画布上的所有元素？已生成的历史作品仍会保留。',{title:'清空画布',confirmLabel:'清空画布',danger:true}))) return;
     try {
+      for(const draft of localQueueReady()?.nodes(projectId)||[])
+        await localQueue.cancel(draft.id);
       await api('/api/projects/'+projectId+'/nodes',{method:'DELETE'});
       selectedId=null;await refresh();toast('画布已清空，作品历史未删除');
     } catch(e){toast('清空画布失败：'+e.message,true);}
@@ -1856,32 +2035,32 @@ for (const direction of ['nw','n','ne','e','se','s','sw','w']) {
       reader.readAsDataURL(file);
     });
   }
-  async function addReferenceFile(file) {
-    if (!projectId) {
-      await refresh();
-      if (!projectId) throw Error('项目画布尚未加载');
+  function addReferenceFile(file,placement={}) {
+    const node=localImage(file,placement,false);
+    toast('图片已放入画布，正在后台上传');
+    return node;
+  }
+  function addReferenceFiles(files,placement={}){
+    const valid=Array.from(files||[]).filter(f=>['image/png','image/jpeg','image/webp'].includes(f.type)).slice(0,15);
+    const added=[];
+    for(const [i,file] of valid.entries()){
+      try{
+        added.push(addReferenceFile(file,{...placement,
+          x:placement.x===undefined?undefined:placement.x+(i%4)*332,
+          y:placement.y===undefined?undefined:placement.y+Math.floor(i/4)*338}));
+      }catch(error){toast(file.name+'：'+error.message,true);}
     }
-    if (!file || !['image/png','image/jpeg','image/webp'].includes(file.type) || file.size>12*1024*1024) {
-      throw Error('只支持不超过 12 MB 的 PNG、JPG、WebP 图片');
-    }
-    const viewport=document.getElementById('canvas-viewport');
-    const zoom=state.zoom||1;
-    const offset=(projectNodes.length%5)*26;
-    const origin=window.HamokiViewport?.worldOrigin?.()||{left:0,top:0};
-    const x=Math.round(((viewport?.scrollLeft||0)-origin.left+(viewport?.clientWidth||600)/2)/zoom-145+offset);
-    const y=Math.round(((viewport?.scrollTop||0)-origin.top+(viewport?.clientHeight||450)/2)/zoom-145+offset);
-    const result=await api('/api/projects/'+projectId+'/assets',payload({
-      image:await fileData(file),name:file.name||'粘贴的参考图片',x,y,w:288,h:288
-    }));
-    selectedId=result.node?.id||selectedId;
-    await refresh();
-    toast('参考图片已从剪贴板加入画布，可直接拖动位置');
-    return result.node;
+    return added;
   }
   async function duplicateFromClipboard(record) {
     if (!projectId || record?.projectId!==projectId) throw Error('只能复制当前项目中的图片');
     const original=projectNodes.find(n=>n.id===record.nodeId&&n.kind!=='note');
     if (!original) throw Error('原图片节点已不存在');
+    if(currentLocal(original.id)){
+      record.pasteCount=(record.pasteCount||0)+1;
+      const copy=new File([currentLocal(original.id).blob],original.title||'副本',{type:currentLocal(original.id).blob.type});
+      return addReferenceFile(copy,{x:original.x+44*record.pasteCount,y:original.y+44*record.pasteCount});
+    }
     record.pasteCount=(record.pasteCount||0)+1;
     const delta=44*record.pasteCount;
     const result=await api('/api/projects/'+projectId+'/nodes/duplicate',payload({
@@ -1918,9 +2097,10 @@ for (const direction of ['nw','n','ne','e','se','s','sw','w']) {
         result.textContent='只支持不超过12MB的 PNG、JPG、WebP 图片';input.value='';return;
       }
       result.textContent='上传中…';
-      try {await api('/api/projects/'+projectId+'/assets',payload({image:await fileData(f),name:f.name,x:200,y:160}));
-        await refresh();toast('参考图片已添加');}
-      catch(e){result.textContent='上传失败：'+e.message;}
+      try{
+        addReferenceFile(f);
+        result.textContent='图片已放到画布，正在后台上传；可在图片上取消或重试';
+      }catch(e){result.textContent='导入失败：'+e.message;}
     });
     const grid=make('div','works-grid');content.append(grid);
     const references=projectNodes.filter(n=>n.kind==='reference');
@@ -2132,5 +2312,5 @@ for (const direction of ['nw','n','ne','e','se','s','sw','w']) {
       e.preventDefault();void deleteSelectedNodes([...selectedNodeIds]);
     });
   });
-  window.HamokiCanvas={refresh,findHistory,revealHistory,clearSelection:()=>focusNode(null),undo:()=>stepHistory(true),redo:()=>stepHistory(false),clear:clearCanvas,showWorks,showLibrary,addReferenceFile,duplicateFromClipboard,copySelectedImage,getProjectId:()=>projectId,toast,updatePopoverVisibility:scheduleResultPosition,beginPopoverMotion:beginResultMotion,endPopoverMotion:endResultMotion,bumpPopoverMotion:noteViewportMotion,allExtent:allCanvasExtent,fitWorldBounds:canvasFitBounds,scheduleVirtualRefresh:scheduleVirtualCanvas};
+  window.HamokiCanvas={refresh,findHistory,revealHistory,clearSelection:()=>focusNode(null),undo:()=>stepHistory(true),redo:()=>stepHistory(false),clear:clearCanvas,showWorks,showLibrary,addReferenceFile,addReferenceFiles,prepareGenerationReferences,duplicateFromClipboard,copySelectedImage,getProjectId:()=>projectId,toast,updatePopoverVisibility:scheduleResultPosition,beginPopoverMotion:beginResultMotion,endPopoverMotion:endResultMotion,bumpPopoverMotion:noteViewportMotion,allExtent:allCanvasExtent,fitWorldBounds:canvasFitBounds,scheduleVirtualRefresh:scheduleVirtualCanvas};
 })();

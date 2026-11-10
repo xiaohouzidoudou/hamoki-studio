@@ -562,12 +562,19 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
         if(projects.filter(x=>!x.archived).length<=1)throw Error('至少保留一个项目');p.archived=true;touchProject(p);return respond(res,200,{archived:true});
       }
       if(action==='assets'&&req.method==='POST'){
+        const b=await readJSON(req),importId=b.clientImportId;
+        if(importId!==undefined&&(typeof importId!=='string'||!/^[a-f0-9-]{36}$/.test(importId)))throw Error('图片导入标识无效');
+        if(importId){
+          if((p.cancelledImportIds||[]).includes(importId))return fail(res,409,'图片已取消上传');
+          const previous=p.nodes.find(node=>node.clientImportId===importId);
+          if(previous)return respond(res,200,{node:nodeView(previous),alreadyImported:true});
+        }
         if(p.nodes.length>=1800)throw Error('画布素材数量已达到上限');
-        const b=await readJSON(req),img=imageFromDataURL(b.image),file=storeMedia(img);
+        const img=imageFromDataURL(b.image),file=storeMedia(img);
         if(b.preview){try{storePreview(file,imageFromDataURL(b.preview))}catch(e){console.warn('[Hamoki] browser preview rejected:',String(e.message).slice(0,100))}}
         const parent=p.nodes.find(n=>n.id===b.parentNodeId);
          const position=parent&&parent.kind!=='note'&&(b.placement==='related'||(b.x===undefined&&b.y===undefined))?placeRelatedImage(p.nodes,{parentId:parent.id,width:num(b.w,288,90,1200),height:num(b.h,288,90,1200),gap:52}):posNode(b);
-         const node={id:crypto.randomUUID(),kind:'reference',assetFile:file,title:clampText(b.name||'参考图片',100),...position,createdAt:time(),parentNodeId:parent?.id||null};
+         const node={id:crypto.randomUUID(),kind:'reference',assetFile:file,title:clampText(b.name||'参考图片',100),...position,createdAt:time(),parentNodeId:parent?.id||null,...(importId?{clientImportId:importId}:{})};
         p.nodes.push(node);touchProject(p);return respond(res,201,{node:nodeView(node)});
       }
       if(action==='notes'&&req.method==='POST'){
@@ -581,6 +588,34 @@ async function handler(req,res){if(ALLOWED_HOST&&String(req.headers.host||'').sp
         const b=await readJSON(req),content=clampText(b.content,4000).trim();if(!content)throw Error('消息不能为空');
         const message={id:crypto.randomUUID(),role:'user',content,createdAt:time()};p.messages.push(message);p.messages=p.messages.slice(-400);touchProject(p);return respond(res,201,{message});
       }
+    }
+    // Abort the corresponding upload and invalidate a racing, already-accepted import.
+    const cancelImport=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/assets\/import\/([a-f0-9-]{36})$/);
+    if(cancelImport&&req.method==='DELETE'){
+      const p=assertProject(cancelImport[1]),id=cancelImport[2];
+      p.cancelledImportIds=p.cancelledImportIds||[];
+      if(!p.cancelledImportIds.includes(id))p.cancelledImportIds.push(id);
+      if(p.cancelledImportIds.length>2000)p.cancelledImportIds.splice(0,p.cancelledImportIds.length-2000);
+      const before=p.nodes.length;
+      const cancelled=p.nodes.filter(node=>node.clientImportId===id);
+      p.nodes=p.nodes.filter(node=>node.clientImportId!==id);
+      if(p.nodes.length!==before)cleanedGroups(p);
+      touchProject(p);
+      // Remove only this import's unreferenced bytes, never another user's artwork.
+      for(const node of cancelled){
+        const file=node.assetFile;
+        const usedByNode=projects.some(pr=>pr.nodes.some(other=>other.assetFile===file));
+        const usedByHistory=history.some(h=>h.file===file||(h.referenceMedia||[]).includes(file));
+        const usedByJob=jobs.some(job=>(job.referenceMedia||[]).includes(file));
+        if(file&&!usedByNode&&!usedByHistory&&!usedByJob){
+          try{fs.unlinkSync(mediaPath(file));}catch(e){if(e.code!=='ENOENT')console.warn('[Hamoki] import cleanup:',e.message);}
+          for(const ext of ['webp','jpg']){
+            try{fs.unlinkSync(previewPath(file,ext));}catch(e){if(e.code!=='ENOENT')console.warn('[Hamoki] preview cleanup:',e.message);}
+          }
+          usageCache=null;
+        }
+      }
+      return respond(res,200,{cancelled:true,removed:before-p.nodes.length});
     }
     // Atomic multi-node removal. Keep media and generation history intact.
     const removeSelection=route.match(/^\/api\/projects\/([a-f0-9-]{36})\/nodes\/selection$/);
