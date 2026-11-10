@@ -103,6 +103,13 @@
                     </svg>
                     去背景 / 修复
                 </button>
+                <button class="top-tool-btn image-converter-trigger" type="button" title="批量图片格式转换（本地处理）">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="12" height="12" rx="2"/>
+                        <path d="M9 9h11m-4-4 4 4-4 4M15 15H4m4-4-4 4 4 4"/>
+                    </svg>
+                    格式转换
+                </button>
             </div>
         </div>
 
@@ -339,6 +346,8 @@
     <script src="assets/result-floating-composer.js?v=pslite-20261110"></script>
     <script src="assets/result-image-editor.js?v=image-editor-2"></script>
     <script src="assets/ps-lite-editor.js?v=20261110-2"></script>
+    <script src="assets/image-converter.js?v=20261110-1"></script>
+    <script>document.addEventListener('click',function(e){if(e.target.closest('.image-converter-trigger'))window.HamokiImageConverter?.open();});</script>
     <script src="assets/canvas-rich-note.js?v=two-tone-1"></script>
     <!-- Original-image modal must load before canvas cards wire their double-click handlers. -->
     <script src="assets/canvas-original-preview.js?v=outside-corner-20261105"></script>
