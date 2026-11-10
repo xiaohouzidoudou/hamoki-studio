@@ -798,7 +798,7 @@
       }catch(error){say('打开扩图窗口失败：'+error.message,true);}
     }
     const act=async(action,button)=>{
-      if(action==='edit'){richPrompt.focus();return;}
+      if(action==='edit')return ctx.onAction('edit',{prompt:input.value,textarea:input,statusEl:footerMsg});
       if(action==='remove-bg'){prepareBackgroundRemoval();return;}
       if(action==='expand'){prepareAiOutpaint();return;}
       if(action==='download'){
