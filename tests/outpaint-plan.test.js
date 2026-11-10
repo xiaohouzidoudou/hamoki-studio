@@ -44,3 +44,15 @@ test('image model limits are checked before spending money',()=>{
   assert.throws(()=>plan(1024,1024,{right:200,left:200},'gpt-image-2'),/3:1/);
   assert.throws(()=>plan(1024,1024,{right:0},'gpt-image-2'),/扩展方向/);
 });
+test('never resize source for small, large, non-square or asymmetric requests',()=>{
+  for(const [w,h,m] of [[193,137,{right:40}],[1024,768,{left:10,right:30,top:20,bottom:15}],[3000,2000,{bottom:10}]]){
+    const p=plan(w,h,m,'gpt-image-2');
+    assert.deepEqual([p.original.w,p.original.h,p.scale],[w,h,1]);
+    const g=require('../assets/ai-outpaint-plan').geometry(w,h,m);
+    assert.ok(p.original.x>=g.left && p.width-p.original.x-w>=g.right);
+    assert.ok(p.original.y>=g.top && p.height-p.original.y-h>=g.bottom);
+  }
+  assert.throws(()=>plan(3900,2000,{right:20},'gpt-image-2'),/保留原图像素/);
+  assert.throws(()=>plan(1536,1024,{right:20},'gpt-image-1.5'),/无损扩图/);
+  assert.throws(()=>plan(512,512,{right:20},'some-unknown-model'),/尚未接入蒙版扩图/);
+});

@@ -24,5 +24,5 @@ test('modal submits a real transparent-region mask and the padded source',()=>{
 });
 test('planner is loaded before the modal script and all assets are cache-busted',()=>{
  assert.ok(html.indexOf('assets/ai-outpaint-plan.js')<html.indexOf('assets/ai-outpaint-dialog.js'));
- assert.match(html,/masked-20261106/);
+ assert.match(html,/preserve-20261106/);
 });
