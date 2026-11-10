@@ -31,13 +31,13 @@ function open(opt){
   const root=mk('div','psl-overlay'),app=mk('div','psl-app'),head=mk('div','psl-head'),foot=mk('div','psl-foot'),body=mk('div','psl-body'),tools=mk('div','psl-tools'),work=mk('div','psl-canvas-area'),settings=mk('div','psl-settings'),stage=mk('div','psl-stage'),selectMark=mk('div','psl-marquee'),status=mk('span','psl-status','正在载入原图…'),dim=mk('span','psl-status'),actions=mk('div','psl-row'),topActions=mk('div','psl-row');
   const source=canvas(1,1),ctx=source.getContext('2d',{willReadFrequently:true}),view=canvas(1,1),vctx=view.getContext('2d');
   let tool='select',sel=null,drag=null,scale=1,busy=false,loaded=false,done=false;
-  let adj={brightness:0,contrast:0,saturation:0,temperature:0,highlights:0,shadows:0};
+  let adj={brightness:0,exposure:0,contrast:0,saturation:0,temperature:0,highlights:0,shadows:0,sharpness:0};
   const undo=[],redo=[],sliders={},buttons={};
   const btn=(parent,label,act)=>{const b=mk('button',null,label);b.type='button';b.onclick=act;parent.append(b);return b;};
   head.append(mk('strong',null,'图片编辑 · PS Lite'),dim);
   const undoBtn=btn(topActions,'↶ 撤销',()=>history(true)),redoBtn=btn(topActions,'↷ 重做',()=>history(false));
   btn(topActions,'× 关闭',()=>close());head.append(topActions);
-  const toolsList=[['select','▧ 选区'],['crop','⌗ 裁剪'],['brush','✎ 画笔'],['eraser','◌ 橡皮擦'],['eyedropper','◉ 吸管'],['text','T 文字'],['rect','□ 矩形'],['ellipse','◯ 圆形'],['line','╱ 直线'],['arrow','↗ 箭头'],['mosaic','▦ 马赛克']];
+  const toolsList=[['select','▧ 选区'],['crop','⌗ 裁剪'],['brush','✎ 画笔'],['eraser','◌ 橡皮擦'],['eyedropper','◉ 吸管'],['text','T 文字'],['rect','□ 矩形'],['ellipse','◯ 圆形'],['line','╱ 直线'],['arrow','↗ 箭头'],['mosaic','▦ 马赛克'],['blur','◉ 局部模糊']];
   toolsList.forEach(([id,label])=>{buttons[id]=btn(tools,label,()=>choose(id));buttons[id].title=label;});
   function choose(t){tool=t;Object.keys(buttons).forEach(k=>buttons[k].setAttribute('aria-pressed',String(k===t)));status.textContent='已选择 '+t;}
   choose('select');
@@ -46,16 +46,18 @@ function open(opt){
   btn(tools,'调整尺寸',resize);
   stage.append(view,selectMark);work.append(stage);
   settings.append(mk('strong',null,'色彩调整'));
-  [['brightness','亮度'],['contrast','对比度'],['saturation','饱和度'],['temperature','色温'],['highlights','高光'],['shadows','阴影']].forEach(([k,title])=>{
+  [['brightness','亮度'],['exposure','曝光'],['contrast','对比度'],['saturation','饱和度'],['temperature','色温'],['highlights','高光'],['shadows','阴影'],['sharpness','锐化']].forEach(([k,title])=>{
    const label=mk('label'),val=mk('span',null,'0');label.append(mk('span',null,title),val);
    const input=mk('input');input.type='range';input.min=-100;input.max=100;input.value=0;input.step=1;
+   input.onpointerdown=()=>remember();input.onkeydown=e=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(e.key))remember();};
    input.oninput=()=>{adj[k]=Number(input.value);val.textContent=input.value;render();};sliders[k]={input,val};settings.append(label,input);
   });
-  btn(settings,'重置调色',()=>{adj=Object.fromEntries(Object.keys(adj).map(k=>[k,0]));refreshSliders();render();});
+  btn(settings,'重置调色',()=>{remember();adj=Object.fromEntries(Object.keys(adj).map(k=>[k,0]));refreshSliders();render();});
   const optRow=mk('div','psl-options'),color=mk('input'),width=mk('input'),wLabel=mk('span',null,'12px');
   color.type='color';color.value='#ffffff';color.title='画笔颜色';width.type='range';width.min=1;width.max=90;width.value=12;
   width.oninput=()=>wLabel.textContent=width.value+'px';optRow.append('画笔颜色',color,'大小',width,wLabel);settings.append(optRow);
-  const cropRow=mk('div','psl-options');
+  const cropRow=mk('div','psl-options'),ratio=mk('select');
+  [['free','自由比例'],['1','1:1'],['1.3333333333','4:3'],['1.7777777778','16:9'],['0.75','3:4']].forEach(([v,t])=>{const o=mk('option',null,t);o.value=v;ratio.append(o);});cropRow.append(ratio);
   btn(cropRow,'裁剪选区',()=>{try{cropSelected();}catch(e){status.textContent=e.message;}});
   btn(cropRow,'取消选区',()=>{sel=null;marquee();});settings.append(cropRow);
   const format=mk('select');[['image/png','PNG'],['image/jpeg','JPG'],['image/webp','WebP']].forEach(([v,t])=>{const o=mk('option',null,t);o.value=v;format.append(o);});
@@ -81,12 +83,21 @@ function open(opt){
    for(let i=0;i<d.length;i+=4){if(!d[i+3])continue;
     const lum=.2126*d[i]+.7152*d[i+1]+.0722*d[i+2];
     const tonal=lum>128?(lum-128)/127*adj.highlights*.34:(128-lum)/128*adj.shadows*.34;
-    let r=(d[i]-128)*contrast+128+adj.brightness*1.4+adj.temperature*.75+tonal;
-    let g=(d[i+1]-128)*contrast+128+adj.brightness*1.4+tonal;
-    let b=(d[i+2]-128)*contrast+128+adj.brightness*1.4-adj.temperature*.75+tonal;
+    const exposure=Math.pow(2,adj.exposure/65);
+    let r=((d[i]-128)*contrast+128)*exposure+adj.brightness*1.4+adj.temperature*.75+tonal;
+    let g=((d[i+1]-128)*contrast+128)*exposure+adj.brightness*1.4+tonal;
+    let b=((d[i+2]-128)*contrast+128)*exposure+adj.brightness*1.4-adj.temperature*.75+tonal;
     const gray=.2126*r+.7152*g+.0722*b;
     d[i]=C(gray+(r-gray)*sat,0,255);d[i+1]=C(gray+(g-gray)*sat,0,255);d[i+2]=C(gray+(b-gray)*sat,0,255);
-   }o.putImageData(im,0,0);return out;
+   }
+   if(adj.sharpness>0){
+    const copy=new Uint8ClampedArray(d),strength=adj.sharpness/180,w=out.width,h=out.height;
+    for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
+     const i=(y*w+x)*4;if(copy[i+3]<10)continue;
+     for(let c=0;c<3;c++)d[i+c]=C(copy[i+c]*(1+4*strength)-strength*(copy[i-4+c]+copy[i+4+c]+copy[i-w*4+c]+copy[i+w*4+c]),0,255);
+    }
+   }
+   o.putImageData(im,0,0);return out;
   }
   function marquee(){
    if(!sel){selectMark.style.display='none';return;}
@@ -111,6 +122,13 @@ function open(opt){
    const w=+m[1],h=+m[2];if(w<8||h<8||w>8192||h>8192||w*h>32000000){status.textContent='尺寸超出范围';return;}
    transform(old=>{ctx.imageSmoothingQuality='high';ctx.drawImage(old,0,0,w,h);},w,h);
   }
+  function constrainSelection(a,p){
+   if(tool!=='crop'||ratio.value==='free')return{x:a.x,y:a.y,x2:p.x,y2:p.y};
+   const r=Number(ratio.value),dx=p.x-a.x,dy=p.y-a.y;
+   let w=Math.min(Math.abs(dx),Math.abs(dy)*r),h=w/r;
+   w=Math.min(w,dx>=0?source.width-a.x:a.x);h=Math.min(h,dy>=0?source.height-a.y:a.y);
+   return{x:a.x,y:a.y,x2:a.x+Math.sign(dx||1)*w,y2:a.y+Math.sign(dy||1)*h};
+  }
   function cropSelected(){
    if(!sel)throw Error('请先框选裁剪区域');const x=Math.round(Math.min(sel.x,sel.x2)),y=Math.round(Math.min(sel.y,sel.y2)),w=Math.round(Math.abs(sel.x2-sel.x)),h=Math.round(Math.abs(sel.y2-sel.y));
    if(w<8||h<8)throw Error('裁剪区域至少8×8像素');remember();const data=ctx.getImageData(x,y,w,h);source.width=w;source.height=h;ctx.putImageData(data,0,0);sel=null;render();
@@ -127,6 +145,11 @@ function open(opt){
    const dx=b.x-a.x,dy=b.y-a.y;ctx.beginPath();
    if(t==='rect')ctx.strokeRect(a.x,a.y,dx,dy);
    else if(t==='ellipse'){ctx.ellipse((a.x+b.x)/2,(a.y+b.y)/2,Math.max(1,Math.abs(dx)/2),Math.max(1,Math.abs(dy)/2),0,0,2*Math.PI);ctx.stroke();}
+   else if(t==='blur'){
+    const x=Math.max(0,Math.floor(Math.min(a.x,b.x))),y=Math.max(0,Math.floor(Math.min(a.y,b.y))),w=Math.max(1,Math.floor(Math.abs(dx))),h=Math.max(1,Math.floor(Math.abs(dy)));
+    const copy=canvas(w,h);copy.getContext('2d').drawImage(source,x,y,w,h,0,0,w,h);
+    ctx.filter='blur('+Math.max(2,Number(width.value)/2)+'px)';ctx.drawImage(copy,0,0,w,h,x,y,w,h);ctx.filter='none';
+   }
    else if(t==='mosaic'){const x=Math.round(Math.min(a.x,b.x)),y=Math.round(Math.min(a.y,b.y)),w=Math.max(1,Math.round(Math.abs(dx))),h=Math.max(1,Math.round(Math.abs(dy))),small=canvas(Math.max(1,Math.round(w/12)),Math.max(1,Math.round(h/12)));small.getContext('2d').drawImage(source,x,y,w,h,0,0,small.width,small.height);ctx.imageSmoothingEnabled=false;ctx.drawImage(small,0,0,small.width,small.height,x,y,w,h);ctx.imageSmoothingEnabled=true;}
    else{ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();if(t==='arrow'){const ang=Math.atan2(dy,dx),sz=Math.max(10,Number(width.value)*2.7);ctx.beginPath();ctx.moveTo(b.x,b.y);ctx.lineTo(b.x-sz*Math.cos(ang-.45),b.y-sz*Math.sin(ang-.45));ctx.lineTo(b.x-sz*Math.cos(ang+.45),b.y-sz*Math.sin(ang+.45));ctx.closePath();ctx.fill();}}
    ctx.restore();
@@ -136,18 +159,18 @@ function open(opt){
    if(tool==='eyedropper'){const col=ctx.getImageData(Math.min(source.width-1,Math.floor(p.x)),Math.min(source.height-1,Math.floor(p.y)),1,1).data;color.value='#'+[col[0],col[1],col[2]].map(v=>v.toString(16).padStart(2,'0')).join('');status.textContent='吸取颜色：'+color.value;return;}
    if(tool==='text'){const t=prompt('输入文字');if(!t)return;remember();ctx.save();ctx.fillStyle=color.value;ctx.font=Math.max(14,Number(width.value)*2)+'px system-ui,sans-serif';ctx.textBaseline='top';t.split('\n').slice(0,10).forEach((v,i)=>ctx.fillText(v,p.x,p.y+i*Math.max(17,Number(width.value)*2.6)));ctx.restore();render();return;}
    if(!['select','crop'].includes(tool))remember();
-   drag={start:p,last:p,tool,original:['rect','ellipse','line','arrow','mosaic'].includes(tool)?ctx.getImageData(0,0,source.width,source.height):null};
+   drag={start:p,last:p,tool,original:['rect','ellipse','line','arrow','mosaic','blur'].includes(tool)?ctx.getImageData(0,0,source.width,source.height):null};
    if(['brush','eraser'].includes(tool))stroke(p,p);
    try{view.setPointerCapture(e.pointerId);}catch(_){}
    e.preventDefault();
   });
   view.addEventListener('pointermove',e=>{
    if(!drag)return;const p=pos(e);
-   if(['select','crop'].includes(drag.tool)){sel={x:drag.start.x,y:drag.start.y,x2:p.x,y2:p.y};marquee();}
+   if(['select','crop'].includes(drag.tool)){sel=constrainSelection(drag.start,p);marquee();}
    else if(['brush','eraser'].includes(drag.tool)){stroke(drag.last,p);drag.last=p;render();}
    else if(drag.original){ctx.putImageData(drag.original,0,0);shape(drag.start,p,drag.tool);render();}
   });
-  function endPointer(e){if(!drag)return;const p=pos(e);if(['select','crop'].includes(drag.tool)){sel={x:drag.start.x,y:drag.start.y,x2:p.x,y2:p.y};marquee();}
+  function endPointer(e){if(!drag)return;const p=pos(e);if(['select','crop'].includes(drag.tool)){sel=constrainSelection(drag.start,p);marquee();}
    else if(['brush','eraser'].includes(drag.tool)){stroke(drag.last,p);render();}
    else if(drag.original){ctx.putImageData(drag.original,0,0);shape(drag.start,p,drag.tool);render();}
    drag=null;}
