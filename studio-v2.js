@@ -2060,8 +2060,7 @@ for (const direction of ['nw','n','ne','e','se','s','sw','w']) {
       top[2].title='添加画布富文本 / 反推提示词块';
       top[2].addEventListener('click',addNote);
     }
-    if (top[3]) top[3].addEventListener('click',()=>document.querySelector('.zoom-btn:last-child')?.click());
-    if (top[4]) {top[4].disabled=true;top[4].title='去背景和修复需要专门的模型接口，暂不可用';}
+    if (top[3]) {top[3].disabled=true;top[3].title='去背景和修复需要专门的模型接口，暂不可用';}
     const icons=document.querySelectorAll('.right-section > .icon-btn');
     if (icons[0]) {
       icons[0].title='撤销上一笔图片移动或尺寸调整';
