@@ -1096,12 +1096,40 @@ function initImageClipboard() {
             if (event.target === viewport || event.target.id === 'canvas') viewport.focus({preventScroll:true});
         });
     }
+    if(viewport){
+        let depth=0;
+        viewport.addEventListener('dragenter',event=>{
+            if(!Array.from(event.dataTransfer?.types||[]).includes('Files'))return;
+            event.preventDefault();depth++;viewport.classList.add('canvas-import-dragging');
+        });
+        viewport.addEventListener('dragover',event=>{
+            if(Array.from(event.dataTransfer?.types||[]).includes('Files'))event.preventDefault();
+        });
+        viewport.addEventListener('dragleave',event=>{
+            event.preventDefault();depth=Math.max(0,depth-1);
+            if(!depth)viewport.classList.remove('canvas-import-dragging');
+        });
+        viewport.addEventListener('drop',event=>{
+            event.preventDefault();event.stopPropagation();depth=0;
+            viewport.classList.remove('canvas-import-dragging');
+            const files=Array.from(event.dataTransfer?.files||[]).filter(f=>REFERENCE_MIME_TYPES.has(f.type));
+            if(!files.length)return;
+            const zoom=state.zoom||1;
+            const bounds=viewport.getBoundingClientRect();
+            const origin=window.HamokiViewport?.worldOrigin?.()||{left:0,top:0};
+            const x=Math.round((viewport.scrollLeft+event.clientX-bounds.left-origin.left)/zoom-144);
+            const y=Math.round((viewport.scrollTop+event.clientY-bounds.top-origin.top)/zoom-144);
+            window.HamokiCanvas?.addReferenceFiles(files,{x,y});
+        });
+    }
     document.addEventListener('paste', event => {
         if (document.body.classList.contains('hs-modal-open') || document.body.classList.contains('flow-mode')) return;
         const items=Array.from(event.clipboardData?.items || []);
         const item = items
             .find(entry => entry.kind === 'file' && ['image/png','image/jpeg','image/webp'].includes(entry.type));
-        const pastedOnCanvas = !!(viewport && (viewport.contains(event.target) || document.activeElement === viewport));
+        const editable=!!event.target.closest?.('input,textarea,select,[contenteditable]');
+        if(editable)return;
+        const pastedOnCanvas=!!viewport;
         if (!item) {
             // For clipboard-denied browsers, the internal copy shortcut works only
             // when there is no unrelated text/file data in the current clipboard.
@@ -1114,14 +1142,11 @@ function initImageClipboard() {
         if(!original)return;
         event.preventDefault();
         if(pastedOnCanvas){
-            void (async()=>{
-                try{
-                    const record=await window.HamokiImageClipboard?.match(original,window.HamokiCanvas?.getProjectId());
-                    if(record){await window.HamokiCanvas.duplicateFromClipboard(record);return;}
-                    if(original.size>12*1024*1024)throw Error('图片超过 12 MB，请先压缩；本项目内部复制的图片可直接复用原始素材');
-                    await window.HamokiCanvas.addReferenceFile(original);
-                }catch(error){void window.HamokiGlassUI.alert('图片粘贴失败：'+error.message);}
-            })();
+            try{
+                // Materialize a local preview before any async hashing or transport.
+                if(original.size>12*1024*1024)throw Error('图片超过 12 MB，请先压缩');
+                window.HamokiCanvas.addReferenceFile(original);
+            }catch(error){void window.HamokiGlassUI.alert('图片粘贴失败：'+error.message);}
             return;
         }
         if (original.size > 12 * 1024 * 1024) {
@@ -1197,6 +1222,8 @@ async function submitJob() {
 
         // Send every surviving thumbnail, in its visual order, to the existing
         // multi-reference server API. A deleted thumbnail is never submitted.
+        // Cropped images are retained locally until this explicit generation submission.
+        await window.HamokiCanvas?.prepareGenerationReferences?.(referenceFiles);
         const references = await Promise.all(referenceFiles.map(file =>
             new Promise((resolve, reject) => {
                 const reader = new FileReader();
