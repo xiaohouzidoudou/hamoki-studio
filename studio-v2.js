@@ -158,11 +158,10 @@
   }
   function canvasDisplayModel() {
     const bounds=worldViewport(),relations=stackRelations();
-    const nodes=projectNodes.filter(node=>!relations.hidden(node)&&touchesViewport(node,bounds));
-    const stacks=[...relations.groups.values()].filter(group=>
-      !relations.hidden(group.parent)&&touchesViewport(group.parent,bounds));
-    const signature=nodes.map(n=>n.id).join('|')+' / '+stacks.map(g=>g.key+(expandedStacks.has(g.key)?'+':'-')).join('|');
-    return {nodes,stacks,relations,signature};
+    // All images remain visible; viewport virtualization still avoids offscreen DOM work.
+    const nodes=projectNodes.filter(node=>touchesViewport(node,bounds));
+    const signature=nodes.map(n=>n.id).join('|');
+    return {nodes,stacks:[],relations,signature};
   }
   function scheduleVirtualCanvas() {
     if(viewportRefreshFrame || dragging)return;
@@ -172,17 +171,7 @@
       if(canvasDisplayModel().signature!==canvasViewportSignature)renderCanvas('viewport');
     });
   }
-  function visibleAncestor(node) {
-    const model=stackRelations();
-    let current=node,visited=new Set();
-    while(current && !visited.has(current.id)){
-      visited.add(current.id);
-      const rel=model.byChild.get(current.id);
-      if(!rel||expandedStacks.has(rel.key))break;
-      current=rel.parent;
-    }
-    return current||node;
-  }
+  function visibleAncestor(node) { return node; }
   function allCanvasExtent() {
     let maxX=0,maxY=0;
     for(const node of projectNodes){
@@ -192,9 +181,8 @@
     return {maxX,maxY};
   }
   function canvasFitBounds() {
-    const relationships=stackRelations(),selected=selectedNodeIds.size;
-    const nodes=projectNodes.filter(node=>selected
-      ?selectedNodeIds.has(node.id):!relationships.hidden(node));
+    const selected=selectedNodeIds.size;
+    const nodes=projectNodes.filter(node=>!selected||selectedNodeIds.has(node.id));
     if(!nodes.length)return null;
     return {minX:Math.min(...nodes.map(n=>Number(n.x)||0)),
       minY:Math.min(...nodes.map(n=>Number(n.y)||0)),
@@ -1394,15 +1382,14 @@
     const oldCards=incremental
       ?new Map([...area.querySelectorAll('.canvas-node[data-id]')].map(card=>[card.dataset.id,card]))
       :new Map();
-    const oldStacks=incremental
-      ?new Map([...area.querySelectorAll('.canvas-derived-stack')].map(card=>[card.dataset.stackKey,card]))
-      :new Map();
+    // Remove legacy folded-image controls during incremental redraws too.
+    area.querySelectorAll('.canvas-derived-stack').forEach(control=>control.remove());
     if(!incremental){
       canvasPreviewObserver?.disconnect();
       window.HamokiRichNote?.resetNodes();
       area.replaceChildren();
     }
-    const display=canvasDisplayModel(),keepNodes=new Set(),keepStacks=new Set();
+    const display=canvasDisplayModel(),keepNodes=new Set();
     canvasViewportSignature=display.signature;
     if (!projectNodes.length) {
       closeResultPopovers();
@@ -1437,12 +1424,7 @@
       card.style.height = (Number(node.h) || 288) + 'px';
       card.tabIndex = 0;
       card.classList.toggle('selected',selectedNodeIds.has(node.id));
-      if(animatedStackKey && display.relations.byChild.get(node.id)?.key===animatedStackKey){
-        card.classList.add('canvas-branch-appear');
-        const rel=display.relations.byChild.get(node.id);
-        card.style.setProperty('--branch-offset',rel?.key.endsWith(':above')?'40px':'-40px');
-        card.style.animationDelay=Math.min(180,display.nodes.indexOf(node)*16)+'ms';
-      }else card.classList.add('canvas-node-appear');
+      card.classList.add('canvas-node-appear');
       // A non-interactive SVG draws one continuous outline from the top-left corner.
       // Keep it inside the card: canvas dragging, resize handles and click targets remain unchanged.
       if (node.kind !== 'note') {
@@ -1746,21 +1728,6 @@ for (const direction of ['nw','n','ne','e','se','s','sw','w']) {
       if(image)canvasPreviewObserver?.unobserve(image);
       card.remove();
     }
-    for(const group of display.stacks){
-      keepStacks.add(group.key);
-      const previous=oldStacks.get(group.key);
-      if(previous){
-        const open=expandedStacks.has(group.key);
-        previous.classList.toggle('expanded',open);
-        previous.setAttribute('aria-expanded',String(open));
-        previous.title=(open?'收起':'展开')+(group.direction==='above'?'上方':'下方')+'的'+group.nodes.length+'张衍生图';
-        previous.setAttribute('aria-label',previous.title);
-        positionStack(group,previous,open);
-        continue;
-      }
-      area.append(makeStack(group));
-    }
-    if(incremental)for(const [key,stack] of oldStacks)if(!keepStacks.has(key))stack.remove();
     window.HamokiCanvasGroups?.render?.(area,{projectId,groups:projectGroups,nodes:projectNodes,bounds:worldViewport(),zoom:()=>state.zoom||1,refresh,toast,clearSelection:()=>focusNode(null)});
     renderSourceLinks(area);
     window.HamokiGenerationFrames?.mount(area);
